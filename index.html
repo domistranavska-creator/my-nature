@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Môj prírodný svet</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  >
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero__overlay"></div>
+      <div class="hero__content hero__content--with-weather">
+        <div class="hero__text">
+          <h1>Môj prírodný svet</h1>
+        </div>
+        <div class="hero__weather">
+          <div class="main-menu-weather-mini main-menu-weather-mini--hero" id="hero-weather-mini"></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="utility-bar">
+        <div class="menu-toolbar">
+          <div class="menu-toolbar__left">
+            <button class="button button--toolbar-home" id="open-main-menu" type="button" hidden>Hlavné menu</button>
+          </div>
+          <div class="menu-toolbar__center">
+            <div class="menu-toolbar__group menu-toolbar__group--primary">
+              <details class="toolbar-add-menu" id="toolbar-add-menu">
+                <summary class="button button--toolbar-add toolbar-add-menu__summary">Pridať</summary>
+                <div class="toolbar-add-menu__panel">
+                  <button class="button button--ghost toolbar-add-menu__action" id="open-add-card" type="button">Pridať kartu</button>
+                  <button class="button button--ghost toolbar-add-menu__action" id="open-add-category" type="button">Pridať kategóriu</button>
+                  <details class="toolbar-add-submenu" id="toolbar-batch-menu" hidden>
+                    <summary class="button button--ghost toolbar-add-menu__action toolbar-add-menu__action--batch">Hromadné akcie</summary>
+                    <div class="toolbar-add-submenu__panel">
+                      <button class="button button--ghost toolbar-add-menu__action toolbar-add-menu__action--batch" id="open-batch-sowing" type="button">Hromadný výsev</button>
+                      <button class="button button--ghost toolbar-add-menu__action toolbar-add-menu__action--batch" id="open-batch-move" type="button">Hromadný presun kariet</button>
+                    </div>
+                  </details>
+                </div>
+              </details>
+              <button class="button button--ghost button--toolbar-utility" id="toggle-worklog-panel" type="button">Plán práce</button>
+              <button class="button button--ghost button--toolbar-utility" id="toggle-journal-panel" type="button">Denník</button>
+            </div>
+          </div>
+        </div>
+        <div class="utility-bar__settings">
+          <div class="menu-toolbar__group menu-toolbar__group--settings" id="menu-toolbar-settings-slot"></div>
+        </div>
+      </section>
+
+      <section class="panel panel--menu" id="menu-panel">
+        <nav id="main-menu" class="main-menu"></nav>
+      </section>
+
+      <section class="workspace-layout">
+        <div class="workspace-main">
+          <section class="panel">
+            <div class="panel__header panel__header--catalog is-hidden" id="catalog-header">
+              <div class="catalog-toolbar">
+                <span class="catalog-toolbar__label">Filtrovanie odrôd</span>
+                <span class="catalog-toolbar__context" id="catalog-context">Aktuálna kategória</span>
+              </div>
+              <details class="filter-disclosure" id="filter-disclosure">
+                <summary class="filter-disclosure__summary">
+                  <span>Filtre</span>
+                  <span class="filter-disclosure__value" id="active-filter-label">Všetko</span>
+                </summary>
+                <div class="filters filters--compact">
+                  <button class="filter is-active" data-filter="all" type="button">Všetko</button>
+                  <button class="filter" data-filter="sown" type="button">Vysiate</button>
+                  <button class="filter" data-filter="favorite" type="button">Top odrody</button>
+                  <button class="filter" data-filter="avoid" type="button">Nechcem ďalší rok</button>
+                </div>
+              </details>
+            </div>
+            <div id="catalog" class="catalog-shell"></div>
+          </section>
+        </div>
+
+        <aside class="workspace-side">
+          <section class="panel panel--glass panel--sticky">
+            <div class="panel__header">
+              <div>
+                <h2>Sezóna 2026</h2>
+              </div>
+            </div>
+
+            <article class="season-card season-card--memories">
+              <div class="season-card__head">
+                <h3>Spomienky</h3>
+                <button class="button button--ghost mini-list__more mini-list__more--inline" type="button" id="open-all-journal-from-memories">Otvoriť denník</button>
+              </div>
+              <div id="memory-strip" class="memory-strip"></div>
+              <div id="insight-strip" class="insight-strip"></div>
+            </article>
+
+            <div id="progress-overview" class="progress-overview"></div>
+
+            <div class="season-grid season-grid--sidebar">
+              <article class="season-card">
+                <h3>Denník</h3>
+                <div id="journal-sidebar" class="mini-list"></div>
+              </article>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="detail-modal" class="detail-modal">
+    <form method="dialog" class="detail-modal__backdrop">
+      <button class="detail-modal__close" type="submit" aria-label="Zavrieť detail">x</button>
+    </form>
+    <div class="detail-modal__content" id="detail-content"></div>
+  </dialog>
+
+  <dialog class="image-lightbox" id="image-lightbox">
+    <button class="image-lightbox__close" id="image-lightbox-close" type="button" aria-label="Zavrieť fotku">×</button>
+    <button class="image-lightbox__nav image-lightbox__nav--prev" id="image-lightbox-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
+    <figure class="image-lightbox__figure">
+      <img class="image-lightbox__image" id="image-lightbox-image" src="" alt="">
+      <figcaption class="image-lightbox__count" id="image-lightbox-count"></figcaption>
+    </figure>
+    <button class="image-lightbox__nav image-lightbox__nav--next" id="image-lightbox-next" type="button" aria-label="Ďalšia fotka">&#8250;</button>
+  </dialog>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
