@@ -417,15 +417,15 @@ function hydrateWalkMaps(root = document) {
     if (normalizedPoints.length < 1) return;
 
     const map = window.L.map(mapEl, {
-      zoomControl: false,
+      zoomControl: true,
       attributionControl: true,
-      dragging: !mapEl.classList.contains("journal-walk__map--compact"),
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
+      dragging: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
       boxZoom: false,
       keyboard: false,
-      tap: false,
-      touchZoom: !mapEl.classList.contains("journal-walk__map--compact")
+      tap: true,
+      touchZoom: true
     });
 
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -638,6 +638,35 @@ const journalListEl = document.getElementById("journal-list");
 const detailModal = document.getElementById("detail-modal");
 const detailContent = document.getElementById("detail-content");
 const imageLightboxEl = document.getElementById("image-lightbox");
+let activeOverlayHistoryKind = "";
+let overlayHistoryNavigating = false;
+
+function pushOverlayHistory(kind = "") {
+  const normalizedKind = String(kind || "").trim();
+  if (!normalizedKind || typeof window === "undefined" || !window.history?.pushState) return;
+  if (activeOverlayHistoryKind === normalizedKind) return;
+  window.history.pushState({ ...(window.history.state || {}), __mzOverlay: normalizedKind }, "");
+  activeOverlayHistoryKind = normalizedKind;
+}
+
+function clearOverlayHistory(kind = "", { fromHistory = false } = {}) {
+  const normalizedKind = String(kind || "").trim();
+  if (!normalizedKind || activeOverlayHistoryKind !== normalizedKind) return;
+  activeOverlayHistoryKind = "";
+  if (fromHistory || typeof window === "undefined" || !window.history?.back) return;
+  overlayHistoryNavigating = true;
+  window.history.back();
+  window.setTimeout(() => {
+    overlayHistoryNavigating = false;
+  }, 0);
+}
+
+function openDetailModalDialog() {
+  if (!detailModal.open) {
+    pushOverlayHistory("detail");
+    detailModal.showModal();
+  }
+}
 const imageLightboxImageEl = document.getElementById("image-lightbox-image");
 const imageLightboxCountEl = document.getElementById("image-lightbox-count");
 const imageLightboxCloseEl = document.getElementById("image-lightbox-close");
@@ -741,7 +770,8 @@ function handleJournalOverlayEscape(event) {
   closeJournalOverlay();
 }
 
-function closeJournalOverlay() {
+function closeJournalOverlay(options = {}) {
+  const { fromHistory = false } = options;
   const root = journalOverlayRoot();
   if (root) root.remove();
   if (journalOverlayPreviousOverflow !== null) {
@@ -749,6 +779,11 @@ function closeJournalOverlay() {
     journalOverlayPreviousOverflow = null;
   }
   document.removeEventListener("keydown", handleJournalOverlayEscape);
+  if (!fromHistory) {
+    clearOverlayHistory("journal");
+  } else if (activeOverlayHistoryKind === "journal") {
+    activeOverlayHistoryKind = "";
+  }
 }
 
 function ensureJournalOverlayRoot() {
@@ -756,18 +791,7 @@ function ensureJournalOverlayRoot() {
   if (!root) {
     root = document.createElement("div");
     root.id = "journal-overlay-root";
-    root.style.cssText = [
-      "position:fixed",
-      "inset:0",
-      "z-index:450",
-      "display:flex",
-      "align-items:flex-start",
-      "justify-content:center",
-      "padding:18px 12px 28px",
-      "background:rgba(22,29,18,0.58)",
-      "backdrop-filter:blur(6px)",
-      "overflow:auto"
-    ].join(";");
+    root.className = "journal-overlay-root";
     root.addEventListener("click", (event) => {
       if (event.target === root) closeJournalOverlay();
     });
@@ -780,21 +804,22 @@ function ensureJournalOverlayRoot() {
   document.body.style.overflow = "hidden";
   document.removeEventListener("keydown", handleJournalOverlayEscape);
   document.addEventListener("keydown", handleJournalOverlayEscape);
+  pushOverlayHistory("journal");
   return root;
 }
 
 function journalOverlayFrame(title, bodyHtml, actionsHtml = "") {
   return `
-    <section style="position:relative;width:min(1080px,100%);margin-top:18px;border-radius:32px;border:1px solid rgba(122,103,74,0.16);background:linear-gradient(180deg, rgba(250,246,237,0.98), rgba(242,236,223,0.98));box-shadow:0 26px 54px rgba(22,29,18,0.28);padding:22px 22px 24px;">
-      <button type="button" id="journal-overlay-close" aria-label="Zavrieť denník" style="position:absolute;top:-14px;right:-14px;width:42px;height:42px;border-radius:999px;border:1px solid rgba(34,34,34,0.18);background:rgba(255,250,240,0.99);color:#1a1a1a;font-weight:900;cursor:pointer;box-shadow:0 14px 28px rgba(22,29,18,0.18), inset 0 1px 0 rgba(255,255,255,0.96);">x</button>
+    <section class="journal-overlay-shell">
+      <button type="button" id="journal-overlay-close" class="journal-overlay-shell__close" aria-label="Zavrieť denník">x</button>
       <div class="journal-overlay-frame__head">
         <div class="journal-overlay-frame__title-block">
-          <h3 id="journal-overlay-title" style="margin:0;font-size:2rem;line-height:1.05;color:#1f2918;">${escapeHtml(title)}</h3>
+          <h3 id="journal-overlay-title">${escapeHtml(title)}</h3>
         </div>
         <div class="journal-overlay-frame__actions">${actionsHtml}</div>
         <div id="journal-overlay-header-weather" class="add-entry-form__weather--head journal-overlay-header-weather" hidden></div>
       </div>
-      <div id="journal-overlay-body" style="display:grid;gap:14px;min-width:0;">${bodyHtml}</div>
+      <div id="journal-overlay-body" class="journal-overlay-shell__body">${bodyHtml}</div>
     </section>
   `;
 }
@@ -1116,7 +1141,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
         </label>
         <label class="upload-field upload-field--compact">
           <span class="upload-field__label">Video k zápisu</span>
-          <input name="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
+          <input name="videoFile" type="file" accept="video/*" capture="environment">
         </label>
         <div id="journal-overlay-video-status" class="journal-upload-status" hidden>
           <div class="journal-upload-status__topline">
@@ -1376,10 +1401,12 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
       walkGpsLiveMap = window.L.map(mapEl, {
         zoomControl: true,
         attributionControl: true,
-        scrollWheelZoom: false,
+        scrollWheelZoom: true,
         dragging: true,
-        doubleClickZoom: false,
-        keyboard: false
+        doubleClickZoom: true,
+        keyboard: false,
+        tap: true,
+        touchZoom: true
       });
       walkGpsLiveTileLayer = window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -2008,10 +2035,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
           tags: form.get("tags"),
           weatherCondition: weatherSnapshot?.condition || ""
         }));
-      const walkPlace = walk
-        ? [walk.startPlace, walk.endPlace].filter(Boolean).join(" → ")
-        : "";
-
       let video = existingVideo;
       let videoPath = existingVideoPath;
       let videoName = existingVideoName;
@@ -2076,7 +2099,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
         linkedCategoryId,
         linkedVarietyId,
         mood: String(form.get("mood") || "").trim(),
-        place: String(form.get("place") || "").trim() || (selectedEntryType === "walk" ? walkPlace : ""),
+        place: String(form.get("place") || "").trim(),
         weather: weatherSnapshot,
         walk,
         video,
@@ -2451,6 +2474,33 @@ function wireStaticEvents() {
 
   detailModal.addEventListener("cancel", (event) => {
     event.preventDefault();
+  });
+
+  detailModal.addEventListener("close", () => {
+    if (!overlayHistoryNavigating) {
+      clearOverlayHistory("detail");
+      return;
+    }
+    if (activeOverlayHistoryKind === "detail") activeOverlayHistoryKind = "";
+  });
+
+  window.addEventListener("popstate", () => {
+    if (activeOverlayHistoryKind === "journal" && journalOverlayRoot()) {
+      overlayHistoryNavigating = true;
+      closeJournalOverlay({ fromHistory: true });
+      window.setTimeout(() => {
+        overlayHistoryNavigating = false;
+      }, 0);
+      return;
+    }
+    if (activeOverlayHistoryKind === "detail" && detailModal.open) {
+      overlayHistoryNavigating = true;
+      activeOverlayHistoryKind = "";
+      detailModal.close();
+      window.setTimeout(() => {
+        overlayHistoryNavigating = false;
+      }, 0);
+    }
   });
 
   document.addEventListener("click", (event) => {
@@ -5486,7 +5536,7 @@ function openTaskManager() {
 
   setTaskEditorOpen(false);
   rerenderTaskManager();
-  if (!detailModal.open) detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function openJournalManager() {
@@ -5891,7 +5941,7 @@ function openAddEntryFlow(editingEntryId = "") {
     detailModal.close();
   });
 
-  if (!detailModal.open) detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function openThingBrowser() {
@@ -5920,7 +5970,7 @@ function openThingBrowser() {
   detailContent.querySelectorAll("[data-open-browser-thing]").forEach((button) => {
     button.addEventListener("click", () => openThingOverview(button.dataset.openBrowserThing || ""));
   });
-  if (!detailModal.open) detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function openThingOverview(thingKey) {
@@ -6032,7 +6082,7 @@ function openThingOverview(thingKey) {
     });
   });
 
-  if (!detailModal.open) detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function openSownOverviewModal(items) {
@@ -6134,7 +6184,7 @@ function openVarietyOverviewModal({ title, items, emptyMessage, detailBuilder })
 
   renderOverviewGroups();
   bindMiniVarietyOpen(listEl);
-  detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function openCategoryManager(categoryId = null, forcedParentId = "") {
@@ -6391,7 +6441,7 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
     }
   }
 
-  detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntryKind = "detail") {
@@ -6785,7 +6835,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     });
   }
 
-  detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function openBatchSowingManager(categoryId = activeCategoryId) {
@@ -7019,7 +7069,7 @@ function openBatchSowingManager(categoryId = activeCategoryId) {
     detailModal.close();
   });
 
-  detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function openBatchMoveManager(categoryId = activeCategoryId) {
@@ -7180,7 +7230,7 @@ function openBatchMoveManager(categoryId = activeCategoryId) {
   }
 
   renderMoveList();
-  detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function deleteCategory(categoryId) {
@@ -8497,7 +8547,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     }
   });
 
-  if (!detailModal.open) detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function getStoredEbirdApiKey() {
@@ -9372,7 +9422,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
   };
 
   renderEditor();
-  detailModal.showModal();
+  openDetailModalDialog();
 }
 
 function resolveBatchSowingCategoryId() {
@@ -14539,7 +14589,7 @@ function openWeatherOverviewModal(options = {}) {
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--weather");
   detailContent.innerHTML = renderWeatherOverviewLoadingMarkup();
-  if (!detailModal.open) detailModal.showModal();
+  openDetailModalDialog();
 
   Promise.all([
     loadHomeWeatherSnapshot(Boolean(options.forceReload)),
