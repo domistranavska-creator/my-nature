@@ -13,6 +13,21 @@ const LOCAL_AUTH_SESSION_KEY = "moja-zahrada-local-auth-session-v1";
 const SUPABASE_PREFERENCES_KEY = "moja-zahrada-supabase-preferences-v1";
 const SUPABASE_AUTH_MIRROR_KEY = "moja-zahrada-supabase-auth-mirror-v1";
 const SUPABASE_SYNC_META_KEY = "moja-zahrada-supabase-sync-meta-v1";
+const UI_MOBILE_PREVIEW_KEY = "moja-zahrada-mobile-preview-v1";
+const MOBILE_WEATHER_THEME_DEBUG_KEY = "moja-zahrada-mobile-weather-theme-debug-v1";
+const MOBILE_WEATHER_THEME_CLOUD_KEY = "moja-zahrada-mobile-weather-cloud-debug-v1";
+const MOBILE_WEATHER_THEME_DEBUG_PERIOD_KEY = "moja-zahrada-mobile-weather-theme-period-debug-v1";
+const MOBILE_WEATHER_THEME_DEBUG_WIND_KEY = "moja-zahrada-mobile-weather-wind-debug-v1";
+const MOBILE_WEATHER_THEME_DEBUG_PRECIP_KEY = "moja-zahrada-mobile-weather-precip-debug-v1";
+const MOBILE_WEATHER_THEME_DEBUG_TEMP_KEY = "moja-zahrada-mobile-weather-temp-debug-v1";
+const MOBILE_WEATHER_THEME_DEBUG_PHASE_KEY = "moja-zahrada-mobile-weather-phase-debug-v1";
+const MOBILE_WEATHER_THEME_DEBUG_MOON_KEY = "moja-zahrada-mobile-weather-moon-debug-v1";
+const MOBILE_WEATHER_THEME_SEASON_KEY = "moja-zahrada-mobile-weather-season-debug-v1";
+const MOBILE_WEATHER_SCENE_ONLY_KEY = "moja-zahrada-mobile-weather-scene-only-v1";
+const MOBILE_WEATHER_SOUND_KEY = "moja-zahrada-mobile-weather-sound-v1";
+const MOBILE_WEATHER_SOUND_VOLUME_KEY = "moja-zahrada-mobile-weather-sound-volume-v1";
+const IMAGE_FILE_ACCEPT = "image/*,.jpg,.jpeg,.png,.webp,.heic,.heif";
+const VIDEO_FILE_ACCEPT = "video/*,.mp4,.mov,.m4v,.webm,.3gp";
 const SUPABASE_IMAGE_BUCKET = "mojazahrada-images";
 const SUPABASE_VIDEO_FILE_LIMIT_BYTES = 100 * 1024 * 1024;
 const GARDEN_WEATHER_PLACE = "Zákopčie, Slovensko";
@@ -22,6 +37,68 @@ const RESET_BACKUP_KEY = "moja-zahrada-reset-backup-v1";
 const IMAGE_BACKGROUND_MIGRATION_KEY = "moja-zahrada-white-bg-v1";
 const FALLBACK_CATEGORY_ID = "cat-nezaradene";
 const ROOT_CATEGORY_IDS = ["root-zahrada", "root-priroda", "root-uroda", "root-ine"];
+const ICONS = {
+  moodJoy: "\uD83D\uDE0A",
+  moodCalm: "\uD83D\uDE0C",
+  moodGratitude: "\uD83D\uDE4F",
+  moodExcitement: "\uD83E\uDD29",
+  moodLove: "\uD83E\uDD70",
+  moodWorry: "\uD83D\uDE1F",
+  moodSadness: "\uD83D\uDE14",
+  moodAnger: "\uD83D\uDE20",
+  moodTired: "\uD83D\uDE34",
+  moodSurprise: "\uD83D\uDE2E",
+  weatherTemp: "\uD83C\uDF21\uFE0F",
+  weatherRain: "\uD83C\uDF27\uFE0F",
+  weatherWind: "\uD83C\uDF2C\uFE0F",
+  weatherStorm: "\u26C8\uFE0F",
+  weatherSnow: "\uD83C\uDF28\uFE0F",
+  weatherMist: "\uD83C\uDF2B\uFE0F",
+  weatherCloud: "\u2601\uFE0F",
+  weatherSun: "\u2600\uFE0F",
+  weatherMoon: "\uD83C\uDF19",
+  weatherPartly: "\u26C5",
+  walkStart: "\u25B6\uFE0F",
+  walkPause: "\u23F8\uFE0F",
+  walkResume: "\u23EF\uFE0F",
+  walkStop: "\u23F9\uFE0F",
+  walkRoute: "\uD83D\uDDFA\uFE0F",
+  walkDuration: "\u23F1\uFE0F",
+  walkGps: "\uD83D\uDCCD",
+  categoryGarden: "\uD83C\uDF31",
+  categoryNature: "\uD83C\uDF3F",
+  categoryHarvest: "\uD83C\uDF4E",
+  categoryOther: "\uD83D\uDCC1",
+  categoryUseful: "\uD83E\uDD55",
+  categoryFlowers: "\uD83C\uDF38",
+  categoryPests: "\uD83D\uDC1B",
+  categoryMushrooms: "\uD83C\uDF44",
+  categoryWildPlants: "\uD83C\uDF3F",
+  categoryBirds: "\uD83D\uDC26",
+  categoryInsects: "\uD83E\uDD8B",
+  categoryHarvesting: "\uD83E\uDDFA",
+  categoryRecipes: "\uD83C\uDF72",
+  categoryCanning: "\uD83C\uDF6F",
+  categoryDrying: "\uD83C\uDF3E",
+  categoryTea: "\uD83C\uDF75",
+  categoryTincture: "\uD83E\uDDEA",
+  categoryCompost: "\u267B\uFE0F",
+  cardVariety: "\uD83C\uDF31",
+  cardMushroom: "\uD83C\uDF44",
+  cardWildPlant: "\uD83C\uDF3F",
+  cardBird: "\uD83D\uDC26",
+  cardInsect: "\uD83E\uDD8B",
+  cardPest: "\uD83D\uDC1B",
+  cardRecipe: "\uD83C\uDF72",
+  lightning: "\u26A1\uFE0F",
+  frost: "\u2744\uFE0F",
+  heat: "\uD83C\uDF21\uFE0F",
+  stars1: "\u2605\u2606\u2606\u2606\u2606",
+  stars2: "\u2605\u2605\u2606\u2606\u2606",
+  stars3: "\u2605\u2605\u2605\u2606\u2606",
+  stars4: "\u2605\u2605\u2605\u2605\u2606",
+  stars5: "\u2605\u2605\u2605\u2605\u2605"
+};
 const PLACE_OPTIONS = [
   { value: "pole", label: "Pole" },
   { value: "sklenik", label: "Skleník" },
@@ -122,13 +199,16 @@ const seedJournal = [
 ];
 
 const MOOD_OPTIONS = [
-  { value: "joy", label: "Radosť", emoji: "😊" },
-  { value: "calm", label: "Pokoj", emoji: "😌" },
-  { value: "gratitude", label: "Vďačnosť", emoji: "🥰" },
-  { value: "worry", label: "Obava", emoji: "😟" },
-  { value: "sadness", label: "Smútok", emoji: "😢" },
-  { value: "anger", label: "Hnev", emoji: "😠" },
-  { value: "tired", label: "Únava", emoji: "😮‍💨" }
+  { value: "joy", label: "Radosť", emoji: ICONS.moodJoy },
+  { value: "calm", label: "Pokoj", emoji: ICONS.moodCalm },
+  { value: "gratitude", label: "Vďačnosť", emoji: ICONS.moodGratitude },
+  { value: "excitement", label: "Nadšenie", emoji: ICONS.moodExcitement },
+  { value: "love", label: "Láska", emoji: ICONS.moodLove },
+  { value: "surprise", label: "Prekvapenie", emoji: ICONS.moodSurprise },
+  { value: "worry", label: "Obava", emoji: ICONS.moodWorry },
+  { value: "sadness", label: "Smútok", emoji: ICONS.moodSadness },
+  { value: "anger", label: "Hnev", emoji: ICONS.moodAnger },
+  { value: "tired", label: "Únava", emoji: ICONS.moodTired }
 ];
 const JOURNAL_ENTRY_TYPE_OPTIONS = [
   { value: "note", label: "Zápis" },
@@ -200,7 +280,30 @@ function normalizeWeatherSnapshot(value) {
     latitude: String(value.latitude || "").trim(),
     longitude: String(value.longitude || "").trim(),
     dayPeriod: String(value.dayPeriod || "").trim(),
-    sunshineHours: Number.isFinite(Number(value.sunshineHours)) ? Number(value.sunshineHours) : null
+    sunshineHours: Number.isFinite(Number(value.sunshineHours)) ? Number(value.sunshineHours) : null,
+    moonPhase: String(value.moonPhase || "").trim(),
+    isDay: Number.isFinite(Number(value.isDay)) ? Number(value.isDay) : null,
+    temperatureC: Number.isFinite(Number(value.temperatureC)) ? Number(value.temperatureC) : null,
+    apparentTemperatureC: Number.isFinite(Number(value.apparentTemperatureC)) ? Number(value.apparentTemperatureC) : null,
+    humidityPct: Number.isFinite(Number(value.humidityPct)) ? Number(value.humidityPct) : null,
+    precipitationMm: Number.isFinite(Number(value.precipitationMm)) ? Number(value.precipitationMm) : null,
+    rainMm: Number.isFinite(Number(value.rainMm)) ? Number(value.rainMm) : null,
+    showersMm: Number.isFinite(Number(value.showersMm)) ? Number(value.showersMm) : null,
+    snowfallCm: Number.isFinite(Number(value.snowfallCm)) ? Number(value.snowfallCm) : null,
+    cloudCoverPct: Number.isFinite(Number(value.cloudCoverPct)) ? Number(value.cloudCoverPct) : null,
+    cloudCoverLowPct: Number.isFinite(Number(value.cloudCoverLowPct)) ? Number(value.cloudCoverLowPct) : null,
+    cloudCoverMidPct: Number.isFinite(Number(value.cloudCoverMidPct)) ? Number(value.cloudCoverMidPct) : null,
+    cloudCoverHighPct: Number.isFinite(Number(value.cloudCoverHighPct)) ? Number(value.cloudCoverHighPct) : null,
+    windSpeedKmh: Number.isFinite(Number(value.windSpeedKmh)) ? Number(value.windSpeedKmh) : null,
+    windGustsKmh: Number.isFinite(Number(value.windGustsKmh)) ? Number(value.windGustsKmh) : null,
+    windDirectionDeg: Number.isFinite(Number(value.windDirectionDeg)) ? Number(value.windDirectionDeg) : null,
+    visibilityM: Number.isFinite(Number(value.visibilityM)) ? Number(value.visibilityM) : null,
+    pressureMslHpa: Number.isFinite(Number(value.pressureMslHpa)) ? Number(value.pressureMslHpa) : null,
+    surfacePressureHpa: Number.isFinite(Number(value.surfacePressureHpa)) ? Number(value.surfacePressureHpa) : null,
+    sunriseAt: String(value.sunriseAt || "").trim(),
+    sunsetAt: String(value.sunsetAt || "").trim(),
+    daylightSeconds: Number.isFinite(Number(value.daylightSeconds)) ? Number(value.daylightSeconds) : null,
+    precipitationProbabilityPct: Number.isFinite(Number(value.precipitationProbabilityPct)) ? Number(value.precipitationProbabilityPct) : null
   };
   return Object.values(snapshot).some(Boolean) ? snapshot : null;
 }
@@ -353,30 +456,74 @@ function walkAutoTitle(walkValue, fallbackDate = todayISO()) {
   return `Prechádzka ${formatDate(dateValue)}`;
 }
 
+function walkTimeRangeLabel(walkValue) {
+  const walk = normalizeJournalWalk({ walk: walkValue }) || null;
+  if (!walk) return "";
+  const gpsPoints = Array.isArray(walk.gpsPoints) ? walk.gpsPoints : [];
+  const startedAt = String(walk.startedAt || gpsPoints[0]?.recordedAt || "").trim();
+  const endedAt = String(walk.endedAt || gpsPoints[gpsPoints.length - 1]?.recordedAt || "").trim();
+  const startTime = formatWalkDateTime(startedAt);
+  const endTime = formatWalkDateTime(endedAt);
+  if (startTime && endTime) return `${startTime} - ${endTime}`;
+  return startTime || endTime || "";
+}
+
 function formatWalkGpsCoordinates(point) {
   if (!point || !Number.isFinite(Number(point.latitude)) || !Number.isFinite(Number(point.longitude))) return "";
   return `${Number(point.latitude).toFixed(5)}, ${Number(point.longitude).toFixed(5)}`;
 }
 
-function formatWalkGpsPointLabel(point, index = 0) {
-  const coordinates = formatWalkGpsCoordinates(point);
+function formatWalkGpsPointLabel(point, index = 0, total = 0) {
   const dateValue = Date.parse(point?.recordedAt || "");
   const timeLabel = Number.isFinite(dateValue)
     ? new Date(dateValue).toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })
     : "";
   const accuracyLabel = Number.isFinite(Number(point?.accuracyMeters)) ? `±${Math.round(Number(point.accuracyMeters))} m` : "";
-  return [`${index + 1}. ${coordinates}`, timeLabel, accuracyLabel].filter(Boolean).join(" • ");
+  const label = index === 0
+    ? "Štart"
+    : (total && index === total - 1 ? "Koniec" : `Bod ${index + 1}`);
+  return [label, timeLabel, accuracyLabel].filter(Boolean).join(" • ");
 }
 
 function formatWalkGpsPlaceLabel(point, kind = "point") {
-  const coordinates = formatWalkGpsCoordinates(point);
-  if (!coordinates) return "";
-  const kindLabel = kind === "start"
-    ? "Štart GPS"
-    : kind === "end"
-      ? "Koniec GPS"
-      : "GPS bod";
-  return `${kindLabel} • ${coordinates}`;
+  return "";
+}
+
+function displayWalkPlaceLabel(value = "") {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  const withoutCoordinates = normalized
+    .replace(/\s*[•\-–]\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (withoutCoordinates.includes("Štart GPS")) return "Štart GPS";
+  if (withoutCoordinates.includes("Koniec GPS")) return "Koniec GPS";
+  if (withoutCoordinates.includes("GPS bod")) return "GPS bod";
+  return withoutCoordinates;
+}
+
+function journalDisplayTitle(entry = {}) {
+  const normalizedEntry = entry && typeof entry === "object" ? entry : {};
+  const fallbackTitle = String(normalizedEntry.title || "Zápis").trim() || "Zápis";
+  if (normalizedEntry.entryType !== "walk") return fallbackTitle;
+  if (/^prechádzka\b/iu.test(fallbackTitle)) {
+    return "Prechádzka";
+  }
+  return fallbackTitle;
+}
+
+function journalHeaderWeather(entry = {}) {
+  const normalizedEntry = entry && typeof entry === "object" ? entry : {};
+  const directWeather = normalizeWeatherSnapshot(normalizedEntry.weather);
+  if (directWeather) return directWeather;
+  const walk = normalizeJournalWalk({ walk: normalizedEntry.walk || normalizedEntry }, directWeather);
+  if (!walk) return null;
+  return normalizeWeatherSnapshot({
+    temperature: walk.temperature,
+    condition: walk.conditions,
+    rain: walk.precipitation,
+    wind: walk.wind
+  });
 }
 
 function walkMapPoints(walkValue) {
@@ -384,18 +531,31 @@ function walkMapPoints(walkValue) {
   return Array.isArray(walk?.gpsPoints) ? walk.gpsPoints.filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude)) : [];
 }
 
-function renderWalkMapMarkup(walkValue, { compact = false, live = false } = {}) {
+function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCount = 0 } = {}) {
   const points = walkMapPoints(walkValue);
   if (points.length < 1) return "";
   return `
-    <div
-      class="journal-walk__map ${compact ? "journal-walk__map--compact" : ""} ${live ? "journal-walk__map--live" : ""}"
-      data-walk-map
-      data-walk-map-points="${escapeAttribute(JSON.stringify(points.map((point) => ({
-        latitude: point.latitude,
-        longitude: point.longitude
-      }))))}"
-    ></div>
+    <div class="journal-walk__map-shell ${compact ? "journal-walk__map-shell--compact" : ""} ${live ? "journal-walk__map-shell--live" : ""}" data-walk-map-shell>
+      <div
+        class="journal-walk__map ${compact ? "journal-walk__map--compact" : ""} ${live ? "journal-walk__map--live" : ""}"
+        data-walk-map
+        data-walk-map-photo-count="${escapeAttribute(String(Math.max(0, Number(photoCount) || 0)))}"
+        data-walk-map-points="${escapeAttribute(JSON.stringify(points.map((point) => ({
+          latitude: point.latitude,
+          longitude: point.longitude
+        }))))}"
+      ></div>
+      ${compact ? "" : `
+        <button class="journal-walk__map-expand" type="button" data-walk-map-fullscreen aria-label="Celá mapa" title="Celá mapa">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 4H4v4"></path>
+            <path d="M16 4h4v4"></path>
+            <path d="M20 16v4h-4"></path>
+            <path d="M4 16v4h4"></path>
+          </svg>
+        </button>
+      `}
+    </div>
   `;
 }
 
@@ -403,17 +563,8 @@ function hydrateWalkMaps(root = document) {
   if (!root || typeof root.querySelectorAll !== "function" || typeof window === "undefined" || !window.L) return;
   root.querySelectorAll("[data-walk-map]").forEach((mapEl) => {
     if (mapEl.dataset.walkMapReady === "true") return;
-    const rawPoints = String(mapEl.getAttribute("data-walk-map-points") || "").trim();
-    if (!rawPoints) return;
-    let points = [];
-    try {
-      points = JSON.parse(rawPoints);
-    } catch (error) {
-      points = [];
-    }
-    const normalizedPoints = Array.isArray(points)
-      ? points.filter((point) => Number.isFinite(Number(point?.latitude)) && Number.isFinite(Number(point?.longitude)))
-      : [];
+    const normalizedPoints = walkMapPointsFromElement(mapEl);
+    const photoCount = Math.max(0, Number(mapEl.getAttribute("data-walk-map-photo-count") || 0) || 0);
     if (normalizedPoints.length < 1) return;
 
     const map = window.L.map(mapEl, {
@@ -424,14 +575,16 @@ function hydrateWalkMaps(root = document) {
       doubleClickZoom: true,
       boxZoom: false,
       keyboard: false,
+      zoomAnimation: false,
+      fadeAnimation: false,
+      markerZoomAnimation: false,
       tap: true,
       touchZoom: true
     });
 
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap"
-    }).addTo(map);
+    createWalkTileLayer(map, mapEl);
+    walkMapInstances.set(mapEl, map);
+    attachWalkMapControls(mapEl, () => walkMapInstances.get(mapEl));
 
     const startPoint = normalizedPoints[0];
     const endPoint = normalizedPoints[normalizedPoints.length - 1];
@@ -466,12 +619,28 @@ function hydrateWalkMaps(root = document) {
       fillOpacity: 1
     }).addTo(map);
 
-    if (polyline) {
-      map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
-    } else {
-      map.setView([Number(startPoint.latitude), Number(startPoint.longitude)], 16);
-    }
-    requestAnimationFrame(() => map.invalidateSize());
+    walkMapPhotoMarkerPoints(normalizedPoints, photoCount).forEach((point, index) => {
+      window.L.marker([Number(point.latitude), Number(point.longitude)], {
+        keyboard: false,
+        zIndexOffset: 600,
+        icon: window.L.divIcon({
+          className: "journal-walk__photo-marker",
+          html: `<span style="display:grid;place-items:center;width:22px;height:22px;border-radius:999px;background:rgba(255,251,244,0.98);border:1px solid rgba(186,155,90,0.42);box-shadow:0 6px 14px rgba(52,41,25,0.16);font-size:12px;line-height:1;">\uD83D\uDCF7</span>`,
+          iconSize: [22, 22],
+          iconAnchor: [11, 11]
+        }),
+        title: photoCount > 1 ? `Fotka ${index + 1}` : "Fotka"
+      }).addTo(map);
+    });
+
+    fitWalkMapViewport(map, {
+      polyline,
+      point: startPoint,
+      compact: mapEl.classList.contains("journal-walk__map--compact"),
+      live: mapEl.classList.contains("journal-walk__map--live"),
+      points: normalizedPoints
+    });
+    scheduleWalkMapResize(map);
     mapEl.dataset.walkMapReady = "true";
   });
 }
@@ -640,6 +809,448 @@ const detailContent = document.getElementById("detail-content");
 const imageLightboxEl = document.getElementById("image-lightbox");
 let activeOverlayHistoryKind = "";
 let overlayHistoryNavigating = false;
+let detailModalPreviousOverflow = null;
+let bodyScrollLockX = 0;
+let bodyScrollLockY = 0;
+let skipNextBodyScrollRestore = false;
+const bodyScrollLockOwners = new Set();
+let mobilePreviewEnabled = (() => {
+  try {
+    return localStorage.getItem(UI_MOBILE_PREVIEW_KEY) === "1";
+  } catch (error) {
+    return false;
+  }
+})();
+let mobileWeatherSoundEnabled = (() => {
+  try {
+    return localStorage.getItem(MOBILE_WEATHER_SOUND_KEY) !== "0";
+  } catch (error) {
+    return true;
+  }
+})();
+let mobileWeatherSoundVolume = 1;
+try {
+  localStorage.removeItem(MOBILE_WEATHER_SOUND_VOLUME_KEY);
+} catch (error) {
+  // Keď panel hlasitosti nie je v UI, nech v appke nezostáva stará skrytá hodnota.
+}
+let mobileWeatherSoundPanelOpen = false;
+let mainMenuWeatherAudioDebugTimer = 0;
+let mainMenuWeatherAudioDebugEventsBound = false;
+let mainMenuWeatherAudioControlsBound = false;
+const walkMapInstances = new WeakMap();
+const MOBILE_APP_SHELL_MAX_WIDTH = 760;
+function normalizeMobileWeatherCloudDebugId(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "partly-cloudy") return "cloudy";
+  return normalized;
+}
+
+const MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS = [
+  { id: "", label: "Auto", tone: "", variant: "" },
+  { id: "clear", label: "Jasno", tone: "sun", variant: "clear" },
+  { id: "mostly-clear", label: "Polojasno", tone: "sun", variant: "mostly-clear" },
+  { id: "cloudy", label: "Oblačno", tone: "cloud", variant: "cloudy" },
+  { id: "overcast", label: "Zamračené", tone: "cloud", variant: "overcast" }
+];
+
+const MOBILE_WEATHER_THEME_DEBUG_OPTIONS = [
+  { id: "auto", label: "Auto", tone: "", variant: "", period: "", wind: "" },
+  { id: "none", label: "Bez javu", tone: "soft", variant: "", period: "", wind: "calm" },
+  { id: "fog", label: "Hmla", tone: "mist", variant: "fog", period: "", wind: "calm" },
+  { id: "rain", label: "Dážď", tone: "rain", variant: "rain", period: "", wind: "windy" },
+  { id: "sleet", label: "Dážď so snehom", tone: "snow", variant: "sleet", period: "", wind: "breeze" },
+  { id: "hail", label: "Krúpy", tone: "storm", variant: "hail", period: "", wind: "fresh" },
+  { id: "snow", label: "Sneženie", tone: "snow", variant: "snow", period: "", wind: "calm" },
+  { id: "storm", label: "Búrka", tone: "storm", variant: "storm", period: "", wind: "gust" }
+];
+
+const MOBILE_WEATHER_PHASE_DEBUG_OPTIONS = [
+  { id: "", label: "Auto" },
+  { id: "dawn", label: "Svitanie" },
+  { id: "day", label: "Deň" },
+  { id: "sunset", label: "Západ" },
+  { id: "night", label: "Noc" }
+];
+
+const MOBILE_WEATHER_MOON_DEBUG_OPTIONS = [
+  { id: "", label: "Auto" },
+  { id: "new", label: "Nov" },
+  { id: "crescent", label: "Srpek" },
+  { id: "quarter", label: "Štvrť" },
+  { id: "gibbous", label: "Gibózna" },
+  { id: "full", label: "Pln" }
+];
+const MOBILE_WEATHER_FIXED_MOON_PHASE = "full";
+
+const MOBILE_WEATHER_SEASON_DEBUG_OPTIONS = [
+  { id: "", label: "Auto" },
+  { id: "spring", label: "Jar" },
+  { id: "summer", label: "Leto" },
+  { id: "autumn", label: "Jeseň" },
+  { id: "winter", label: "Zima" }
+];
+
+function isCompactAppShellViewport() {
+  if (typeof window === "undefined") return Boolean(mobilePreviewEnabled);
+  return Boolean(mobilePreviewEnabled) || window.innerWidth <= MOBILE_APP_SHELL_MAX_WIDTH;
+}
+
+function syncResponsiveAppShellClass() {
+  if (typeof document === "undefined") return;
+  document.body.classList.toggle("app-mobile-shell", isCompactAppShellViewport());
+  syncResponsiveToolbarButtonPlacement();
+  syncMobileBottomNavPlacement();
+  syncMobileWeatherMiniPlacement();
+  applyMobileWeatherTheme();
+  applyMobileWeatherSceneMode();
+  syncMobileToolbarScrollState();
+}
+
+function syncMobileToolbarScrollState() {
+  if (!utilityBarEl || typeof document === "undefined" || typeof window === "undefined") return;
+  const isMobileShell = document.body.classList.contains("app-mobile-shell");
+  if (isMobileShell) {
+    utilityBarEl.classList.remove("is-collapsed");
+    return;
+  }
+  utilityBarEl.classList.remove("is-collapsed");
+}
+
+function syncMobilePreviewClass() {
+  if (typeof document === "undefined") return;
+  document.body.classList.toggle("app-mobile-preview", Boolean(mobilePreviewEnabled));
+  syncResponsiveAppShellClass();
+  document.getElementById("mobile-preview-system-chrome")?.remove();
+  const button = document.getElementById("toggle-mobile-preview");
+  if (button) {
+    const nextLabel = mobilePreviewEnabled ? "Desktop náhľad" : "Mobilný náhľad";
+    button.textContent = nextLabel;
+    button.setAttribute("aria-pressed", mobilePreviewEnabled ? "true" : "false");
+    button.setAttribute("aria-label", nextLabel);
+    button.setAttribute("title", nextLabel);
+    button.dataset.previewTarget = mobilePreviewEnabled ? "desktop" : "mobile";
+  }
+  syncMobileWeatherSoundButton();
+}
+
+function setMobilePreviewEnabled(enabled) {
+  mobilePreviewEnabled = Boolean(enabled);
+  try {
+    localStorage.setItem(UI_MOBILE_PREVIEW_KEY, mobilePreviewEnabled ? "1" : "0");
+  } catch (error) {
+    console.warn("Mobilný náhľad sa nepodarilo uložiť.", error);
+  }
+  syncMobilePreviewClass();
+  render();
+  syncMobileToolbarScrollState();
+}
+
+function lockBodyScroll(owner = "") {
+  if (typeof document === "undefined") return;
+  const normalizedOwner = String(owner || "").trim();
+  if (normalizedOwner && bodyScrollLockOwners.has(normalizedOwner)) return;
+
+  if (!bodyScrollLockOwners.size) {
+    bodyScrollLockX = Math.max(window.scrollX || 0, document.documentElement?.scrollLeft || 0, 0);
+    bodyScrollLockY = Math.max(window.scrollY || 0, document.documentElement?.scrollTop || 0, 0);
+    detailModalPreviousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${bodyScrollLockY}px`;
+    document.body.style.left = `-${bodyScrollLockX}px`;
+    document.body.style.right = "";
+    document.body.style.width = "100%";
+    document.body.classList.add("app-detail-locked");
+  }
+
+  if (normalizedOwner) {
+    bodyScrollLockOwners.add(normalizedOwner);
+  }
+}
+
+function unlockBodyScroll(owner = "") {
+  if (typeof document === "undefined") return;
+  const normalizedOwner = String(owner || "").trim();
+  if (normalizedOwner) {
+    if (!bodyScrollLockOwners.has(normalizedOwner)) return;
+    bodyScrollLockOwners.delete(normalizedOwner);
+  } else {
+    bodyScrollLockOwners.clear();
+  }
+
+  if (bodyScrollLockOwners.size) return;
+
+  const shouldRestoreScroll = !skipNextBodyScrollRestore;
+  skipNextBodyScrollRestore = false;
+  document.body.style.overflow = detailModalPreviousOverflow ?? "";
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.width = "";
+  document.body.classList.remove("app-detail-locked");
+  if (shouldRestoreScroll) {
+    window.scrollTo(bodyScrollLockX, bodyScrollLockY);
+  }
+  detailModalPreviousOverflow = null;
+  bodyScrollLockX = 0;
+  bodyScrollLockY = 0;
+}
+
+function lockDetailBodyScroll() {
+  lockBodyScroll("detail");
+}
+
+function unlockDetailBodyScroll() {
+  unlockBodyScroll("detail");
+}
+
+function scheduleWalkMapResize(map) {
+  if (!map) return;
+  requestAnimationFrame(() => map.invalidateSize());
+  window.setTimeout(() => map.invalidateSize(), 220);
+}
+
+function walkMapPointsFromElement(mapEl) {
+  if (!mapEl) return [];
+  const rawPoints = String(mapEl.getAttribute("data-walk-map-points") || "").trim();
+  if (!rawPoints) return [];
+  let points = [];
+  try {
+    points = JSON.parse(rawPoints);
+  } catch (error) {
+    points = [];
+  }
+  return Array.isArray(points)
+    ? points.filter((point) => Number.isFinite(Number(point?.latitude)) && Number.isFinite(Number(point?.longitude)))
+    : [];
+}
+
+function walkMapPhotoMarkerPoints(points = [], photoCount = 0) {
+  const normalizedPoints = Array.isArray(points) ? points.filter(Boolean) : [];
+  const totalPoints = normalizedPoints.length;
+  const totalPhotos = Math.max(0, Number(photoCount) || 0);
+  if (totalPoints < 1 || totalPhotos < 1) return [];
+
+  const markerIndexes = new Set();
+  if (totalPhotos === 1) {
+    markerIndexes.add(Math.max(0, Math.floor((totalPoints - 1) / 2)));
+  } else {
+    for (let index = 0; index < totalPhotos; index += 1) {
+      const ratio = (index + 1) / (totalPhotos + 1);
+      markerIndexes.add(Math.max(0, Math.min(totalPoints - 1, Math.round(ratio * (totalPoints - 1)))));
+    }
+  }
+
+  return [...markerIndexes]
+    .sort((a, b) => a - b)
+    .map((index) => normalizedPoints[index])
+    .filter((point) => Number.isFinite(Number(point?.latitude)) && Number.isFinite(Number(point?.longitude)));
+}
+
+function constrainWalkMapBounds(bounds, { compact = false } = {}) {
+  if (!bounds || !compact || typeof window === "undefined" || !window.L) return bounds;
+  const center = bounds.getCenter();
+  if (!center || !Number.isFinite(center.lat) || !Number.isFinite(center.lng)) return bounds;
+
+  const maxRadiusKm = 30;
+  const latRadius = maxRadiusKm / 111.32;
+  const lngRadius = maxRadiusKm / (111.32 * Math.max(Math.cos((center.lat * Math.PI) / 180), 0.2));
+  const northEast = bounds.getNorthEast();
+  const southWest = bounds.getSouthWest();
+  const latHalfSpan = Math.max(Math.abs(Number(northEast?.lat) - center.lat), Math.abs(center.lat - Number(southWest?.lat)));
+  const lngHalfSpan = Math.max(Math.abs(Number(northEast?.lng) - center.lng), Math.abs(center.lng - Number(southWest?.lng)));
+
+  if (latHalfSpan <= latRadius && lngHalfSpan <= lngRadius) {
+    return bounds;
+  }
+
+  return window.L.latLngBounds(
+    [center.lat - latRadius, center.lng - lngRadius],
+    [center.lat + latRadius, center.lng + lngRadius]
+  );
+}
+
+function walkTileProviderConfigs() {
+  return [
+    {
+      key: "osm",
+      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      options: {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors",
+        referrerPolicy: "origin",
+        updateWhenIdle: true,
+        updateWhenZooming: false,
+        keepBuffer: 1
+      }
+    },
+    {
+      key: "stadia-osm-bright",
+      url: "https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png",
+      options: {
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank" rel="noreferrer">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
+        updateWhenIdle: true,
+        updateWhenZooming: false,
+        keepBuffer: 1
+      }
+    }
+  ];
+}
+
+function setWalkMapBlockedState(mapEl, blocked = false) {
+  if (!mapEl) return;
+  mapEl.dataset.walkMapBlocked = blocked ? "true" : "false";
+  if (blocked) {
+    mapEl.setAttribute("aria-label", "Mapa sa teraz nepodarila načítať.");
+  } else {
+    mapEl.removeAttribute("aria-label");
+  }
+}
+
+function createWalkTileLayer(map, mapEl) {
+  const providers = walkTileProviderConfigs();
+  let providerIndex = 0;
+  let errorCount = 0;
+  let loadedSuccessfully = false;
+  let activeLayer = null;
+
+  const applyProvider = (nextIndex) => {
+    providerIndex = nextIndex;
+    errorCount = 0;
+    loadedSuccessfully = false;
+    setWalkMapBlockedState(mapEl, false);
+
+    if (activeLayer) {
+      activeLayer.off();
+      if (map?.hasLayer(activeLayer)) {
+        map.removeLayer(activeLayer);
+      }
+    }
+
+    const provider = providers[providerIndex];
+    activeLayer = window.L.tileLayer(provider.url, provider.options);
+    activeLayer.on("tileload", () => {
+      loadedSuccessfully = true;
+      errorCount = 0;
+      setWalkMapBlockedState(mapEl, false);
+    });
+    activeLayer.on("tileerror", () => {
+      errorCount += 1;
+      if (!loadedSuccessfully && errorCount >= 2 && providerIndex < providers.length - 1) {
+        applyProvider(providerIndex + 1);
+        return;
+      }
+      if (!loadedSuccessfully && errorCount >= 2) {
+        setWalkMapBlockedState(mapEl, true);
+      }
+    });
+    activeLayer.addTo(map);
+    if (mapEl) {
+      mapEl.dataset.walkMapProvider = provider.key;
+    }
+    return activeLayer;
+  };
+
+  return applyProvider(0);
+}
+
+function fitWalkMapViewport(map, { polyline = null, point = null, compact = false, live = false, points = [] } = {}) {
+  if (!map) return;
+  const padding = live ? [20, 20] : compact ? [16, 16] : [24, 24];
+  const latLngPoints = Array.isArray(points)
+    ? points
+      .map((item) => [Number(item?.latitude), Number(item?.longitude)])
+      .filter(([latitude, longitude]) => Number.isFinite(latitude) && Number.isFinite(longitude))
+    : [];
+  const sourceBounds = polyline?.getBounds?.() || (latLngPoints.length >= 2 ? window.L.latLngBounds(latLngPoints) : null);
+  if (sourceBounds) {
+    map.fitBounds(constrainWalkMapBounds(sourceBounds, { compact }), {
+      padding,
+      maxZoom: compact ? 16 : 17
+    });
+    return;
+  }
+  if (point && Number.isFinite(Number(point.latitude)) && Number.isFinite(Number(point.longitude))) {
+    map.setView([Number(point.latitude), Number(point.longitude)], live ? 15 : compact ? 14 : 15);
+  }
+}
+
+function refreshWalkMapElement(mapEl) {
+  if (!mapEl) return;
+  const map = walkMapInstances.get(mapEl);
+  if (!map) return;
+  const points = walkMapPointsFromElement(mapEl);
+  const fitOptions = {
+    point: points[0] || null,
+    points,
+    compact: mapEl.classList.contains("journal-walk__map--compact"),
+    live: mapEl.classList.contains("journal-walk__map--live")
+  };
+
+  map.invalidateSize();
+  fitWalkMapViewport(map, fitOptions);
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    fitWalkMapViewport(map, fitOptions);
+  });
+  window.setTimeout(() => {
+    map.invalidateSize();
+    fitWalkMapViewport(map, fitOptions);
+  }, 240);
+}
+
+function refreshWalkMaps(root = document) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  hydrateWalkMaps(root);
+  root.querySelectorAll("[data-walk-map]").forEach((mapEl) => {
+    refreshWalkMapElement(mapEl);
+  });
+}
+
+function attachWalkMapControls(mapEl, getMap) {
+  const shell = mapEl?.closest("[data-walk-map-shell]");
+  if (!shell || shell.dataset.walkMapControlsReady === "true") return;
+  const expandButton = shell.querySelector("[data-walk-map-fullscreen]");
+  const updateUi = () => {
+    const isFullscreen = document.fullscreenElement === shell || shell.classList.contains("is-expanded");
+    shell.classList.toggle("is-fullscreen", document.fullscreenElement === shell);
+    if (expandButton) {
+      const label = isFullscreen ? "Zavrieť mapu" : "Celá mapa";
+      expandButton.setAttribute("aria-label", label);
+      expandButton.setAttribute("title", label);
+      expandButton.setAttribute("aria-pressed", isFullscreen ? "true" : "false");
+    }
+  };
+
+  expandButton?.addEventListener("click", async () => {
+    const map = getMap();
+    if (!map) return;
+    try {
+      if (document.fullscreenElement === shell) {
+        await document.exitFullscreen();
+      } else if (!document.fullscreenElement && typeof shell.requestFullscreen === "function") {
+        await shell.requestFullscreen();
+      } else {
+        shell.classList.toggle("is-expanded");
+      }
+    } catch (error) {
+      shell.classList.toggle("is-expanded");
+    }
+    updateUi();
+    scheduleWalkMapResize(map);
+  });
+
+  document.addEventListener("fullscreenchange", () => {
+    updateUi();
+    scheduleWalkMapResize(getMap());
+  });
+
+  shell.dataset.walkMapControlsReady = "true";
+  updateUi();
+}
 
 function pushOverlayHistory(kind = "") {
   const normalizedKind = String(kind || "").trim();
@@ -647,6 +1258,13 @@ function pushOverlayHistory(kind = "") {
   if (activeOverlayHistoryKind === normalizedKind) return;
   window.history.pushState({ ...(window.history.state || {}), __mzOverlay: normalizedKind }, "");
   activeOverlayHistoryKind = normalizedKind;
+}
+
+function inferVisibleOverlayHistoryKind() {
+  if (imageLightboxEl?.open) return "lightbox";
+  if (journalOverlayRoot()) return "journal";
+  if (detailModal?.open) return "detail";
+  return "";
 }
 
 function clearOverlayHistory(kind = "", { fromHistory = false } = {}) {
@@ -664,14 +1282,21 @@ function clearOverlayHistory(kind = "", { fromHistory = false } = {}) {
 function openDetailModalDialog() {
   if (!detailModal.open) {
     pushOverlayHistory("detail");
+    lockDetailBodyScroll();
     detailModal.showModal();
   }
+  syncMobileOverlayBottomNavPlacement();
+  detailModal.scrollTop = 0;
+  if (detailContent) detailContent.scrollTop = 0;
+  refreshWalkMaps(detailContent || detailModal);
 }
 const imageLightboxImageEl = document.getElementById("image-lightbox-image");
 const imageLightboxCountEl = document.getElementById("image-lightbox-count");
 const imageLightboxCloseEl = document.getElementById("image-lightbox-close");
+const imageLightboxBackEl = document.getElementById("image-lightbox-back");
 const imageLightboxPrevEl = document.getElementById("image-lightbox-prev");
 const imageLightboxNextEl = document.getElementById("image-lightbox-next");
+const detailModalBackEl = document.getElementById("detail-modal-back");
 const undoDeleteEl = document.getElementById("undo-delete");
 const restoreResetEl = document.getElementById("restore-reset");
 const mainMenuQuickEl = document.getElementById("open-main-menu");
@@ -691,6 +1316,13 @@ const activeFilterLabelEl = document.getElementById("active-filter-label");
 const filterDisclosureEl = document.getElementById("filter-disclosure");
 const workspaceLayoutEl = document.querySelector(".workspace-layout");
 const workspaceMainEl = document.querySelector(".workspace-main");
+const utilityBarEl = document.querySelector(".utility-bar");
+const pageShellEl = document.querySelector(".page-shell");
+const heroWeatherWrapEl = document.querySelector(".hero__weather");
+const heroWeatherOriginalParentEl = heroWeatherWrapEl?.parentElement || null;
+const mainMenuQuickOriginalParentEl = mainMenuQuickEl?.parentElement || null;
+const worklogQuickOriginalParentEl = worklogPanelToggleEl?.parentElement || null;
+const journalQuickOriginalParentEl = journalPanelToggleEl?.parentElement || null;
 let lastDeleted = loadUndoState();
 const imageLightboxState = { images: [], index: 0, label: "Fotka" };
 let toolbarSearchQuery = "";
@@ -698,6 +1330,9 @@ let toolbarSearchLastResults = [];
 
 wireStaticEvents();
 render();
+syncResponsiveAppShellClass();
+window.addEventListener("resize", syncResponsiveAppShellClass, { passive: true });
+window.addEventListener("scroll", syncMobileToolbarScrollState, { passive: true });
 scheduleImageBackgroundCleanup();
 hydrateStateFromFolderStorage().catch((error) => {
   console.warn("Dočasné diskové úložisko sa nepodarilo načítať.", error);
@@ -716,7 +1351,26 @@ function openMainMenuView() {
   closeUtilityDrawers();
   isFocusedView = false;
   render();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  if (isMobileShell) {
+    const scrollMainMenuTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      if (document.scrollingElement) {
+        document.scrollingElement.scrollTop = 0;
+        document.scrollingElement.scrollLeft = 0;
+      }
+      if (pageShellEl && typeof pageShellEl.scrollTo === "function") {
+        pageShellEl.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      }
+    };
+    scrollMainMenuTop();
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(scrollMainMenuTop);
+    }
+    return;
+  }
+  const menuTop = menuPanelEl?.offsetTop ?? 0;
+  window.scrollTo({ top: Math.max(0, menuTop - 12), behavior: "smooth" });
 }
 
 function normalizedJournalList() {
@@ -774,16 +1428,15 @@ function closeJournalOverlay(options = {}) {
   const { fromHistory = false } = options;
   const root = journalOverlayRoot();
   if (root) root.remove();
-  if (journalOverlayPreviousOverflow !== null) {
-    document.body.style.overflow = journalOverlayPreviousOverflow;
-    journalOverlayPreviousOverflow = null;
-  }
+  unlockBodyScroll("journal");
+  journalOverlayPreviousOverflow = null;
   document.removeEventListener("keydown", handleJournalOverlayEscape);
   if (!fromHistory) {
     clearOverlayHistory("journal");
   } else if (activeOverlayHistoryKind === "journal") {
     activeOverlayHistoryKind = "";
   }
+  syncMobileOverlayBottomNavPlacement();
 }
 
 function ensureJournalOverlayRoot() {
@@ -801,16 +1454,23 @@ function ensureJournalOverlayRoot() {
   if (journalOverlayPreviousOverflow === null) {
     journalOverlayPreviousOverflow = document.body.style.overflow;
   }
-  document.body.style.overflow = "hidden";
+  lockBodyScroll("journal");
   document.removeEventListener("keydown", handleJournalOverlayEscape);
   document.addEventListener("keydown", handleJournalOverlayEscape);
   pushOverlayHistory("journal");
   return root;
 }
 
-function journalOverlayFrame(title, bodyHtml, actionsHtml = "") {
+function journalOverlayFrame(title, bodyHtml, actionsHtml = "", topbarHtml = "") {
+  const topbarSlot = topbarHtml
+    ? `<div class="journal-overlay-shell__topline-main">${topbarHtml}</div>`
+    : "";
   return `
     <section class="journal-overlay-shell">
+      <div class="journal-overlay-shell__topline${topbarHtml ? " has-topbar" : ""}">
+        <button type="button" id="journal-overlay-back" class="back-button journal-overlay-shell__back" aria-label="Krok späť">Späť</button>
+        ${topbarSlot}
+      </div>
       <button type="button" id="journal-overlay-close" class="journal-overlay-shell__close" aria-label="Zavrieť denník">x</button>
       <div class="journal-overlay-frame__head">
         <div class="journal-overlay-frame__title-block">
@@ -828,13 +1488,14 @@ function renderJournalOverlayCard(entry) {
   const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true });
-  const safeTitle = String(normalizedEntry.title || "Zápis").trim() || "Zápis";
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
+  const safeTitle = journalDisplayTitle(normalizedEntry);
   const safeText = String(normalizedEntry.text || "").trim();
   const safeId = String(normalizedEntry.id || "").trim() || makeId("journal");
   const dateLabel = journalDateLabel(normalizedEntry.date);
   const chips = journalDisplayChips(normalizedEntry);
-  const weatherWidgets = renderJournalWeatherWidgets(normalizedEntry.weather);
+  const weatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry));
+  const headerWeatherWidgets = weatherWidgets;
   const footerChips = chips;
 
   return `
@@ -843,7 +1504,7 @@ function renderJournalOverlayCard(entry) {
         <div class="journal-overlay-card__meta">
           <div class="journal-overlay-card__topline">
             <span class="journal-item__date-badge">${escapeHtml(dateLabel)}</span>
-            ${weatherWidgets}
+            ${headerWeatherWidgets}
           </div>
           <div class="journal-overlay-card__title-row">
             <strong class="journal-overlay-card__title">${escapeHtml(safeTitle)}</strong>
@@ -967,6 +1628,9 @@ function openJournalOverlayList(initialTagKey = "") {
   let activeTagKey = String(initialTagKey || "").trim();
 
   const renderOverlay = () => {
+    const showMobileQuickActionsTopbar = document.body.classList.contains("app-mobile-shell");
+    const journalQuickActionsTopbar = "";
+    const journalQuickActionsInline = showMobileQuickActionsTopbar ? "" : openJournalQuickActions();
     const activeRecords = journalTagRecords(entries);
     if (activeTagKey && !activeRecords.some((item) => item.themeKey === activeTagKey)) {
       activeTagKey = "";
@@ -979,7 +1643,7 @@ function openJournalOverlayList(initialTagKey = "") {
         entries.length
           ? `
             <div class="journal-overlay-stack">
-              ${openJournalQuickActions()}
+              ${journalQuickActionsInline}
               ${renderJournalTagFilterPanel(entries, activeTagKey, filteredEntries.length)}
               ${filteredEntries.length
                 ? renderJournalOverlayTimeline(filteredEntries)
@@ -988,13 +1652,14 @@ function openJournalOverlayList(initialTagKey = "") {
           `
           : `
             <div class="journal-overlay-stack">
-              ${openJournalQuickActions()}
+              ${journalQuickActionsInline}
               <div class="empty-state empty-state--compact">Denník je pripravený. Pridaj prvý zápis a začne žiť.</div>
             </div>
           `,
         `
           <button class="button" type="button" id="journal-overlay-add">Pridať zápis</button>
-        `
+        `,
+        journalQuickActionsTopbar
       );
     } catch (error) {
       console.error("Denníkový overlay sa nepodarilo vykresliť", error);
@@ -1010,6 +1675,7 @@ function openJournalOverlayList(initialTagKey = "") {
     }
 
     root.querySelector("#journal-overlay-close")?.addEventListener("click", closeJournalOverlay);
+    root.querySelector("#journal-overlay-back")?.addEventListener("click", closeJournalOverlay);
     root.querySelector("#journal-overlay-add")?.addEventListener("click", () => openJournalComposer());
     root.querySelectorAll("[data-open-journal-type]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1025,6 +1691,7 @@ function openJournalOverlayList(initialTagKey = "") {
     });
     bindJournalOverlayCardActions(root);
     hydrateWalkMaps(root);
+    syncMobileOverlayBottomNavPlacement();
   };
 
   renderOverlay();
@@ -1064,7 +1731,7 @@ function renderJournalComposerImagePreview(existingImages, pendingUrls, existing
   return items.join("");
 }
 
-function openJournalQuickActions() {
+function openJournalQuickActions(activeType = "") {
   const quickItems = [
     { type: "note", label: "Zápis" },
     { type: "walk", label: "Prechádzka" },
@@ -1072,6 +1739,44 @@ function openJournalQuickActions() {
     { type: "work", label: "Práca" },
     { type: "problem", label: "Problém" }
   ];
+  const isMobileTopbar = document.body.classList.contains("app-mobile-shell");
+  const normalizedActiveType = String(activeType || "").trim();
+  const iconForType = (entryType) => {
+    const icons = {
+      note: "📝",
+      walk: "🚶",
+      weather: ICONS.weatherPartly,
+      work: "🪏",
+      problem: "⚠️"
+    };
+    return icons[String(entryType || "").trim()] || "📝";
+  };
+  if (isMobileTopbar) {
+    return `
+      <div class="journal-quick-actions journal-quick-actions--topbar detail-editor-mobile-switch">
+        <div class="entry-mode-switch entry-mode-switch--topbar journal-quick-actions__chips">
+          ${quickItems.map((item) => {
+            const isActive = normalizedActiveType === item.type;
+            return `
+            <button
+              class="journal-quick-actions__button entry-mode-switch__button${isActive ? " is-active" : ""}"
+              type="button"
+              data-open-journal-type="${escapeAttribute(item.type)}"
+              aria-pressed="${isActive ? "true" : "false"}"
+              aria-label="${escapeAttribute(item.label)}"
+              title="${escapeAttribute(item.label)}"
+            >
+              <span class="entry-mode-switch__button-content">
+                <span class="entry-mode-switch__button-icon" aria-hidden="true">${escapeHtml(iconForType(item.type))}</span>
+                <span class="entry-mode-switch__button-label">${escapeHtml(item.label)}</span>
+              </span>
+            </button>
+          `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
   return `
     <div class="journal-quick-actions">
       <span class="journal-quick-actions__label">Rýchlo pridať</span>
@@ -1089,6 +1794,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
     ? normalizedJournalList().find((entry) => entry.id === editingEntryId) || null
     : null;
   const initialEntryType = String(editingEntry?.entryType || preferredEntryType || "note").trim() || "note";
+  const isMobileJournalShell = document.body.classList.contains("app-mobile-shell");
   const root = ensureJournalOverlayRoot();
   let existingImages = editingEntry ? [...journalImages(editingEntry)] : [];
   let pendingFiles = [];
@@ -1111,16 +1817,50 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
     || editingEntry.linkedVarietyId
     || initialDate !== todayISO()
   ) ? "full" : "quick";
+  const showMobileQuickActionsTopbar = document.body.classList.contains("app-mobile-shell");
+  const journalQuickActionsTopbar = showMobileQuickActionsTopbar ? openJournalQuickActions(initialEntryType) : "";
+  const journalModeSwitchMarkup = `
+      <div class="entry-mode-switch journal-overlay-mode-switch" id="journal-overlay-mode-switch" role="group" aria-label="Režim zápisu">
+        <button
+          class="entry-mode-switch__button ${defaultEntryMode === "quick" ? "is-active" : ""}"
+          type="button"
+          data-journal-overlay-mode="quick"
+          aria-pressed="${defaultEntryMode === "quick" ? "true" : "false"}"
+        >Jednoduchý</button>
+        <button
+          class="entry-mode-switch__button ${defaultEntryMode === "full" ? "is-active" : ""}"
+          type="button"
+          data-journal-overlay-mode="full"
+          aria-pressed="${defaultEntryMode === "full" ? "true" : "false"}"
+        >Rozšírený</button>
+      </div>
+    `;
+  const journalModeToggleMarkup = isMobileJournalShell
+    ? ""
+    : `
+        <div class="add-entry-form__topbar">
+          <button class="button button--ghost" id="journal-overlay-mode-toggle" type="button">${defaultEntryMode === "full" ? "Menej možností" : "Rozšírený zápis"}</button>
+        </div>
+      `;
+  const journalComposerActions = isMobileJournalShell
+    ? `
+        <div class="journal-overlay-mobile-actions">
+          <button class="button" id="journal-overlay-submit" type="submit" form="journal-overlay-form">${editingEntry ? "Uložiť zmeny" : "Uložiť zápis"}</button>
+          ${journalModeSwitchMarkup}
+        </div>
+      `
+    : `
+      <button class="button button--ghost" type="button" id="journal-overlay-cancel">Späť</button>
+      <button class="button" id="journal-overlay-submit" type="submit" form="journal-overlay-form">${editingEntry ? "Uložiť zmeny" : "Uložiť zápis"}</button>
+    `;
 
   root.innerHTML = journalOverlayFrame(
     editingEntry ? "Upraviť zápis" : "Pridať zápis",
     `
       <form id="journal-overlay-form" class="journal-form add-entry-form" style="display:grid;gap:14px;">
-        <div class="add-entry-form__topbar">
-          <button class="button button--ghost" id="journal-overlay-mode-toggle" type="button">${defaultEntryMode === "full" ? "Menej možností" : "Rozšírený zápis"}</button>
-        </div>
+        ${journalModeToggleMarkup}
         <div class="add-entry-form__main">
-          ${renderJournalEntryTypePicker(initialEntryType)}
+          ${renderJournalEntryTypePicker(initialEntryType, { mobileMinimal: isMobileJournalShell })}
           <div data-full-only data-title-field>
             <input id="journal-overlay-title-input" name="title" type="text" placeholder="${escapeAttribute(journalEntryTypeUi(initialEntryType).title)}" value="${escapeAttribute(editingEntry?.title || "")}">
           </div>
@@ -1137,11 +1877,11 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
         ${renderJournalWalkFields(editingEntry?.walk || null)}
         <label class="upload-field upload-field--compact">
           <span class="upload-field__label">Fotky k zápisu</span>
-          <input name="imageFiles" type="file" accept="image/*" capture="environment" multiple>
+          <input name="imageFiles" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple>
         </label>
         <label class="upload-field upload-field--compact">
           <span class="upload-field__label">Video k zápisu</span>
-          <input name="videoFile" type="file" accept="video/*" capture="environment">
+          <input name="videoFile" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}">
         </label>
         <div id="journal-overlay-video-status" class="journal-upload-status" hidden>
           <div class="journal-upload-status__topline">
@@ -1179,15 +1919,14 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
         </details>
       </form>
     `,
-    `
-      <button class="button button--ghost" type="button" id="journal-overlay-cancel">Späť</button>
-      <button class="button" id="journal-overlay-submit" type="submit" form="journal-overlay-form">${editingEntry ? "Uložiť zmeny" : "Uložiť zápis"}</button>
-    `
+    journalComposerActions,
+    journalQuickActionsTopbar
   );
 
   const formEl = root.querySelector("#journal-overlay-form");
   const overlayTitleEl = root.querySelector("#journal-overlay-title");
   const modeToggleEl = root.querySelector("#journal-overlay-mode-toggle");
+  const modeSwitchButtons = [...root.querySelectorAll("[data-journal-overlay-mode]")];
   const advancedDetailsEl = root.querySelector("#journal-overlay-advanced");
   const submitButton = root.querySelector("#journal-overlay-submit");
   const dateInput = formEl?.elements.date;
@@ -1284,6 +2023,10 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
   };
 
   root.querySelector("#journal-overlay-close")?.addEventListener("click", () => {
+    cleanupJournalComposer();
+    closeJournalOverlay();
+  });
+  root.querySelector("#journal-overlay-back")?.addEventListener("click", () => {
     cleanupJournalComposer();
     closeJournalOverlay();
   });
@@ -1405,13 +2148,15 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
         dragging: true,
         doubleClickZoom: true,
         keyboard: false,
+        zoomAnimation: false,
+        fadeAnimation: false,
+        markerZoomAnimation: false,
         tap: true,
         touchZoom: true
       });
-      walkGpsLiveTileLayer = window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap"
-      }).addTo(walkGpsLiveMap);
+      walkGpsLiveTileLayer = createWalkTileLayer(walkGpsLiveMap, mapEl);
+      walkMapInstances.set(mapEl, walkGpsLiveMap);
+      attachWalkMapControls(mapEl, () => walkGpsLiveMap);
     }
 
     if (walkGpsLivePolyline) walkGpsLiveMap.removeLayer(walkGpsLivePolyline);
@@ -1447,12 +2192,12 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
       fillOpacity: 1
     }).addTo(walkGpsLiveMap);
 
-    if (walkGpsLivePolyline) {
-      walkGpsLiveMap.fitBounds(walkGpsLivePolyline.getBounds(), { padding: [20, 20] });
-    } else {
-      walkGpsLiveMap.setView([Number(startPoint.latitude), Number(startPoint.longitude)], 16);
-    }
-    requestAnimationFrame(() => walkGpsLiveMap?.invalidateSize());
+    fitWalkMapViewport(walkGpsLiveMap, {
+      polyline: walkGpsLivePolyline,
+      point: startPoint,
+      live: true
+    });
+    scheduleWalkMapResize(walkGpsLiveMap);
   };
 
   const renderWalkGpsState = () => {
@@ -1515,7 +2260,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
     if (walkGpsPointsEl) {
       const previewPoints = walkGpsPoints.slice(-4);
       walkGpsPointsEl.innerHTML = previewPoints.length
-        ? previewPoints.map((point, index) => `<span class="journal-walk-gps__point">${escapeHtml(formatWalkGpsPointLabel(point, walkGpsPoints.length - previewPoints.length + index))}</span>`).join("")
+        ? previewPoints.map((point, index) => `<span class="journal-walk-gps__point">${escapeHtml(formatWalkGpsPointLabel(point, walkGpsPoints.length - previewPoints.length + index, walkGpsPoints.length))}</span>`).join("")
         : "";
       walkGpsPointsEl.hidden = !previewPoints.length;
     }
@@ -1833,6 +2578,11 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
     if (titleInput) titleInput.placeholder = ui.title;
     if (textInput) textInput.placeholder = ui.text;
     if (placeInput) placeInput.placeholder = ui.place;
+    root.querySelectorAll("[data-open-journal-type]").forEach((button) => {
+      const isActive = String(button.getAttribute("data-open-journal-type") || "").trim() === selectedType;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
     if (walkFieldsEl) walkFieldsEl.hidden = selectedType !== "walk";
     titleFieldSections.forEach((section) => {
       section.hidden = formEl?.dataset.entryMode !== "full" || selectedType !== "note";
@@ -1854,6 +2604,11 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
       modeToggleEl.textContent = isFull ? "Menej možností" : "Rozšírený zápis";
       modeToggleEl.setAttribute("aria-pressed", isFull ? "true" : "false");
     }
+    modeSwitchButtons.forEach((button) => {
+      const isActive = String(button.dataset.journalOverlayMode || "").trim() === mode;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
 
     formEl.querySelectorAll("[data-full-only]").forEach((section) => {
       if (section.hasAttribute("data-title-field")) {
@@ -1878,7 +2633,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
   const renderWeatherHint = async () => {
     if (!weatherMountEl || !dateInput) return;
     const selectedDate = String(dateInput.value || todayISO()).trim() || todayISO();
-    const weatherPlaceName = String(loadWeatherPreferences()?.placeLabel || GARDEN_WEATHER_PLACE).trim() || GARDEN_WEATHER_PLACE;
     let snapshot = null;
     if (selectedDate === todayISO()) {
       snapshot = homeWeatherSnapshot || await loadHomeWeatherSnapshot().catch(() => null);
@@ -1889,18 +2643,8 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
     currentWeatherSnapshot = snapshot || null;
     syncWalkAutoFields();
 
-    weatherMountEl.hidden = false;
-    weatherMountEl.innerHTML = snapshot
-      ? `
-        <div class="weather-inline-card weather-inline-card--header-flat">
-          <div class="weather-inline-card__summary">${renderMainMenuWeatherMini(snapshot)}</div>
-        </div>
-      `
-      : `
-        <div class="weather-inline-card weather-inline-card--header-flat weather-inline-card--quiet">
-          <p class="weather-inline-card__status">${selectedDate === todayISO() ? `Dnes sa počasie z miesta ${weatherPlaceName} pripojí automaticky.` : "Pre iný dátum sa počasie zatiaľ nepripája automaticky."}</p>
-        </div>
-      `;
+    weatherMountEl.hidden = true;
+    weatherMountEl.innerHTML = "";
   };
 
   setupCategoryTreePickers(formEl);
@@ -1948,6 +2692,28 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
   modeToggleEl?.addEventListener("click", () => {
     setEntryMode(formEl?.dataset.entryMode === "full" ? "quick" : "full");
   });
+  modeSwitchButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextMode = String(button.dataset.journalOverlayMode || "").trim() || "quick";
+      setEntryMode(nextMode === "full" ? "full" : "quick");
+    });
+  });
+
+  root.querySelectorAll("[data-open-journal-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!formEl) return;
+      const nextType = String(button.getAttribute("data-open-journal-type") || "").trim() || "note";
+      const targetInput = [...formEl.querySelectorAll('input[name="entryType"]')]
+        .find((input) => String(input.value || "").trim() === nextType);
+      if (!targetInput) return;
+      if (!targetInput.checked) {
+        targetInput.checked = true;
+        targetInput.dispatchEvent(new Event("change", { bubbles: true }));
+        return;
+      }
+      syncEntryTypeUi();
+    });
+  });
 
   formEl?.querySelectorAll('input[name="entryType"]').forEach((input) => {
     input.addEventListener("change", () => {
@@ -1972,6 +2738,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
   renderPreview();
   renderWalkGpsState();
   renderWeatherHint().catch(() => {});
+  syncMobileOverlayBottomNavPlacement();
 
   formEl?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2283,6 +3050,7 @@ function renderToolbarSearchResults() {
         activeCategoryId = id;
         isFocusedView = true;
         render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
       const card = state.varieties.find((item) => item.id === id);
@@ -2291,6 +3059,7 @@ function renderToolbarSearchResults() {
         isFocusedView = true;
       }
       render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
       openStoredCardEditor(id);
     });
   });
@@ -2318,8 +3087,16 @@ function ensureToolbarSearch() {
       <div class="toolbar-search__results" id="toolbar-search-results" hidden></div>
     `;
   }
+  const shouldLeadToolbar = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  const targetBefore = shouldLeadToolbar ? (group.firstChild || null) : null;
   if (wrap.parentElement !== group) {
-    group.appendChild(wrap);
+    if (shouldLeadToolbar) {
+      group.insertBefore(wrap, targetBefore);
+    } else {
+      group.appendChild(wrap);
+    }
+  } else if (shouldLeadToolbar && group.firstElementChild !== wrap) {
+    group.insertBefore(wrap, group.firstChild || null);
   }
 
   const input = document.getElementById("toolbar-search-input");
@@ -2362,12 +3139,38 @@ function ensureToolbarSearch() {
 
   if (input) input.value = toolbarSearchQuery;
   if (clearButton) clearButton.hidden = !toolbarSearchQuery.trim();
+  if (group && group.dataset.mobileSearchTapBound !== "true") {
+    group.dataset.mobileSearchTapBound = "true";
+    group.addEventListener("click", (event) => {
+      if (!document.body?.classList.contains("app-mobile-shell")) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(
+        ".toolbar-add-menu, #open-main-menu, #toggle-worklog-panel, #toggle-journal-panel, #open-settings-panel, #toggle-mobile-preview, #toggle-weather-sound"
+      )) {
+        return;
+      }
+      if (target.closest("#toolbar-search-results, #toolbar-search-clear, .toolbar-search__item")) return;
+      if (target.closest("#toolbar-search-input")) return;
+      const activeInput = document.getElementById("toolbar-search-input");
+      if (!(activeInput instanceof HTMLInputElement)) return;
+      activeInput.focus({ preventScroll: true });
+      try {
+        const caretIndex = String(activeInput.value || "").length;
+        activeInput.setSelectionRange(caretIndex, caretIndex);
+      } catch (error) {
+        // Some mobile browsers do not allow manual caret positioning here.
+      }
+    });
+  }
   renderToolbarSearchResults();
   return wrap;
 }
 
 function wireStaticEvents() {
   const settingsPanelToggleEl = ensureSettingsToolbarButton();
+  const mobilePreviewToggleEl = ensureMobilePreviewButton();
+  const mobileWeatherSoundToggleEl = ensureMobileWeatherSoundButton();
 
   document.querySelectorAll(".filter").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2380,6 +3183,28 @@ function wireStaticEvents() {
 
   if (undoDeleteEl) {
     undoDeleteEl.addEventListener("click", undoLastDelete);
+  }
+
+  if (mobilePreviewToggleEl) {
+    mobilePreviewToggleEl.addEventListener("click", () => {
+      setMobilePreviewEnabled(!mobilePreviewEnabled);
+    });
+    syncMobilePreviewClass();
+  }
+
+  if (mobileWeatherSoundToggleEl && mobileWeatherSoundToggleEl.dataset.bound !== "true") {
+    mobileWeatherSoundToggleEl.dataset.bound = "true";
+    mobileWeatherSoundToggleEl.addEventListener("click", (event) => {
+      event.preventDefault();
+      const nextEnabled = !mobileWeatherSoundEnabled;
+      if (nextEnabled) {
+        window.weatherAudioEngine?.handleUserActivation?.();
+      }
+      setMobileWeatherSoundEnabled(nextEnabled);
+      setMobileWeatherSoundPanelOpen(false);
+    });
+    window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
+    syncMobileWeatherSoundButton();
   }
 
   if (mainMenuQuickEl) {
@@ -2401,7 +3226,10 @@ function wireStaticEvents() {
   }
 
   if (worklogPanelToggleEl) {
-    worklogPanelToggleEl.addEventListener("click", openTaskManager);
+    worklogPanelToggleEl.addEventListener("click", () => {
+      closeToolbarAddMenu();
+      openTaskManager();
+    });
   }
 
   if (journalPanelToggleEl) {
@@ -2413,7 +3241,10 @@ function wireStaticEvents() {
   }
 
   if (settingsPanelToggleEl) {
-    settingsPanelToggleEl.addEventListener("click", () => openSettingsManager());
+    settingsPanelToggleEl.addEventListener("click", () => {
+      closeToolbarAddMenu();
+      openSettingsManager();
+    });
   }
 
   if (addCardQuickEl) {
@@ -2477,6 +3308,8 @@ function wireStaticEvents() {
   });
 
   detailModal.addEventListener("close", () => {
+    unlockDetailBodyScroll();
+    syncMobileOverlayBottomNavPlacement();
     if (!overlayHistoryNavigating) {
       clearOverlayHistory("detail");
       return;
@@ -2484,7 +3317,21 @@ function wireStaticEvents() {
     if (activeOverlayHistoryKind === "detail") activeOverlayHistoryKind = "";
   });
 
+  if (detailModalBackEl) {
+    detailModalBackEl.addEventListener("click", () => {
+      if (detailModal?.open && typeof detailModal.close === "function") detailModal.close();
+    });
+  }
+
   window.addEventListener("popstate", () => {
+    if (activeOverlayHistoryKind === "lightbox" && imageLightboxEl?.open) {
+      overlayHistoryNavigating = true;
+      closeImageLightbox();
+      window.setTimeout(() => {
+        overlayHistoryNavigating = false;
+      }, 0);
+      return;
+    }
     if (activeOverlayHistoryKind === "journal" && journalOverlayRoot()) {
       overlayHistoryNavigating = true;
       closeJournalOverlay({ fromHistory: true });
@@ -2521,6 +3368,10 @@ function wireStaticEvents() {
     imageLightboxCloseEl.addEventListener("click", closeImageLightbox);
   }
 
+  if (imageLightboxBackEl) {
+    imageLightboxBackEl.addEventListener("click", closeImageLightbox);
+  }
+
   if (imageLightboxPrevEl) {
     imageLightboxPrevEl.addEventListener("click", () => stepImageLightbox(-1));
   }
@@ -2536,6 +3387,29 @@ function wireStaticEvents() {
     imageLightboxEl.addEventListener("cancel", (event) => {
       event.preventDefault();
       closeImageLightbox();
+    });
+    imageLightboxEl.addEventListener("close", () => {
+      const fallbackKind = inferVisibleOverlayHistoryKind();
+      if (!overlayHistoryNavigating) {
+        if (activeOverlayHistoryKind === "lightbox" && typeof window !== "undefined" && window.history?.back) {
+          activeOverlayHistoryKind = "";
+          overlayHistoryNavigating = true;
+          window.history.back();
+          window.setTimeout(() => {
+            overlayHistoryNavigating = false;
+            if (!activeOverlayHistoryKind) {
+              activeOverlayHistoryKind = fallbackKind;
+            }
+          }, 0);
+        } else if (activeOverlayHistoryKind === "lightbox") {
+          activeOverlayHistoryKind = fallbackKind;
+        }
+      } else if (activeOverlayHistoryKind === "lightbox") {
+        activeOverlayHistoryKind = fallbackKind;
+      }
+
+      unlockBodyScroll("lightbox");
+      syncMobileOverlayBottomNavPlacement();
     });
   }
 
@@ -2584,8 +3458,11 @@ function openImageLightbox(images, startIndex = 0, label = "Fotka") {
   imageLightboxState.label = label;
   syncImageLightbox();
   if (!imageLightboxEl.open && typeof imageLightboxEl.showModal === "function") {
+    pushOverlayHistory("lightbox");
+    lockBodyScroll("lightbox");
     imageLightboxEl.showModal();
   }
+  syncMobileOverlayBottomNavPlacement();
 }
 
 function closeImageLightbox() {
@@ -2612,6 +3489,7 @@ function render() {
   };
 
   ensureActiveCategory();
+  syncMobilePreviewClass();
   closeToolbarAddMenu();
   refreshAutoTasks();
   updateUndoButton();
@@ -2636,11 +3514,179 @@ function render() {
 function renderMainMenu() {
   const grouped = groupedCategories();
   const roots = grouped.map(({ root }) => root);
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const activeWeatherThemeDebugOverride = loadMobileWeatherThemeDebugOverride();
+  const activeWeatherThemeDebugId = activeWeatherThemeDebugOverride?.id || "auto";
+  const activeWeatherThemeCloudOverride = loadMobileWeatherThemeCloudOverride();
+  const activeWeatherThemePhase = loadMobileWeatherThemePhaseOverride();
+  const activeWeatherThemeSeason = loadMobileWeatherThemeSeasonOverride();
+  const activeWeatherThemeTemperatureOverride = loadMobileWeatherThemeTemperatureOverride();
+  const activeWeatherThemeWindOverride = loadMobileWeatherThemeWindOverride();
+  const activeWeatherThemePrecipOverride = loadMobileWeatherThemePrecipOverride();
+  const weatherSceneOnlyActive = isMobileShell && loadMobileWeatherSceneOnlyPreference();
+  const autoWeatherWindSpeed = homeWeatherSnapshot
+    ? weatherWindSpeedKmh(homeWeatherSnapshot)
+    : weatherWindSpeedFallbackForCategory(activeWeatherThemeDebugOverride?.wind || "calm");
+  const effectiveWeatherWindSpeed = activeWeatherThemeWindOverride ?? autoWeatherWindSpeed;
+  const autoWeatherPrecipitationAmount = homeWeatherSnapshot ? weatherPrecipitationMm(homeWeatherSnapshot) : 0;
+  const effectiveWeatherPrecipitationAmount = activeWeatherThemePrecipOverride ?? autoWeatherPrecipitationAmount;
+  const autoWeatherTemperature = homeWeatherSnapshot ? (weatherTemperatureC(homeWeatherSnapshot) ?? 16) : 16;
+  const effectiveWeatherTemperature = activeWeatherThemeTemperatureOverride ?? autoWeatherTemperature;
+  const weatherWindDebugLabel = activeWeatherThemeWindOverride === null
+    ? `Auto · ${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`
+    : `${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`;
+  const weatherPrecipitationDebugLabel = activeWeatherThemePrecipOverride === null
+    ? `Auto · ${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`
+    : `${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`;
+  const weatherTemperatureDebugLabel = activeWeatherThemeTemperatureOverride === null
+    ? `Auto · ${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`
+    : `${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`;
+  const weatherBackgroundDebugState = typeof window !== "undefined" && window.weatherBackgroundEngine?.getDebugState
+    ? window.weatherBackgroundEngine.getDebugState()
+    : null;
+  const weatherBackgroundDebugText = formatWeatherBackgroundDebugText(weatherBackgroundDebugState);
+  const weatherAudioDebugState = typeof window !== "undefined" && window.weatherAudioEngine?.getState
+    ? window.weatherAudioEngine.getState()
+    : null;
+  const weatherAudioDebugMarkup = renderWeatherAudioDebugMarkup(weatherAudioDebugState);
+  const weatherAudioInlineMarkup = renderWeatherAudioInlineMarkup(weatherAudioDebugState);
+  applyMobileWeatherSceneMode();
   mainMenuEl.innerHTML = `
     <section class="menu-group">
       <div class="home-section__header">
       <div></div>
       </div>
+      ${isMobileShell ? `
+        <div class="weather-theme-debug-layout">
+          <details class="weather-theme-debug"${activeWeatherThemeDebugId !== "auto" || activeWeatherThemeCloudOverride !== "" || activeWeatherThemePhase !== "" || activeWeatherThemeSeason !== "" || activeWeatherThemeWindOverride !== null || activeWeatherThemePrecipOverride !== null || activeWeatherThemeTemperatureOverride !== null || weatherSceneOnlyActive ? " open" : ""}>
+            <summary class="weather-theme-debug__summary">Test počasia</summary>
+            <div class="weather-theme-debug__scene">
+              <button
+                class="weather-theme-debug__scene-button ${weatherSceneOnlyActive ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-scene-toggle="1"
+                aria-pressed="${weatherSceneOnlyActive ? "true" : "false"}"
+              >${weatherSceneOnlyActive ? "Čisté pozadie je zapnuté" : "Čisté pozadie"}</button>
+              <p class="weather-theme-debug__scene-note" data-mobile-weather-scene-note>${weatherSceneOnlyActive ? "Karty a ďalší obsah sú skryté, aby bolo vidno celé pozadie." : "Dočasne skryje karty a obsah, aby si vedela odfotiť celé pozadie."}</p>
+            </div>
+            <div class="weather-theme-debug__period">
+              ${MOBILE_WEATHER_PHASE_DEBUG_OPTIONS.map((item) => `
+                <button class="weather-theme-debug__mode ${item.id === activeWeatherThemePhase ? "is-active" : ""}" type="button" data-mobile-weather-phase="${escapeAttribute(item.id)}">${escapeHtml(item.label)}</button>
+              `).join("")}
+            </div>
+            <div class="weather-theme-debug__section-label">Sezóna</div>
+            <div class="weather-theme-debug__chips">
+              ${MOBILE_WEATHER_SEASON_DEBUG_OPTIONS.map((item) => `
+                <button
+                  class="weather-theme-debug__chip ${item.id === activeWeatherThemeSeason ? "is-active" : ""}"
+                  type="button"
+                  data-mobile-weather-season="${escapeAttribute(item.id)}"
+                >${escapeHtml(item.label)}</button>
+              `).join("")}
+            </div>
+            <div class="weather-theme-debug__section-label">Oblačnosť</div>
+            <div class="weather-theme-debug__chips">
+              ${MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.map((item) => `
+                <button
+                  class="weather-theme-debug__chip ${item.id === activeWeatherThemeCloudOverride ? "is-active" : ""}"
+                  type="button"
+                  data-mobile-weather-cloud="${escapeAttribute(item.id)}"
+                >${escapeHtml(item.label)}</button>
+              `).join("")}
+            </div>
+            <div class="weather-theme-debug__section-label">Javy</div>
+            ${MOBILE_WEATHER_THEME_DEBUG_OPTIONS.length > 1 ? `
+              <div class="weather-theme-debug__chips">
+                ${MOBILE_WEATHER_THEME_DEBUG_OPTIONS.map((item) => `
+                  <button
+                    class="weather-theme-debug__chip ${item.id === activeWeatherThemeDebugId ? "is-active" : ""}"
+                    type="button"
+                    data-mobile-weather-debug="${escapeAttribute(item.id)}"
+                  >${escapeHtml(item.label)}</button>
+                `).join("")}
+              </div>
+            ` : ""}
+            <div class="weather-theme-debug__wind weather-theme-debug__wind--precip">
+              <div class="weather-theme-debug__wind-head">
+                <span class="weather-theme-debug__wind-caption">Zrážky</span>
+                <span class="weather-theme-debug__wind-value" data-mobile-weather-precip-label>${escapeHtml(weatherPrecipitationDebugLabel)}</span>
+              </div>
+              <div class="weather-theme-debug__wind-controls">
+                <button class="weather-theme-debug__mode ${activeWeatherThemePrecipOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-precip-auto="1">Auto</button>
+                <input
+                  class="weather-theme-debug__range weather-theme-debug__range--precip"
+                  type="range"
+                  min="0"
+                  max="12"
+                  step="0.2"
+                  value="${escapeAttribute(effectiveWeatherPrecipitationAmount.toFixed(1))}"
+                  data-mobile-weather-precip-range
+                  aria-label="Intenzita zrážok v milimetroch"
+                >
+              </div>
+              <div class="weather-theme-debug__scale" aria-hidden="true">
+                <span>0</span>
+                <span>2</span>
+                <span>6</span>
+                <span>12 mm</span>
+              </div>
+            </div>
+            <div class="weather-theme-debug__wind">
+              <div class="weather-theme-debug__wind-head">
+                <span class="weather-theme-debug__wind-caption">Vietor</span>
+                <span class="weather-theme-debug__wind-value" data-mobile-weather-wind-label>${escapeHtml(weatherWindDebugLabel)}</span>
+              </div>
+              <div class="weather-theme-debug__wind-controls">
+                <button class="weather-theme-debug__mode ${activeWeatherThemeWindOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-wind-auto="1">Auto</button>
+                <input
+                  class="weather-theme-debug__range"
+                  type="range"
+                  min="0"
+                  max="70"
+                  step="2"
+                  value="${escapeAttribute(Math.round(effectiveWeatherWindSpeed))}"
+                  data-mobile-weather-wind-range
+                  aria-label="Sila vetra v kilometroch za hodinu"
+                >
+              </div>
+              <div class="weather-theme-debug__scale" aria-hidden="true">
+                <span>0</span>
+                <span>20</span>
+                <span>40</span>
+                <span>70 km/h</span>
+              </div>
+            </div>
+            <div class="weather-theme-debug__wind weather-theme-debug__wind--temp">
+              <div class="weather-theme-debug__wind-head">
+                <span class="weather-theme-debug__wind-caption">Teplota</span>
+                <span class="weather-theme-debug__wind-value" data-mobile-weather-temp-label>${escapeHtml(weatherTemperatureDebugLabel)}</span>
+              </div>
+              <div class="weather-theme-debug__wind-controls">
+                <button class="weather-theme-debug__mode ${activeWeatherThemeTemperatureOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-temp-auto="1">Auto</button>
+                <input
+                  class="weather-theme-debug__range weather-theme-debug__range--temp"
+                  type="range"
+                  min="-15"
+                  max="38"
+                  step="1"
+                  value="${escapeAttribute(String(Math.round(effectiveWeatherTemperature)))}"
+                  data-mobile-weather-temp-range
+                  aria-label="Teplota v stupňoch Celzia"
+                >
+              </div>
+              <div class="weather-theme-debug__scale" aria-hidden="true">
+                <span>-15</span>
+                <span>0</span>
+                <span>20</span>
+                <span>38 °C</span>
+              </div>
+            </div>
+            <p class="weather-theme-debug__inline-state" data-mobile-weather-inline-state style="margin:10px 0 0; padding:8px 10px; border-radius:14px; background:rgba(16,22,30,.08); color:#314233; font-size:12px; line-height:1.35; word-break:break-word;">Debug: ${escapeHtml(weatherBackgroundDebugText)}</p>
+          </details>
+          ${weatherAudioDebugMarkup}
+        </div>
+      ` : ""}
+      ${isMobileShell ? weatherAudioInlineMarkup : ""}
       <div class="catalog-grid catalog-grid--main-menu">
         ${roots.map(renderMainMenuCategoryCard).join("")}
       </div>
@@ -2652,6 +3698,7 @@ function renderMainMenu() {
       activeCategoryId = item.dataset.openMainCategory;
       isFocusedView = true;
       render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
     item.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -2659,6 +3706,7 @@ function renderMainMenu() {
         activeCategoryId = item.dataset.openMainCategory;
         isFocusedView = true;
         render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
     });
   });
@@ -2669,15 +3717,227 @@ function renderMainMenu() {
       openCategoryManager(button.dataset.editMainCategory);
     });
   });
+
+  mainMenuEl.querySelectorAll("[data-mobile-weather-debug]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const nextId = String(button.getAttribute("data-mobile-weather-debug") || "auto").trim() || "auto";
+      saveMobileWeatherThemeDebugOverride(nextId);
+      applyMobileWeatherTheme();
+      renderMainMenu();
+    });
+  });
+
+  mainMenuEl.querySelectorAll("[data-mobile-weather-cloud]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const nextId = String(button.getAttribute("data-mobile-weather-cloud") || "").trim();
+      saveMobileWeatherThemeCloudOverride(nextId);
+      applyMobileWeatherTheme();
+      renderMainMenu();
+    });
+  });
+
+  mainMenuEl.querySelectorAll("[data-mobile-weather-phase]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const nextValue = String(button.getAttribute("data-mobile-weather-phase") || "").trim();
+      saveMobileWeatherThemePhaseOverride(nextValue);
+      applyMobileWeatherTheme();
+      renderMainMenu();
+    });
+  });
+
+  mainMenuEl.querySelectorAll("[data-mobile-weather-season]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const nextValue = String(button.getAttribute("data-mobile-weather-season") || "").trim();
+      saveMobileWeatherThemeSeasonOverride(nextValue);
+      applyMobileWeatherTheme();
+      renderMainMenu();
+    });
+  });
+
+  const weatherWindAutoButton = mainMenuEl.querySelector("[data-mobile-weather-wind-auto]");
+  const weatherWindRange = mainMenuEl.querySelector("[data-mobile-weather-wind-range]");
+  const weatherWindLabel = mainMenuEl.querySelector("[data-mobile-weather-wind-label]");
+  const weatherPrecipAutoButton = mainMenuEl.querySelector("[data-mobile-weather-precip-auto]");
+  const weatherPrecipRange = mainMenuEl.querySelector("[data-mobile-weather-precip-range]");
+  const weatherPrecipLabel = mainMenuEl.querySelector("[data-mobile-weather-precip-label]");
+  const weatherTempAutoButton = mainMenuEl.querySelector("[data-mobile-weather-temp-auto]");
+  const weatherTempRange = mainMenuEl.querySelector("[data-mobile-weather-temp-range]");
+  const weatherTempLabel = mainMenuEl.querySelector("[data-mobile-weather-temp-label]");
+  const weatherInlineState = mainMenuEl.querySelector("[data-mobile-weather-inline-state]");
+  const weatherSceneToggle = mainMenuEl.querySelector("[data-mobile-weather-scene-toggle]");
+  const weatherSceneNote = mainMenuEl.querySelector("[data-mobile-weather-scene-note]");
+  const resolveAutoWeatherWindSpeed = () => {
+    const liveDebugOverride = loadMobileWeatherThemeDebugOverride();
+    return homeWeatherSnapshot
+      ? weatherWindSpeedKmh(homeWeatherSnapshot)
+      : weatherWindSpeedFallbackForCategory(liveDebugOverride?.wind || "calm");
+  };
+  const resolveAutoWeatherPrecipitationAmount = () => homeWeatherSnapshot ? weatherPrecipitationMm(homeWeatherSnapshot) : 0;
+  const resolveAutoWeatherTemperature = () => homeWeatherSnapshot ? (weatherTemperatureC(homeWeatherSnapshot) ?? 16) : 16;
+  const syncWeatherWindUi = (speedValue, isAuto) => {
+    const normalizedSpeed = Math.max(0, Math.min(70, Math.round(Number(speedValue) || 0)));
+    if (weatherWindRange) weatherWindRange.value = String(normalizedSpeed);
+    if (weatherWindLabel) {
+      weatherWindLabel.textContent = isAuto
+        ? `Auto · ${normalizedSpeed} km/h · ${mobileWeatherWindLabel(normalizedSpeed)}`
+        : `${normalizedSpeed} km/h · ${mobileWeatherWindLabel(normalizedSpeed)}`;
+    }
+    if (weatherWindAutoButton) weatherWindAutoButton.classList.toggle("is-active", isAuto);
+  };
+  const syncWeatherPrecipUi = (amountValue, isAuto) => {
+    const normalizedAmount = Math.max(0, Math.min(12, Math.round((Number(amountValue) || 0) * 10) / 10));
+    if (weatherPrecipRange) weatherPrecipRange.value = normalizedAmount.toFixed(1);
+    if (weatherPrecipLabel) {
+      weatherPrecipLabel.textContent = isAuto
+        ? `Auto · ${normalizedAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(normalizedAmount)}`
+        : `${normalizedAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(normalizedAmount)}`;
+    }
+    if (weatherPrecipAutoButton) weatherPrecipAutoButton.classList.toggle("is-active", isAuto);
+  };
+  const syncWeatherTempUi = (temperatureValue, isAuto) => {
+    const normalizedTemp = Math.max(-15, Math.min(38, Math.round(Number(temperatureValue) || 0)));
+    if (weatherTempRange) weatherTempRange.value = String(normalizedTemp);
+    if (weatherTempLabel) {
+      weatherTempLabel.textContent = isAuto
+        ? `Auto · ${normalizedTemp} °C · ${mobileWeatherTemperatureBandLabel(normalizedTemp)}`
+        : `${normalizedTemp} °C · ${mobileWeatherTemperatureBandLabel(normalizedTemp)}`;
+    }
+    if (weatherTempAutoButton) weatherTempAutoButton.classList.toggle("is-active", isAuto);
+  };
+  const syncWeatherSceneUi = (isActive) => {
+    if (weatherSceneToggle) {
+      weatherSceneToggle.classList.toggle("is-active", isActive);
+      weatherSceneToggle.setAttribute("aria-pressed", isActive ? "true" : "false");
+      weatherSceneToggle.textContent = isActive ? "Čisté pozadie je zapnuté" : "Čisté pozadie";
+    }
+    if (weatherSceneNote) {
+      weatherSceneNote.textContent = isActive
+        ? "Karty a ďalší obsah sú skryté, aby bolo vidno celé pozadie."
+        : "Dočasne skryje karty a obsah, aby si vedela odfotiť celé pozadie.";
+    }
+  };
+  const syncWeatherInlineDebugText = () => {
+    if (!weatherInlineState) return;
+    const nextDebugState = typeof window !== "undefined" && window.weatherBackgroundEngine?.getDebugState
+      ? window.weatherBackgroundEngine.getDebugState()
+      : null;
+    weatherInlineState.textContent = `Debug: ${formatWeatherBackgroundDebugText(nextDebugState)}`;
+  };
+  const syncWeatherAudioDebugPanel = () => {
+    updateMainMenuWeatherAudioDebugPanel();
+  };
+
+  if (weatherWindAutoButton) {
+    weatherWindAutoButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      saveMobileWeatherThemeWindOverride(null);
+      applyMobileWeatherTheme();
+      syncWeatherWindUi(resolveAutoWeatherWindSpeed(), true);
+      syncWeatherInlineDebugText();
+      syncWeatherAudioDebugPanel();
+    });
+  }
+
+  if (weatherWindRange) {
+    const applyWeatherWindFromRange = () => {
+      const nextSpeed = Math.max(0, Math.min(70, Math.round(Number(weatherWindRange.value) || 0)));
+      saveMobileWeatherThemeWindOverride(nextSpeed);
+      applyMobileWeatherTheme();
+      syncWeatherWindUi(nextSpeed, false);
+      syncWeatherInlineDebugText();
+      syncWeatherAudioDebugPanel();
+    };
+
+    weatherWindRange.addEventListener("input", applyWeatherWindFromRange);
+    weatherWindRange.addEventListener("change", applyWeatherWindFromRange);
+  }
+
+  if (weatherPrecipAutoButton) {
+    weatherPrecipAutoButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      saveMobileWeatherThemePrecipOverride(null);
+      applyMobileWeatherTheme();
+      syncWeatherPrecipUi(resolveAutoWeatherPrecipitationAmount(), true);
+      syncWeatherInlineDebugText();
+      syncWeatherAudioDebugPanel();
+    });
+  }
+
+  if (weatherPrecipRange) {
+    const applyWeatherPrecipFromRange = () => {
+      const nextAmount = Math.max(0, Math.min(12, Math.round((Number(weatherPrecipRange.value) || 0) * 10) / 10));
+      saveMobileWeatherThemePrecipOverride(nextAmount);
+      applyMobileWeatherTheme();
+      syncWeatherPrecipUi(nextAmount, false);
+      syncWeatherInlineDebugText();
+      syncWeatherAudioDebugPanel();
+    };
+
+    weatherPrecipRange.addEventListener("input", applyWeatherPrecipFromRange);
+    weatherPrecipRange.addEventListener("change", applyWeatherPrecipFromRange);
+  }
+
+  if (weatherTempAutoButton) {
+    weatherTempAutoButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      saveMobileWeatherThemeTemperatureOverride(null);
+      applyMobileWeatherTheme();
+      syncWeatherTempUi(resolveAutoWeatherTemperature(), true);
+      syncWeatherInlineDebugText();
+      syncWeatherAudioDebugPanel();
+    });
+  }
+
+  if (weatherTempRange) {
+    const applyWeatherTempFromRange = () => {
+      const nextTemp = Math.max(-15, Math.min(38, Math.round(Number(weatherTempRange.value) || 0)));
+      saveMobileWeatherThemeTemperatureOverride(nextTemp);
+      applyMobileWeatherTheme();
+      syncWeatherTempUi(nextTemp, false);
+      syncWeatherInlineDebugText();
+      syncWeatherAudioDebugPanel();
+    };
+
+    weatherTempRange.addEventListener("input", applyWeatherTempFromRange);
+    weatherTempRange.addEventListener("change", applyWeatherTempFromRange);
+  }
+
+  if (weatherSceneToggle) {
+    weatherSceneToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      const nextValue = !loadMobileWeatherSceneOnlyPreference();
+      saveMobileWeatherSceneOnlyPreference(nextValue);
+      applyMobileWeatherSceneMode();
+      syncWeatherSceneUi(nextValue);
+    });
+  }
+
+  syncWeatherWindUi(activeWeatherThemeWindOverride ?? resolveAutoWeatherWindSpeed(), activeWeatherThemeWindOverride === null);
+  syncWeatherPrecipUi(activeWeatherThemePrecipOverride ?? resolveAutoWeatherPrecipitationAmount(), activeWeatherThemePrecipOverride === null);
+  syncWeatherTempUi(activeWeatherThemeTemperatureOverride ?? resolveAutoWeatherTemperature(), activeWeatherThemeTemperatureOverride === null);
+  syncWeatherSceneUi(weatherSceneOnlyActive);
+  syncWeatherInlineDebugText();
+  syncWeatherAudioDebugPanel();
+  bindMainMenuWeatherAudioControlEvents();
+  bindMainMenuWeatherAudioDebugEvents();
+  ensureMainMenuWeatherAudioDebugTicker();
 }
 
 function ensureSettingsToolbarButton() {
   const toolbarSlot = document.getElementById("menu-toolbar-settings-slot") || document.querySelector(".utility-bar__settings");
   if (!toolbarSlot) return null;
+  const mobilePrimaryGroup = document.querySelector(".menu-toolbar__group--primary");
+  const targetParent = document.body?.classList.contains("app-mobile-shell") && mobilePrimaryGroup
+    ? mobilePrimaryGroup
+    : toolbarSlot;
   let button = document.getElementById("open-settings-panel");
   if (button) {
-    if (button.parentElement !== toolbarSlot) {
-      toolbarSlot.appendChild(button);
+    if (button.parentElement !== targetParent) {
+      targetParent.appendChild(button);
     }
     return button;
   }
@@ -2687,8 +3947,343 @@ function ensureSettingsToolbarButton() {
   button.id = "open-settings-panel";
   button.type = "button";
   button.textContent = "Nastavenia";
-  toolbarSlot.appendChild(button);
+  targetParent.appendChild(button);
   return button;
+}
+
+function ensureMobilePreviewButton() {
+  const toolbarSlot = document.getElementById("menu-toolbar-settings-slot") || document.querySelector(".utility-bar__settings");
+  if (!toolbarSlot) return null;
+  const mobilePrimaryGroup = document.querySelector(".menu-toolbar__group--primary");
+  const targetParent = document.body?.classList.contains("app-mobile-shell") && mobilePrimaryGroup
+    ? mobilePrimaryGroup
+    : toolbarSlot;
+  let button = document.getElementById("toggle-mobile-preview");
+  if (button) {
+    if (button.parentElement !== targetParent) {
+      targetParent.appendChild(button);
+    }
+    button.hidden = false;
+    return button;
+  }
+
+  button = document.createElement("button");
+  button.className = "button button--ghost button--toolbar-utility button--toolbar-preview";
+  button.id = "toggle-mobile-preview";
+  button.type = "button";
+  targetParent.appendChild(button);
+  button.hidden = false;
+  syncMobilePreviewClass();
+  return button;
+}
+
+function ensureMobileWeatherSoundButton() {
+  const toolbarSlot = document.getElementById("menu-toolbar-settings-slot") || document.querySelector(".utility-bar__settings");
+  if (!toolbarSlot) return null;
+  const mobilePrimaryGroup = document.querySelector(".menu-toolbar__group--primary");
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  const targetParent = isMobileShell && mobilePrimaryGroup ? mobilePrimaryGroup : toolbarSlot;
+  let button = document.getElementById("toggle-weather-sound");
+  if (button) {
+    if (button.parentElement !== targetParent) {
+      targetParent.appendChild(button);
+    }
+    button.hidden = !isMobileShell;
+    syncMobileWeatherSoundButton();
+    return button;
+  }
+
+  button = document.createElement("button");
+  button.className = "button button--ghost button--toolbar-utility button--toolbar-sound";
+  button.id = "toggle-weather-sound";
+  button.type = "button";
+  button.hidden = !isMobileShell;
+  targetParent.appendChild(button);
+  syncMobileWeatherSoundButton();
+  return button;
+}
+
+function syncMobileWeatherSoundButton() {
+  if (typeof document === "undefined") return;
+  const button = document.getElementById("toggle-weather-sound");
+  if (!button) return;
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  button.hidden = !isMobileShell;
+  const audioState = window.weatherAudioEngine?.getState?.() || null;
+  const supported = audioState?.supported !== false;
+  const waitingForGesture = Boolean(
+    mobileWeatherSoundEnabled
+    && supported
+    && audioState?.ready
+    && audioState?.running === false
+  );
+  const soundLabel = mobileWeatherSoundEnabled ? "Zvuk počasia zapnutý" : "Zvuk počasia vypnutý";
+  const hint = !supported
+    ? "Zvuk nie je v tomto prehliadači podporovaný."
+    : waitingForGesture
+      ? "Zvuk sa po prvom dotyku alebo kliknutí spustí."
+      : mobileWeatherSoundEnabled
+        ? "Ťuknutím zvuk vypneš."
+        : "Ťuknutím zvuk zapneš.";
+  button.textContent = soundLabel;
+  button.setAttribute("aria-pressed", mobileWeatherSoundEnabled ? "true" : "false");
+  button.removeAttribute("aria-expanded");
+  button.setAttribute("aria-label", soundLabel);
+  button.setAttribute("title", `${soundLabel}. ${hint}`.trim());
+  button.dataset.soundState = mobileWeatherSoundEnabled ? "on" : "off";
+  button.dataset.audioReady = waitingForGesture ? "pending" : "ready";
+}
+
+function setMobileWeatherSoundPanelOpen(open) {
+  mobileWeatherSoundPanelOpen = Boolean(open);
+  syncMobileWeatherSoundButton();
+  syncMainMenuWeatherAudioControls();
+}
+
+function setMobileWeatherSoundEnabled(enabled, { persist = true } = {}) {
+  mobileWeatherSoundEnabled = Boolean(enabled);
+  if (persist) {
+    try {
+      localStorage.setItem(MOBILE_WEATHER_SOUND_KEY, mobileWeatherSoundEnabled ? "1" : "0");
+    } catch (error) {
+      console.warn("Zvuk počasia sa nepodarilo uložiť.", error);
+    }
+  }
+  window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
+  window.weatherAudioEngine?.setMasterVolume?.(mobileWeatherSoundVolume);
+  if (!mobileWeatherSoundEnabled) {
+    window.weatherAudioEngine?.clear?.();
+  }
+  applyMobileWeatherTheme();
+  syncMobileWeatherSoundButton();
+  updateMainMenuWeatherAudioDebugPanel();
+  syncMainMenuWeatherAudioControls();
+}
+
+function setMobileWeatherSoundVolume(value, { persist = true } = {}) {
+  mobileWeatherSoundVolume = Math.max(0, Math.min(1, Number(value) || 0));
+  if (persist) {
+    try {
+      localStorage.setItem(MOBILE_WEATHER_SOUND_VOLUME_KEY, String(mobileWeatherSoundVolume));
+    } catch (error) {
+      console.warn("Hlasitosť zvuku počasia sa nepodarilo uložiť.", error);
+    }
+  }
+  window.weatherAudioEngine?.setMasterVolume?.(mobileWeatherSoundVolume);
+  updateMainMenuWeatherAudioDebugPanel();
+  syncMainMenuWeatherAudioControls();
+}
+
+function syncResponsiveToolbarButtonPlacement() {
+  if (typeof document === "undefined") return;
+  ensureSettingsToolbarButton();
+  ensureMobilePreviewButton();
+  ensureMobileWeatherSoundButton();
+}
+
+function mobileBottomNavMarkup() {
+  return `
+    <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="menu">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--menu" aria-hidden="true"></span>
+      <span class="mobile-bottom-nav__label">Menu</span>
+    </button>
+    <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="tasks">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--tasks" aria-hidden="true"></span>
+      <span class="mobile-bottom-nav__label">Úlohy</span>
+    </button>
+    <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="journal">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--journal" aria-hidden="true"></span>
+      <span class="mobile-bottom-nav__label">Denník</span>
+    </button>
+  `;
+}
+
+function closeMobileOverlaySurfacesForNavigation() {
+  const hasLightbox = Boolean(imageLightboxEl?.open);
+  const hasJournal = Boolean(journalOverlayRoot());
+  const hasDetail = Boolean(detailModal?.open);
+  if (!hasLightbox && !hasJournal && !hasDetail) return;
+
+  skipNextBodyScrollRestore = true;
+  overlayHistoryNavigating = true;
+  activeOverlayHistoryKind = "";
+
+  if (hasLightbox) closeImageLightbox();
+  if (hasJournal) closeJournalOverlay({ fromHistory: true });
+  if (hasDetail) detailModal.close();
+
+  window.setTimeout(() => {
+    overlayHistoryNavigating = false;
+  }, 0);
+}
+
+function runMobileBottomNavAction(action = "") {
+  const normalizedAction = String(action || "").trim();
+  if (!normalizedAction) return;
+
+  closeToolbarAddMenu();
+  closeMobileOverlaySurfacesForNavigation();
+
+  const applyAction = () => {
+    if (normalizedAction === "menu") {
+      openMainMenuView();
+      return;
+    }
+    if (normalizedAction === "tasks") {
+      openTaskManager();
+      return;
+    }
+    if (normalizedAction === "journal") {
+      forceOpenJournalManager();
+    }
+  };
+
+  applyAction();
+}
+
+function bindMobileBottomNav(slot) {
+  if (!slot || slot.dataset.bound === "true") return slot;
+  slot.dataset.bound = "true";
+  slot.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-mobile-bottom-nav]");
+    if (!button || !slot.contains(button)) return;
+    runMobileBottomNavAction(button.getAttribute("data-mobile-bottom-nav") || "");
+  });
+  return slot;
+}
+
+function ensureMobileBottomNavHostSlot(host, { id, className = "" } = {}) {
+  if (!host) return null;
+  let slot = id ? host.querySelector(`#${id}`) : host.querySelector(".mobile-bottom-nav");
+  if (!slot) {
+    slot = document.createElement("nav");
+    slot.className = `mobile-bottom-nav ${className}`.trim();
+    if (id) slot.id = id;
+    slot.setAttribute("aria-label", "Spodná mobilná navigácia");
+    slot.innerHTML = mobileBottomNavMarkup();
+  } else if (className) {
+    slot.className = `mobile-bottom-nav ${className}`.trim();
+  }
+
+  if (slot.parentElement !== host) {
+    host.appendChild(slot);
+  }
+
+  bindMobileBottomNav(slot);
+  return slot;
+}
+
+function ensureMobileBottomNavSlot() {
+  return ensureMobileBottomNavHostSlot(pageShellEl, { id: "mobile-bottom-nav" });
+}
+
+function syncMobileOverlayBottomNavPlacement() {
+  if (typeof document === "undefined") return;
+  const isMobileShell = document.body.classList.contains("app-mobile-shell");
+
+  if (!isMobileShell) {
+    detailModal?.querySelector("#detail-mobile-bottom-nav")?.remove();
+    imageLightboxEl?.querySelector("#lightbox-mobile-bottom-nav")?.remove();
+    journalOverlayRoot()?.querySelector("#journal-mobile-bottom-nav")?.remove();
+    return;
+  }
+
+  if (detailModal?.open) {
+    ensureMobileBottomNavHostSlot(detailModal, {
+      id: "detail-mobile-bottom-nav",
+      className: "mobile-bottom-nav--overlay mobile-bottom-nav--detail"
+    });
+  } else {
+    detailModal?.querySelector("#detail-mobile-bottom-nav")?.remove();
+  }
+
+  const journalRoot = journalOverlayRoot();
+  const journalHost = journalRoot?.querySelector(".journal-overlay-shell") || journalRoot;
+  if (journalHost) {
+    ensureMobileBottomNavHostSlot(journalHost, {
+      id: "journal-mobile-bottom-nav",
+      className: "mobile-bottom-nav--overlay mobile-bottom-nav--journal"
+    });
+  }
+
+  if (imageLightboxEl?.open) {
+    ensureMobileBottomNavHostSlot(imageLightboxEl, {
+      id: "lightbox-mobile-bottom-nav",
+      className: "mobile-bottom-nav--overlay mobile-bottom-nav--lightbox"
+    });
+  } else {
+    imageLightboxEl?.querySelector("#lightbox-mobile-bottom-nav")?.remove();
+  }
+}
+
+function syncMobileBottomNavPlacement() {
+  if (typeof document === "undefined") return;
+  const isMobileShell = document.body.classList.contains("app-mobile-shell");
+  if (isMobileShell) {
+    if (mainMenuQuickEl && mainMenuQuickOriginalParentEl && mainMenuQuickEl.parentElement !== mainMenuQuickOriginalParentEl) {
+      mainMenuQuickOriginalParentEl.appendChild(mainMenuQuickEl);
+    }
+    if (worklogPanelToggleEl && worklogQuickOriginalParentEl && worklogPanelToggleEl.parentElement !== worklogQuickOriginalParentEl) {
+      worklogQuickOriginalParentEl.appendChild(worklogPanelToggleEl);
+    }
+    if (journalPanelToggleEl && journalQuickOriginalParentEl && journalPanelToggleEl.parentElement !== journalQuickOriginalParentEl) {
+      journalQuickOriginalParentEl.appendChild(journalPanelToggleEl);
+    }
+    ensureMobileBottomNavSlot();
+    syncMobileOverlayBottomNavPlacement();
+    return;
+  }
+
+  if (mainMenuQuickEl) {
+    mainMenuQuickEl.hidden = !isFocusedView;
+    if (mainMenuQuickOriginalParentEl && mainMenuQuickEl.parentElement !== mainMenuQuickOriginalParentEl) {
+      mainMenuQuickOriginalParentEl.appendChild(mainMenuQuickEl);
+    }
+  }
+  if (worklogPanelToggleEl) {
+    if (worklogQuickOriginalParentEl && worklogPanelToggleEl.parentElement !== worklogQuickOriginalParentEl) {
+      worklogQuickOriginalParentEl.appendChild(worklogPanelToggleEl);
+    }
+  }
+  if (journalPanelToggleEl) {
+    if (journalQuickOriginalParentEl && journalPanelToggleEl.parentElement !== journalQuickOriginalParentEl) {
+      journalQuickOriginalParentEl.appendChild(journalPanelToggleEl);
+    }
+  }
+  document.getElementById("mobile-bottom-nav")?.remove();
+  syncMobileOverlayBottomNavPlacement();
+}
+
+function ensureMobileWeatherToolbarSlot() {
+  const contentShell = utilityBarEl?.parentElement;
+  if (!utilityBarEl || !contentShell) return null;
+  let slot = document.getElementById("mobile-toolbar-weather-slot");
+  if (!slot) {
+    slot = document.createElement("div");
+    slot.className = "mobile-toolbar-weather-slot";
+    slot.id = "mobile-toolbar-weather-slot";
+  }
+  const targetSibling = utilityBarEl.nextSibling;
+  if (slot.parentElement !== contentShell || slot.previousSibling !== utilityBarEl) {
+    contentShell.insertBefore(slot, targetSibling);
+  }
+  return slot;
+}
+
+function syncMobileWeatherMiniPlacement() {
+  if (typeof document === "undefined" || !heroWeatherWrapEl || !heroWeatherOriginalParentEl) return;
+  const isMobileShell = document.body.classList.contains("app-mobile-shell");
+  if (isMobileShell) {
+    const slot = ensureMobileWeatherToolbarSlot();
+    if (slot && heroWeatherWrapEl.parentElement !== slot) {
+      slot.appendChild(heroWeatherWrapEl);
+    }
+    return;
+  }
+  if (heroWeatherWrapEl.parentElement !== heroWeatherOriginalParentEl) {
+    heroWeatherOriginalParentEl.appendChild(heroWeatherWrapEl);
+  }
+  document.getElementById("mobile-toolbar-weather-slot")?.remove();
 }
 
 function renderProgressOverview() {
@@ -2809,6 +4404,23 @@ function renderCatalog() {
   const varietyEmpty = category.nodeType === "parent"
     ? "Karty patria skôr pod konkrétne kategórie. Najprv otvor alebo vytvor podradenú kategóriu."
     : "V tejto kategórii ešte nie sú karty. Klikni na Pridať kartu.";
+  const categoryManageMarkup = `
+      <details class="category-action-disclosure category-action-disclosure--inline category-panel__manage">
+        <summary class="button button--soft category-action-disclosure__summary">Správa kategórie</summary>
+        <section class="category-action-panel category-action-panel--inline">
+          <div class="category-action-panel__row category-action-panel__row--category">
+            <button class="button button--soft category-action-panel__button category-action-panel__button--manage" type="button" id="edit-category">Upraviť kategóriu</button>
+            <button class="button button--soft category-action-panel__button category-action-panel__button--structure" type="button" id="add-child-category">Pridať podradenú kategóriu</button>
+          </div>
+          <div class="category-action-panel__row category-action-panel__row--entries">
+            <button class="button category-action-panel__button category-action-panel__button--detail" type="button" id="add-detail-entry">Pridať kartu</button>
+            <button class="button button--soft category-action-panel__button category-action-panel__button--gallery" type="button" id="add-gallery-entry">Pridať galériu</button>
+            <button class="button button--soft category-action-panel__button category-action-panel__button--sowing" type="button" id="sow-category-entries">Hromadný výsev</button>
+            <button class="button button--soft category-action-panel__button category-action-panel__button--move" type="button" id="move-category-entries">Hromadný presun kariet</button>
+          </div>
+        </section>
+      </details>
+    `;
 
   catalogEl.innerHTML = `
         <div class="category-shell">
@@ -2824,15 +4436,8 @@ function renderCatalog() {
             `).join("")}
             </div>
         </div>
-        ${childCategories.length ? `
-          <section class="subcatalog subcatalog--overview">
-            <div class="catalog-grid catalog-grid--subcategories">
-              ${childCategories.map(renderChildCategoryCard).join("")}
-            </div>
-          </section>
-        ` : ""}
         ${isFocusedView ? `
-        <section class="category-panel category-panel--${category.nodeType === "parent" ? "section" : "kind"}">
+        <section class="category-panel category-panel--summary category-panel--${category.nodeType === "parent" ? "section" : "kind"}">
         <div class="category-panel__hero">
           <div class="category-panel__intro">
             <div class="category-panel__intro-copy">
@@ -2843,21 +4448,7 @@ function renderCatalog() {
               ${inheritedNotes ? `<p class="category-panel__notes">${escapeHtml(inheritedNotes)}</p>` : ""}
             </div>
           </div>
-          <details class="category-action-disclosure category-action-disclosure--inline category-panel__manage">
-            <summary class="button button--soft category-action-disclosure__summary">Správa kategórie</summary>
-            <section class="category-action-panel category-action-panel--inline">
-              <div class="category-action-panel__row category-action-panel__row--category">
-                <button class="button button--soft category-action-panel__button category-action-panel__button--manage" type="button" id="edit-category">Upraviť kategóriu</button>
-                <button class="button button--soft category-action-panel__button category-action-panel__button--structure" type="button" id="add-child-category">Pridať podradenú kategóriu</button>
-              </div>
-              <div class="category-action-panel__row category-action-panel__row--entries">
-                <button class="button category-action-panel__button category-action-panel__button--detail" type="button" id="add-detail-entry">Pridať kartu</button>
-                <button class="button button--soft category-action-panel__button category-action-panel__button--gallery" type="button" id="add-gallery-entry">Pridať galériu</button>
-                <button class="button button--soft category-action-panel__button category-action-panel__button--sowing" type="button" id="sow-category-entries">Hromadný výsev</button>
-                <button class="button button--soft category-action-panel__button category-action-panel__button--move" type="button" id="move-category-entries">Hromadný presun kariet</button>
-              </div>
-            </section>
-          </details>
+          ${categoryManageMarkup}
       </div>
         <div class="category-panel__chips category-panel__chips--actions">
         ${sownCount ? `<button class="tag tag--button tag--button-sown" type="button" id="open-category-sown">${sownCount} vysiate</button>` : ""}
@@ -2870,6 +4461,13 @@ function renderCatalog() {
       </div>
     </section>
         ` : ""}
+        ${childCategories.length ? `
+          <section class="subcatalog subcatalog--overview">
+            <div class="catalog-grid catalog-grid--subcategories">
+              ${childCategories.map(renderChildCategoryCard).join("")}
+            </div>
+          </section>
+        ` : ""}
     </div>
       ${varieties.length ? `
         <section class="subcatalog">
@@ -2881,6 +4479,25 @@ function renderCatalog() {
     `;
 
   syncCatalogCardImagePresentation(catalogEl);
+  if (typeof window !== "undefined") {
+    window.requestAnimationFrame(() => {
+      if (!document.body.classList.contains("app-mobile-shell")) return;
+      const compactBreadcrumb = catalogEl.querySelector(".breadcrumb--compact");
+      const currentCrumb = compactBreadcrumb?.querySelector(".breadcrumb__item.is-current");
+      if (!compactBreadcrumb || !currentCrumb) return;
+      const fitsFully = compactBreadcrumb.scrollWidth <= compactBreadcrumb.clientWidth + 8;
+      const targetLeft = fitsFully
+        ? 0
+        : Math.max(
+          0,
+          Math.min(
+            currentCrumb.offsetLeft - 14,
+            Math.max(0, compactBreadcrumb.scrollWidth - compactBreadcrumb.clientWidth)
+          )
+        );
+      compactBreadcrumb.scrollTo({ left: targetLeft });
+    });
+  }
 
   const editCategoryButton = document.getElementById("edit-category");
   if (editCategoryButton) editCategoryButton.addEventListener("click", () => openCategoryManager(category.id));
@@ -2987,8 +4604,18 @@ function renderCatalog() {
   });
 
   catalogEl.querySelectorAll("[data-open-category]").forEach((button) => {
-    button.addEventListener("click", (event) => {
+    button.addEventListener("click", () => {
       activeCategoryId = button.dataset.openCategory;
+      isFocusedView = true;
+      render();
+    });
+  });
+
+  catalogEl.querySelectorAll('.catalog-card--child[data-open-category][role="button"]').forEach((card) => {
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      activeCategoryId = card.dataset.openCategory;
       isFocusedView = true;
       render();
     });
@@ -3337,26 +4964,1635 @@ function weatherVisualTone(weather) {
   const condition = String(weather?.condition || "").toLowerCase();
   if (!condition) return "soft";
   if (condition.includes("búrka") || condition.includes("krúp")) return "storm";
+  if (condition.includes("mrhol") || condition.includes("mrznú")) return "rain";
   if (condition.includes("sne")) return "snow";
   if (condition.includes("dážď") || condition.includes("prehán")) return "rain";
+  if (condition.includes("mráz") || condition.includes("námraz")) return "snow";
   if (condition.includes("hmla")) return "mist";
+  if (condition.includes("polojas")) return "sun";
+  if (condition.includes("zamrač")) return "cloud";
   if (condition.includes("jasno")) return "sun";
   if (condition.includes("obla")) return "cloud";
   return "soft";
 }
 
+function weatherFogVariantFromData(weather, { condition = "", liquidMm = null, snowfallCm = null, hasMixedPrecipitation = null } = {}) {
+  const normalizedCondition = String(condition || "").trim().toLowerCase();
+  if (normalizedCondition.includes("hmla")) return "fog";
+  if (normalizedCondition.includes("opar")) return "mist";
+  const visibility = weatherVisibilityM(weather);
+  if (!Number.isFinite(visibility)) return "";
+  const humidity = weatherHumidityPct(weather);
+  const liquidAmount = Number.isFinite(liquidMm)
+    ? liquidMm
+    : weatherLiquidPrecipitationMm(weather, { condition: normalizedCondition });
+  const snowAmount = Number.isFinite(snowfallCm)
+    ? snowfallCm
+    : weatherSnowAmountCm(weather, { condition: normalizedCondition });
+  const mixedPrecipitation = typeof hasMixedPrecipitation === "boolean"
+    ? hasMixedPrecipitation
+    : weatherHasMixedPrecipitation(weather, { condition: normalizedCondition });
+  const hasWetCondition = normalizedCondition.includes("dáž")
+    || normalizedCondition.includes("mrhol")
+    || normalizedCondition.includes("prehán")
+    || normalizedCondition.includes("krúp")
+    || normalizedCondition.includes("búrka")
+    || normalizedCondition.includes("sne");
+  if (mixedPrecipitation || hasWetCondition || liquidAmount > 0.12 || snowAmount > 0.05) return "";
+  if (visibility <= 700) return "fog";
+  if (visibility <= 1200 && (!Number.isFinite(humidity) || humidity >= 92)) return "fog";
+  if (visibility <= 2400 && (!Number.isFinite(humidity) || humidity >= 88)) return "mist";
+  return "";
+}
+
 function weatherIllustrationVariant(weather) {
-  const condition = String(weather?.condition || "").toLowerCase();
-  if (!condition) return "soft";
+  const condition = weatherConditionText(weather);
+  const tempC = weatherTemperatureC(weather);
+  const liquidMm = weatherLiquidPrecipitationMm(weather, { condition });
+  const snowfallCm = weatherSnowAmountCm(weather, { condition });
+  const hasMixedPrecipitation = weatherHasMixedPrecipitation(weather, { condition });
+  const frostLike = (condition.includes("mráz") || condition.includes("námraz"))
+    && Number.isFinite(tempC)
+    && tempC <= 0.2
+    && liquidMm <= 0.02
+    && snowfallCm <= 0.01;
+  if (hasMixedPrecipitation) return "sleet";
+  const fogVariant = weatherFogVariantFromData(weather, {
+    condition,
+    liquidMm,
+    snowfallCm,
+    hasMixedPrecipitation
+  });
+  if (fogVariant) return fogVariant;
+  if (!condition) {
+    if (snowfallCm > 0.03) return "snow";
+    if (liquidMm > 0.03) return "rain";
+    return "soft";
+  }
   if (condition.includes("takmer jasno")) return "mostly-clear";
+  if (condition.includes("polojas")) return "mostly-clear";
   if (condition.includes("jasno")) return "clear";
   if (condition.includes("poloobla")) return "partly-cloudy";
+  if (condition.includes("zamrač")) return "overcast";
+  if (condition.includes("oblačno") || condition.includes("oblač")) return "cloudy";
   if (condition.includes("obla")) return "overcast";
+  if (condition.includes("silné mrhol")) return "rain";
+  if (condition.includes("mrhol")) return "rain";
+  if (condition.includes("mrznúci") && condition.includes("dáž")) return "freezing-rain";
+  if (condition.includes("silný dáž") || condition.includes("silné prehán")) return "rain";
   if (condition.includes("dážď") || condition.includes("prehán")) return "rain";
-  if (condition.includes("búrka") || condition.includes("krúp")) return "storm";
+  if (condition.includes("krúp")) return "hail";
+  if (condition.includes("búrka")) return "storm";
+  if (condition.includes("silné snež") || condition.includes("silné snehové")) return "snow";
+  if (condition.includes("slabé snež")) return "snow";
   if (condition.includes("sne")) return "snow";
-  if (condition.includes("hmla")) return "mist";
+  if (frostLike) return "frost";
+  if (condition.includes("hmla")) return "fog";
+  if (condition.includes("opar")) return "mist";
   return weatherVisualTone(weather);
+}
+
+function weatherWindState(weather) {
+  const speed = weatherWindSpeedKmh(weather);
+  return weatherWindStateFromSpeed(speed);
+}
+
+function weatherWindStateFromSpeed(speed) {
+  const normalizedSpeed = Math.max(0, Number(speed) || 0);
+  if (normalizedSpeed >= 52) return "gale";
+  if (normalizedSpeed >= 36) return "gust";
+  if (normalizedSpeed >= 26) return "fresh";
+  if (normalizedSpeed >= 16) return "windy";
+  if (normalizedSpeed >= 8) return "breeze";
+  return "calm";
+}
+
+function weatherWindSpeedFallbackForCategory(category = "calm") {
+  const normalizedCategory = String(category || "").trim().toLowerCase();
+  if (normalizedCategory === "gale") return 58;
+  if (normalizedCategory === "gust") return 40;
+  if (normalizedCategory === "fresh") return 28;
+  if (normalizedCategory === "windy" || normalizedCategory === "strong") return 18;
+  if (normalizedCategory === "breeze") return 10;
+  return 0;
+}
+
+function mobileWeatherWindLabel(speed) {
+  const category = weatherWindStateFromSpeed(speed);
+  if (category === "gale") return "víchrica";
+  if (category === "gust") return "nárazy";
+  if (category === "fresh") return "silný vietor";
+  if (category === "windy") return "veterno";
+  if (category === "breeze") return "vánok";
+  return "bezvetrie";
+}
+
+function formatWeatherBackgroundDebugText(debugState) {
+  if (!debugState) return "engine missing";
+  const seasonLabel = debugState.season === "spring"
+    ? "jar"
+    : debugState.season === "summer"
+      ? "leto"
+      : debugState.season === "autumn"
+        ? "jeseň"
+        : debugState.season === "winter"
+          ? "zima"
+          : "";
+  const sourceLabel = debugState.source === "canvas-local"
+    ? "canvas"
+    : (debugState.hasVideo ? "video" : "fallback");
+  const parts = [
+    debugState.scene || "no-scene",
+    debugState.phase || debugState.period || "no-period",
+    sourceLabel,
+    debugState.precipitation || "no-precip"
+  ];
+  if (Number.isFinite(Number(debugState.precipitationAmount)) && Number(debugState.precipitationAmount) > 0) {
+    parts.push(`${Number(debugState.precipitationAmount).toFixed(1)} mm`);
+  } else if (Number.isFinite(Number(debugState.snowfallAmount)) && Number(debugState.snowfallAmount) > 0) {
+    parts.push(`${Number(debugState.snowfallAmount).toFixed(1)} cm sneh`);
+  }
+  if (Number.isFinite(Number(debugState.windSpeed))) {
+    parts.push(`vietor ${Math.round(Number(debugState.windSpeed))} km/h`);
+  } else if (debugState.windCategory) {
+    parts.push(`vietor ${debugState.windCategory}`);
+  }
+  if (Number.isFinite(Number(debugState.temperature))) {
+    parts.push(`${Math.round(Number(debugState.temperature))} °C`);
+  }
+  if (debugState.moonPhase) {
+    parts.push(`mesiac ${debugState.moonPhase}`);
+  }
+  if (seasonLabel) {
+    parts.push(`sezóna ${seasonLabel}`);
+  }
+  return parts.join(" | ");
+}
+
+function mobileWeatherAudioLabel(key = "") {
+  const labels = {
+    dawn: "ráno",
+    day: "deň",
+    evening: "večer",
+    night: "noc",
+    clear: "jasno",
+    partly_cloudy: "polojasno",
+    cloudy: "oblačno",
+    overcast: "zamračené",
+    fog: "hmla",
+    drizzle: "mrholenie",
+    rain: "dážď",
+    heavy_rain: "silný dážď",
+    storm_far: "vzdialená búrka",
+    storm_near: "blízka búrka",
+    wind_soft: "jemný vánok",
+    wind_medium: "vietor",
+    wind_strong: "silný vietor",
+    snow_light: "slabé sneženie",
+    snow_medium: "sneženie",
+    snow_heavy: "silné sneženie",
+    wet_snow: "mokrý sneh",
+    blizzard_like: "víchrica so snehom",
+    hail: "krúpy",
+    post_rain: "po daždi",
+    post_storm: "po búrke",
+    post_snow: "po snežení",
+    frost: "mráz",
+    heat_haze: "horúčava",
+    dawn_chorus_rich: "ranný chorus",
+    dawn_chorus_soft: "mäkké ranné vtáky",
+    dawn_chorus_sparse: "riedke ranné vtáky",
+    dawn_garden_air: "ranný vzduch",
+    day_garden_soft: "denné vtáky",
+    day_garden_open: "denný priestor",
+    day_forest_air: "denný lesný vzduch",
+    evening_softbirds: "večerné vtáky",
+    evening_garden_air: "večerný vzduch",
+    night_deep_air: "hlboká noc",
+    night_forest_air: "nočný vzduch",
+    night_cold_air: "studená noc",
+    clear_air_soft: "čistý vzduch",
+    cloud_air_soft: "oblačný vzduch",
+    overcast_air_heavy: "ťažký vzduch",
+    fog_air_soft: "hmlistý priestor",
+    drizzle_soft: "jemné mrholenie",
+    rain_soft: "dážď",
+    rain_heavy: "silný dážď",
+    storm_far_bed: "vzdialená búrka",
+    storm_near_bed: "blízka búrka",
+    wind_soft_trees: "jemný vánok v stromoch",
+    wind_medium_trees: "vietor v stromoch",
+    wind_strong_trees: "silný vietor v stromoch",
+    snow_air_soft: "tichý sneh",
+    snow_air_heavy: "hutný sneh",
+    snow_wind_soft: "snehový vzduch",
+    wet_snow_slush: "mokrá kaša",
+    hail_hits_bed: "krúpy na povrchu",
+    frost_cold_air: "mrazivý vzduch",
+    heat_soft_air: "horúci vzduch",
+    crowns_soft: "jemné koruny stromov",
+    crowns_medium: "koruny stromov",
+    crowns_strong: "silné koruny stromov",
+    wet_space_soft: "mokré okolie",
+    winter_space_soft: "zimný priestor",
+    day_gentle_insects: "jemný denný hmyz",
+    night_crickets_bed: "cvrčky",
+    evening_warm_insects: "teplý večerný hmyz",
+    autumn_leaves_soft: "suché lístie",
+    post_rain_drip_bed: "kvapky po daždi",
+    day_bird_call: "spev vtákov",
+    bird_wings: "prelet vtáka",
+    woodpecker: "ďateľ",
+    crow_call: "vrana",
+    owl_call: "sova",
+    wolf_far: "vlk",
+    dog_far: "vzdialený pes",
+    bee_pass: "včela",
+    bumblebee_pass: "čmeliak",
+    dove_call: "hrdlička",
+    cuckoo_call: "kukučka",
+    squirrel_rustle: "veverička",
+    mosquito_pass: "komár",
+    frog_call: "žaba",
+    tree_drips: "kvapky zo stromov",
+    thunder_far: "vzdialený hrom",
+    thunder_near: "blízky hrom",
+    cold: "chladno",
+    mild: "mierne",
+    warm: "teplo",
+    hot: "horúco"
+  };
+  if (labels[key]) return labels[key];
+  return String(key || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function renderWeatherAudioDebugChipList(items = [], emptyLabel = "nič", options = {}) {
+  const normalizedItems = Array.isArray(items) ? items.filter(Boolean) : [];
+  const activeSet = new Set(Array.isArray(options.activeItems) ? options.activeItems.filter(Boolean) : []);
+  const mutedSet = new Set(Array.isArray(options.mutedItems) ? options.mutedItems.filter(Boolean) : []);
+  const playingSet = new Set(Array.isArray(options.playingItems) ? options.playingItems.filter(Boolean) : []);
+  const muted = Boolean(options.muted);
+  const playing = Boolean(options.playing);
+  if (!normalizedItems.length) {
+    return `<span class="weather-audio-debug__empty">${escapeHtml(emptyLabel)}</span>`;
+  }
+  return normalizedItems.map((item) => {
+    const classes = ["weather-audio-debug__chip"];
+    const isPlaying = playing || playingSet.has(item);
+    const isActive = isPlaying || activeSet.has(item);
+    const isMuted = muted || mutedSet.has(item);
+    if (isMuted && !isActive) classes.push("weather-audio-debug__chip--muted");
+    if (isActive) classes.push("weather-audio-debug__chip--active");
+    if (isPlaying) classes.push("weather-audio-debug__chip--playing");
+    return `<span class="${classes.join(" ")}">${escapeHtml(mobileWeatherAudioLabel(item))}</span>`;
+  }).join("");
+}
+
+function renderWeatherAudioDebugMarkup(audioState = null) {
+  const supported = audioState?.supported !== false;
+  const enabled = audioState?.enabled !== false;
+  const activated = Boolean(audioState?.activated);
+  const running = Boolean(audioState?.running);
+  const evaluation = audioState?.evaluation || null;
+  const activeMix = audioState?.activeMix || null;
+  const currentState = audioState?.currentState || {};
+  const soundscapeConfig = typeof window !== "undefined" ? window.weatherAudioConfig?.soundscapeConfig || {} : {};
+  const activeLayerKeys = Object.keys(activeMix?.activeLayers || {});
+  const timeLayerKeys = activeLayerKeys.filter((key) => Boolean(soundscapeConfig.timeLayers?.[key]));
+  const weatherLayerKeys = activeLayerKeys.filter((key) => Boolean(soundscapeConfig.weatherLayers?.[key]));
+  const textureLayerKeys = activeLayerKeys.filter((key) => Boolean(soundscapeConfig.textureLayers?.[key]));
+  const allDetailKeys = Object.entries(soundscapeConfig.detailEvents || {})
+    .filter(([, detail]) => (detail?.chance ?? 1) > 0)
+    .map(([detailKey]) => detailKey);
+  const playingDetailKeys = Array.isArray(audioState?.playingDetails) ? audioState.playingDetails.filter(Boolean) : [];
+  const allowedDetailKeys = Array.isArray(evaluation?.allowedDetails) ? evaluation.allowedDetails.filter(Boolean) : [];
+  const blockedDetailKeys = Object.keys(evaluation?.blockedReasons || {}).filter(Boolean);
+  const mutedReasons = Array.isArray(evaluation?.mutedDueToPriority) ? evaluation.mutedDueToPriority.filter(Boolean) : [];
+  const statusLabel = !supported
+    ? "Zvuk nie je podporovaný"
+    : !enabled
+      ? "Zvuk je vypnutý"
+      : !activated
+        ? "Čaká na kliknutie"
+        : running
+          ? "Zvuk je aktívny"
+          : "Zvuk je pripravený";
+  const statusClass = !supported || !enabled
+    ? "is-off"
+    : !activated
+      ? "is-pending"
+      : running
+        ? "is-on"
+        : "is-idle";
+  const masterVolume = Math.max(0, Math.min(1, Number(currentState.masterVolume ?? mobileWeatherSoundVolume) || 0));
+  const masterVolumePercent = Math.round(masterVolume * 100);
+  const metaParts = [];
+  if (currentState.timeOfDay) metaParts.push(mobileWeatherAudioLabel(currentState.timeOfDay));
+  if (currentState.weather) metaParts.push(mobileWeatherAudioLabel(currentState.weather));
+  if (currentState.temperatureBand) metaParts.push(mobileWeatherAudioLabel(currentState.temperatureBand));
+  return `
+    <section class="weather-audio-debug" data-mobile-weather-audio-panel>
+      <div class="weather-audio-debug__header">
+        <p class="weather-audio-debug__title">Zvuky počasia</p>
+        <span class="weather-audio-debug__status ${statusClass}">${escapeHtml(statusLabel)}</span>
+      </div>
+      <p class="weather-audio-debug__meta">${escapeHtml(metaParts.join(" • ") || "bez aktívneho stavu")}</p>
+      <p class="weather-audio-debug__legend">Tmavé hrá teraz · zelené sú povolené · sivé sú vypnuté</p>
+      <div class="weather-audio-debug__master">
+        <div class="weather-audio-debug__master-head">
+          <p class="weather-audio-debug__label">Hlasitosť</p>
+          <span class="weather-audio-debug__master-value" data-mobile-weather-audio-volume-value>${escapeHtml(`${masterVolumePercent} %`)}</span>
+        </div>
+        <div class="weather-audio-debug__range-wrap">
+          <input
+            class="weather-audio-debug__range"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="${escapeAttribute(String(masterVolumePercent))}"
+            data-mobile-weather-audio-volume-range
+            aria-label="Celková hlasitosť zvukov počasia"
+          >
+        </div>
+      </div>
+      <div class="weather-audio-debug__block ${timeLayerKeys.length ? "is-live" : ""}">
+        <p class="weather-audio-debug__label">Loop času</p>
+        <div class="weather-audio-debug__chips">${renderWeatherAudioDebugChipList(timeLayerKeys, "nič", { activeItems: timeLayerKeys })}</div>
+      </div>
+      <div class="weather-audio-debug__block ${weatherLayerKeys.length ? "is-live" : ""}">
+        <p class="weather-audio-debug__label">Počasie</p>
+        <div class="weather-audio-debug__chips">${renderWeatherAudioDebugChipList(weatherLayerKeys, "nič", { activeItems: weatherLayerKeys })}</div>
+      </div>
+      <div class="weather-audio-debug__block ${textureLayerKeys.length ? "is-live" : ""}">
+        <p class="weather-audio-debug__label">Textúry</p>
+        <div class="weather-audio-debug__chips">${renderWeatherAudioDebugChipList(textureLayerKeys, "nič", { activeItems: textureLayerKeys })}</div>
+      </div>
+      <div class="weather-audio-debug__block ${playingDetailKeys.length ? "is-live" : allowedDetailKeys.length ? "is-ready" : ""}">
+        <p class="weather-audio-debug__label">Všetky detaily</p>
+        <div class="weather-audio-debug__chips">${renderWeatherAudioDebugChipList(allDetailKeys, "nič", { activeItems: allowedDetailKeys, mutedItems: blockedDetailKeys, playingItems: playingDetailKeys })}</div>
+      </div>
+      <div class="weather-audio-debug__block ${playingDetailKeys.length ? "is-live" : ""}">
+        <p class="weather-audio-debug__label">Práve hrá</p>
+        <div class="weather-audio-debug__chips">${renderWeatherAudioDebugChipList(playingDetailKeys, "zatiaľ nič", { playingItems: playingDetailKeys, playing: true })}</div>
+      </div>
+      ${mutedReasons.length ? `<p class="weather-audio-debug__note">${escapeHtml(mutedReasons.join(" "))}</p>` : ""}
+    </section>
+  `;
+}
+
+function renderWeatherAudioInlineMarkup(audioState = null) {
+  return "";
+}
+
+function syncMainMenuWeatherAudioControls() {
+  if (typeof document === "undefined" || !mainMenuEl) return;
+  const audioState = typeof window !== "undefined" && window.weatherAudioEngine?.getState
+    ? window.weatherAudioEngine.getState()
+    : null;
+  const supported = audioState?.supported !== false;
+  const statusLabel = !supported
+    ? "Bez podpory"
+    : !mobileWeatherSoundEnabled
+      ? "Vypnutý"
+      : "Zapnutý";
+  const statusClass = !supported || !mobileWeatherSoundEnabled
+    ? "is-off"
+    : "is-on";
+  mainMenuEl.querySelectorAll("[data-mobile-weather-audio-inline-status]").forEach((element) => {
+    element.textContent = statusLabel;
+    element.className = `weather-audio-inline__status ${statusClass}`;
+    if (element instanceof HTMLButtonElement) {
+      element.setAttribute("aria-pressed", mobileWeatherSoundEnabled ? "true" : "false");
+      element.setAttribute("title", mobileWeatherSoundEnabled ? "Ťuknutím zvuk vypneš" : "Ťuknutím zvuk zapneš");
+    }
+  });
+  mainMenuEl.querySelectorAll("[data-mobile-weather-audio-inline]").forEach((element) => {
+    element.classList.toggle("is-on", Boolean(mobileWeatherSoundEnabled && supported));
+    element.classList.toggle("is-off", !mobileWeatherSoundEnabled || !supported);
+    element.hidden = !mobileWeatherSoundPanelOpen;
+  });
+}
+
+function updateMainMenuWeatherAudioDebugPanel() {
+  if (typeof document === "undefined" || !mainMenuEl) return;
+  const panel = mainMenuEl.querySelector("[data-mobile-weather-audio-panel]");
+  if (!panel) return;
+  const activeElement = document.activeElement;
+  if (activeElement instanceof HTMLInputElement && activeElement.matches("[data-mobile-weather-audio-volume-range]")) {
+    return;
+  }
+  const audioState = typeof window !== "undefined" && window.weatherAudioEngine?.getState
+    ? window.weatherAudioEngine.getState()
+    : null;
+  panel.outerHTML = renderWeatherAudioDebugMarkup(audioState);
+  syncMainMenuWeatherAudioControls();
+}
+
+function bindMainMenuWeatherAudioDebugEvents() {
+  if (typeof window === "undefined" || mainMenuWeatherAudioDebugEventsBound) return;
+  window.addEventListener("weatheraudio:statechange", () => {
+    updateMainMenuWeatherAudioDebugPanel();
+    syncMainMenuWeatherAudioControls();
+  });
+  mainMenuWeatherAudioDebugEventsBound = true;
+}
+
+function bindMainMenuWeatherAudioControlEvents() {
+  if (mainMenuWeatherAudioControlsBound || !mainMenuEl) return;
+  mainMenuEl.addEventListener("click", (event) => {
+    const toggleButton = event.target instanceof Element
+      ? event.target.closest("[data-mobile-weather-audio-inline-toggle]")
+      : null;
+    if (!(toggleButton instanceof HTMLButtonElement) || !mainMenuEl.contains(toggleButton)) return;
+    event.preventDefault();
+    window.weatherAudioEngine?.handleUserActivation?.();
+    setMobileWeatherSoundEnabled(!mobileWeatherSoundEnabled);
+  });
+  mainMenuEl.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.matches("[data-mobile-weather-audio-volume-range]")) return;
+    window.weatherAudioEngine?.handleUserActivation?.();
+    const nextPercent = Math.max(0, Math.min(100, Math.round(Number(target.value) || 0)));
+    setMobileWeatherSoundVolume(nextPercent / 100);
+  });
+  mainMenuWeatherAudioControlsBound = true;
+}
+
+function ensureMainMenuWeatherAudioDebugTicker() {
+  if (typeof window === "undefined" || mainMenuWeatherAudioDebugTimer) return;
+  mainMenuWeatherAudioDebugTimer = window.setInterval(() => {
+    if (typeof document === "undefined" || !document.body?.classList.contains("app-mobile-shell")) return;
+    updateMainMenuWeatherAudioDebugPanel();
+  }, 320);
+}
+
+function toFiniteWeatherNumber(value) {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function extractWeatherNumber(value) {
+  const match = String(value ?? "").match(/-?\d+(?:[.,]\d+)?/);
+  return match ? Number(String(match[0]).replace(",", ".")) : null;
+}
+
+function averageWeatherNumbers(...values) {
+  const finiteValues = values
+    .map((value) => toFiniteWeatherNumber(value))
+    .filter((value) => value !== null);
+  if (!finiteValues.length) return null;
+  return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+}
+
+function moonPhaseFromDateValue(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(String(value || ""));
+  if (Number.isNaN(date.getTime())) return "gibbous";
+  const synodicMonth = 29.530588853;
+  const knownNewMoonUtc = Date.UTC(2000, 0, 6, 18, 14, 0);
+  const daysSince = (date.getTime() - knownNewMoonUtc) / 86400000;
+  const lunation = ((daysSince % synodicMonth) + synodicMonth) % synodicMonth;
+  const phase = lunation / synodicMonth;
+  if (phase < 0.03 || phase > 0.97) return "new";
+  if (phase < 0.22) return "waxing_crescent";
+  if (phase < 0.28) return "first_quarter";
+  if (phase < 0.47) return "waxing_gibbous";
+  if (phase < 0.53) return "full";
+  if (phase < 0.72) return "waning_gibbous";
+  if (phase < 0.78) return "last_quarter";
+  return "waning_crescent";
+}
+
+function weatherWindSpeedKmh(weather) {
+  return toFiniteWeatherNumber(weather?.windSpeedKmh) ?? extractWeatherNumber(weather?.wind) ?? 0;
+}
+
+function weatherWindGustsKmh(weather) {
+  return toFiniteWeatherNumber(weather?.windGustsKmh) ?? 0;
+}
+
+function weatherWindDirectionDeg(weather) {
+  return toFiniteWeatherNumber(weather?.windDirectionDeg);
+}
+
+function weatherTemperatureC(weather) {
+  return toFiniteWeatherNumber(weather?.temperatureC) ?? extractWeatherNumber(weather?.temperature);
+}
+
+function weatherApparentTemperatureC(weather) {
+  return toFiniteWeatherNumber(weather?.apparentTemperatureC) ?? weatherTemperatureC(weather);
+}
+
+function weatherHumidityPct(weather) {
+  return toFiniteWeatherNumber(weather?.humidityPct) ?? extractWeatherNumber(weather?.humidity);
+}
+
+function weatherPrecipitationMm(weather) {
+  return toFiniteWeatherNumber(weather?.precipitationMm) ?? extractWeatherNumber(weather?.rain);
+}
+
+function weatherRainMm(weather) {
+  return toFiniteWeatherNumber(weather?.rainMm);
+}
+
+function weatherShowersMm(weather) {
+  return toFiniteWeatherNumber(weather?.showersMm);
+}
+
+function weatherSnowfallCm(weather) {
+  return toFiniteWeatherNumber(weather?.snowfallCm);
+}
+
+function weatherConditionText(weather) {
+  return String(weather?.condition || "").trim().toLowerCase();
+}
+
+function weatherLiquidPrecipitationMm(weather, options = {}) {
+  const explicitLiquid = Math.max(0, weatherRainMm(weather) || 0, weatherShowersMm(weather) || 0);
+  if (explicitLiquid > 0.03) return explicitLiquid;
+
+  const totalPrecipitation = Math.max(0, weatherPrecipitationMm(weather) || 0);
+  if (totalPrecipitation <= 0.03) return 0;
+
+  const condition = String(options?.condition || weatherConditionText(weather));
+  const snowLike = condition.includes("sne");
+  const rainLike = condition.includes("dáž") || condition.includes("mrhol") || condition.includes("prehán") || condition.includes("lejak") || condition.includes("búrka") || condition.includes("krúp");
+  return rainLike && !snowLike ? totalPrecipitation : 0;
+}
+
+function weatherSnowAmountCm(weather, options = {}) {
+  const explicitSnow = Math.max(0, weatherSnowfallCm(weather) || 0);
+  if (explicitSnow > 0.03) return explicitSnow;
+
+  const totalPrecipitation = Math.max(0, weatherPrecipitationMm(weather) || 0);
+  if (totalPrecipitation <= 0.03) return 0;
+
+  const condition = String(options?.condition || weatherConditionText(weather));
+  const snowLike = condition.includes("sne");
+  const liquidLike = condition.includes("dáž") || condition.includes("mrhol") || condition.includes("prehán");
+  return snowLike && !liquidLike ? Number((totalPrecipitation * 1.18).toFixed(2)) : 0;
+}
+
+function weatherHasMixedPrecipitation(weather, options = {}) {
+  const condition = String(options?.condition || weatherConditionText(weather));
+  if (condition.includes("dáž") && condition.includes("sneh")) return true;
+  const explicitLiquid = Math.max(0, weatherRainMm(weather) || 0, weatherShowersMm(weather) || 0);
+  const explicitSnow = Math.max(0, weatherSnowfallCm(weather) || 0);
+  return explicitLiquid > 0.04 && explicitSnow > 0.03;
+}
+
+function weatherCloudCoverPct(weather) {
+  return toFiniteWeatherNumber(weather?.cloudCoverPct);
+}
+
+function weatherCloudCoverLowPct(weather) {
+  return toFiniteWeatherNumber(weather?.cloudCoverLowPct);
+}
+
+function weatherCloudCoverMidPct(weather) {
+  return toFiniteWeatherNumber(weather?.cloudCoverMidPct);
+}
+
+function weatherCloudCoverHighPct(weather) {
+  return toFiniteWeatherNumber(weather?.cloudCoverHighPct);
+}
+
+function weatherVisibilityM(weather) {
+  return toFiniteWeatherNumber(weather?.visibilityM);
+}
+
+function weatherPressureMslHpa(weather) {
+  return toFiniteWeatherNumber(weather?.pressureMslHpa);
+}
+
+function weatherSurfacePressureHpa(weather) {
+  return toFiniteWeatherNumber(weather?.surfacePressureHpa);
+}
+
+function weatherPrecipitationProbabilityPct(weather) {
+  return toFiniteWeatherNumber(weather?.precipitationProbabilityPct);
+}
+
+function weatherMoonPhase(weather) {
+  return String(weather?.moonPhase || "").trim() || moonPhaseFromDateValue(weather?.observedAt || new Date());
+}
+
+function weatherClockMinutes(value) {
+  const rawValue = value && typeof value === "object"
+    ? (value.observedAt ?? value.time ?? "")
+    : value;
+  const date = new Date(rawValue);
+  if (!Number.isNaN(date.getTime())) return (date.getHours() * 60) + date.getMinutes();
+  const match = String(rawValue || "").match(/\b(\d{1,2}):(\d{2})\b/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minutes)) return null;
+  return (hour * 60) + minutes;
+}
+
+function weatherObservedHour(value) {
+  const minutes = weatherClockMinutes(value);
+  return minutes === null ? null : Math.floor(minutes / 60);
+}
+
+function mobileWeatherPhaseFromSnapshot(snapshot = null, period = "day") {
+  if (period === "night") return "night";
+  const fallbackHour = new Date().getHours();
+  const observedMinutes = weatherClockMinutes(snapshot) ?? (fallbackHour * 60);
+  const sunriseMinutes = weatherClockMinutes(snapshot?.sunriseAt);
+  const sunsetMinutes = weatherClockMinutes(snapshot?.sunsetAt);
+
+  if (sunriseMinutes !== null && observedMinutes >= sunriseMinutes - 50 && observedMinutes <= sunriseMinutes + 85) {
+    return "dawn";
+  }
+  if (sunsetMinutes !== null && observedMinutes >= sunsetMinutes - 95 && observedMinutes <= sunsetMinutes + 55) {
+    return "sunset";
+  }
+  return mobileWeatherPhaseFromHour(Math.floor(observedMinutes / 60), period);
+}
+
+function mobileWeatherHeatLevel(weather, period = "day") {
+  const temp = weatherTemperatureC(weather);
+  if (!Number.isFinite(temp)) return "normal";
+  if (period === "night" && temp >= 20) return "tropical";
+  if (period === "day" && temp >= 35) return "extreme";
+  if (period === "day" && temp >= 30) return "hot";
+  return "normal";
+}
+
+function mobileWeatherSeasonFromDate(date = new Date()) {
+  const month = Number(date?.getMonth?.() ?? new Date().getMonth());
+  if (month === 11 || month <= 1) return "winter";
+  if (month >= 2 && month <= 4) return "spring";
+  if (month >= 5 && month <= 7) return "summer";
+  return "autumn";
+}
+
+function buildMobileWeatherBackgroundInput({
+  snapshot = null,
+  tone = "soft",
+  variant = "clear",
+  phenomenonVariant = "",
+  season = "auto",
+  period = "day",
+  phase = "day",
+  wind = "calm",
+  windSpeed = null,
+  precipitationLocked = false,
+  moonPhaseOverride = "",
+  cloudLocked = false
+} = {}) {
+  const conditionText = String(snapshot?.condition || "").toLowerCase();
+  const hasManualWindSpeed = Number.isFinite(Number(windSpeed));
+  const resolvedWindSpeed = hasManualWindSpeed ? Number(windSpeed) : weatherWindSpeedKmh(snapshot);
+  const observedWindGust = weatherWindGustsKmh(snapshot);
+  const precipitationAmount = weatherPrecipitationMm(snapshot);
+  const rainAmount = weatherRainMm(snapshot);
+  const showersAmount = weatherShowersMm(snapshot);
+  const snowfallAmount = weatherSnowfallCm(snapshot);
+  const precipitationSuppressed = Boolean(precipitationLocked)
+    && String(phenomenonVariant || "").trim().toLowerCase() === "none";
+  const derivedManualWindGust = resolvedWindSpeed <= 0
+    ? 0
+    : Math.max(
+      resolvedWindSpeed,
+      Math.round(resolvedWindSpeed * 1.22 + (resolvedWindSpeed >= 22 ? 6 : resolvedWindSpeed >= 10 ? 3 : 1))
+    );
+  const resolvedWindGustSpeed = hasManualWindSpeed ? derivedManualWindGust : observedWindGust;
+  const resolvedWindDirection = hasManualWindSpeed && resolvedWindGustSpeed <= 0
+    ? null
+    : weatherWindDirectionDeg(snapshot);
+
+  return {
+    isDay: period !== "night",
+    period,
+    phase,
+    season,
+    tone,
+    variant,
+    phenomenonVariant,
+    precipitationLocked: Boolean(precipitationLocked),
+    windCategory: wind || weatherWindStateFromSpeed(resolvedWindSpeed),
+    windSpeed: resolvedWindSpeed,
+    windGustSpeed: resolvedWindGustSpeed,
+    windDirection: resolvedWindDirection,
+    temperature: weatherTemperatureC(snapshot),
+    apparentTemperature: weatherApparentTemperatureC(snapshot),
+    humidity: weatherHumidityPct(snapshot),
+    precipitationAmount,
+    rainAmount,
+    showersAmount,
+    snowfallAmount,
+    precipitationProbability: weatherPrecipitationProbabilityPct(snapshot),
+    cloudCover: weatherCloudCoverPct(snapshot),
+    cloudCoverLow: weatherCloudCoverLowPct(snapshot),
+    cloudCoverMid: weatherCloudCoverMidPct(snapshot),
+    cloudCoverHigh: weatherCloudCoverHighPct(snapshot),
+    cloudLocked: Boolean(cloudLocked),
+    visibility: weatherVisibilityM(snapshot),
+    pressureMsl: weatherPressureMslHpa(snapshot),
+    surfacePressure: weatherSurfacePressureHpa(snapshot),
+    hasThunder: !precipitationSuppressed && (tone === "storm" || phenomenonVariant === "storm" || conditionText.includes("búrka")),
+    hasHail: !precipitationSuppressed && (phenomenonVariant === "hail" || conditionText.includes("krúp")),
+    moonPhase: String(moonPhaseOverride || weatherMoonPhase(snapshot) || "").trim().toLowerCase()
+  };
+}
+
+function mobileWeatherPhaseFromHour(hourValue, period = "day") {
+  const hour = Number(hourValue);
+  if (!Number.isFinite(hour)) return period === "night" ? "night" : "day";
+  if (hour >= 5 && hour < 9) return "dawn";
+  if (hour >= 17 && hour < 21) return "sunset";
+  if (hour >= 21 || hour < 5) return "night";
+  return "day";
+}
+
+function mobileWeatherPhasePeriod(phaseValue = "", fallbackPeriod = "day") {
+  const phase = String(phaseValue || "").trim().toLowerCase();
+  if (phase === "night") return "night";
+  if (phase === "dawn" || phase === "day" || phase === "sunset") return "day";
+  return fallbackPeriod === "night" ? "night" : "day";
+}
+
+function mobileWeatherCloudVariantFromCover(coverPct) {
+  const cover = Number(coverPct);
+  if (!Number.isFinite(cover)) return "";
+  if (cover >= 90) return "overcast";
+  if (cover >= 44) return "cloudy";
+  if (cover >= 10) return "mostly-clear";
+  return "clear";
+}
+
+function mobileWeatherCloudVariantFromSnapshot(snapshot = null, period = "day") {
+  const directVariant = weatherIllustrationVariant(snapshot);
+  if (["clear", "mostly-clear", "cloudy", "overcast"].includes(directVariant)) return directVariant;
+  if (directVariant === "partly-cloudy") {
+    const cover = weatherCloudCoverPct(snapshot);
+    return Number.isFinite(cover) && cover >= 44 ? "cloudy" : "mostly-clear";
+  }
+
+  const cloudVariant = mobileWeatherCloudVariantFromCover(weatherCloudCoverPct(snapshot));
+  if (cloudVariant) return cloudVariant;
+
+  const condition = String(snapshot?.condition || "").toLowerCase();
+  if (condition.includes("zamrač")) return "overcast";
+  if (condition.includes("poloobla")) return "cloudy";
+  if (condition.includes("obla")) return "cloudy";
+  if (condition.includes("polojas") || condition.includes("takmer jasno")) return "mostly-clear";
+  if (condition.includes("jasno")) return "clear";
+  if (condition.includes("hmla")) return "overcast";
+  return period === "night" ? "mostly-clear" : "clear";
+}
+
+function mobileWeatherPhenomenonVariantFromSnapshot(snapshot = null) {
+  const directVariant = weatherIllustrationVariant(snapshot);
+  if (["hail", "storm", "freezing-rain"].includes(directVariant)) {
+    return directVariant;
+  }
+
+  const condition = weatherConditionText(snapshot);
+  const tempC = weatherTemperatureC(snapshot);
+  const liquidMm = weatherLiquidPrecipitationMm(snapshot, { condition });
+  const snowfallCm = weatherSnowAmountCm(snapshot, { condition });
+  const hasMixedPrecipitation = weatherHasMixedPrecipitation(snapshot, { condition });
+  const fogVariant = weatherFogVariantFromData(snapshot, {
+    condition,
+    liquidMm,
+    snowfallCm,
+    hasMixedPrecipitation
+  });
+  const frostLike = (directVariant === "frost" || condition.includes("mráz") || condition.includes("námraz"))
+    && Number.isFinite(tempC)
+    && tempC <= 0.2
+    && liquidMm <= 0.02
+    && snowfallCm <= 0.01;
+  const hasSnow = condition.includes("sne") || snowfallCm > 0.03;
+  const hasRain = condition.includes("dáž") || condition.includes("mrhol") || condition.includes("prehán") || liquidMm > 0.03;
+
+  if (condition.includes("krúp") || directVariant === "hail") return "hail";
+  if (condition.includes("búrka") || directVariant === "storm") return "storm";
+  if (hasMixedPrecipitation) return "sleet";
+  if (frostLike) return "frost";
+  if (hasSnow || directVariant === "snow") return "snow";
+  if (directVariant === "freezing-rain") return "freezing-rain";
+  if (hasRain || directVariant === "rain") return "rain";
+  if (fogVariant === "fog") return "fog";
+  if (fogVariant === "mist") return "mist";
+  if (condition.includes("hmla") || directVariant === "fog") return "fog";
+  if (condition.includes("opar") || directVariant === "mist") return "mist";
+  return "none";
+}
+
+function mobileWeatherToneFromState({ phenomenonVariant = "", cloudVariant = "", heatLevel = "normal", snapshot = null } = {}) {
+  if (heatLevel === "tropical" || heatLevel === "hot" || heatLevel === "extreme") return "sun";
+  if (phenomenonVariant === "storm" || phenomenonVariant === "hail") return "storm";
+  if (phenomenonVariant === "snow" || phenomenonVariant === "frost" || phenomenonVariant === "sleet") return "snow";
+  if (phenomenonVariant === "rain" || phenomenonVariant === "freezing-rain") return "rain";
+  if (phenomenonVariant === "fog" || phenomenonVariant === "mist") return "mist";
+  if (cloudVariant === "clear" || cloudVariant === "mostly-clear") return "sun";
+  if (cloudVariant === "partly-cloudy" || cloudVariant === "cloudy" || cloudVariant === "overcast") return "cloud";
+  return weatherVisualTone(snapshot);
+}
+
+function mobileWeatherBodyVariantFromState({ cloudVariant = "", heatLevel = "normal", period = "day" } = {}) {
+  if (heatLevel === "tropical") return "tropical-night";
+  if (heatLevel === "hot" || heatLevel === "extreme") return "heat";
+  return cloudVariant || (period === "night" ? "mostly-clear" : "clear");
+}
+
+function mobileWeatherPrecipitationLabel(amountMm) {
+  const amount = Math.max(0, Number(amountMm) || 0);
+  if (amount >= 8) return "extrémne";
+  if (amount >= 4.5) return "veľmi silné";
+  if (amount >= 2.2) return "výrazné";
+  if (amount >= 0.8) return "mierne";
+  if (amount > 0.05) return "slabé";
+  return "sucho";
+}
+
+function mobileWeatherTemperatureBandLabel(tempC) {
+  const temp = Number(tempC);
+  if (!Number.isFinite(temp)) return "mierne";
+  if (temp <= 4) return "chladno";
+  if (temp < 19) return "mierne";
+  if (temp < 28) return "teplo";
+  return "horúco";
+}
+
+function applyMobileWeatherPrecipitationOverride(template = {}, debugId = "", overrideMm = null) {
+  if (!Number.isFinite(Number(overrideMm))) return template;
+  const nextTemplate = { ...template };
+  const amountMm = Math.max(0, Math.min(12, Number(overrideMm)));
+  const resolvedDebugId = debugId === "heavy-rain"
+    ? "rain"
+    : debugId === "drizzle"
+      ? "rain"
+    : debugId === "light-rain" || debugId === "light-snow" || debugId === "dense-snow"
+      ? (debugId.includes("snow") ? "snow" : "rain")
+      : debugId;
+  const isSnow = resolvedDebugId === "snow";
+  const isSleet = resolvedDebugId === "sleet";
+  const isRainLike = ["rain", "hail", "storm"].includes(resolvedDebugId);
+
+  if (!isSnow && !isSleet && !isRainLike) return nextTemplate;
+
+  if (amountMm <= 0) {
+    nextTemplate.precipitationMm = 0;
+    nextTemplate.rainMm = 0;
+    nextTemplate.showersMm = 0;
+    nextTemplate.snowfallCm = 0;
+    nextTemplate.precipitationProbabilityPct = Math.min(Number(nextTemplate.precipitationProbabilityPct) || 0, 18);
+    return nextTemplate;
+  }
+
+  nextTemplate.precipitationMm = Number(amountMm.toFixed(1));
+  nextTemplate.precipitationProbabilityPct = Math.min(100, Math.round(56 + amountMm * 7));
+
+  if (isSnow) {
+    const cloudFloor = amountMm >= 4.5
+      ? { total: 90, low: 94, mid: 84, high: 68 }
+      : amountMm >= 1.6
+        ? { total: 76, low: 82, mid: 68, high: 48 }
+        : { total: 58, low: 66, mid: 46, high: 26 };
+    nextTemplate.cloudCoverPct = Math.max(Number(nextTemplate.cloudCoverPct) || 0, cloudFloor.total);
+    nextTemplate.cloudCoverLowPct = Math.max(Number(nextTemplate.cloudCoverLowPct) || 0, cloudFloor.low);
+    nextTemplate.cloudCoverMidPct = Math.max(Number(nextTemplate.cloudCoverMidPct) || 0, cloudFloor.mid);
+    nextTemplate.cloudCoverHighPct = Math.max(Number(nextTemplate.cloudCoverHighPct) || 0, cloudFloor.high);
+    nextTemplate.rainMm = 0;
+    nextTemplate.showersMm = 0;
+    nextTemplate.snowfallCm = Number((amountMm * 1.18).toFixed(2));
+    nextTemplate.visibilityM = Math.max(700, Math.round((Number(template.visibilityM) || 6400) - amountMm * 680));
+    nextTemplate.humidityPct = Math.max(Number(nextTemplate.humidityPct) || 0, 90);
+    return nextTemplate;
+  }
+
+  if (isSleet) {
+    const cloudFloor = amountMm >= 4.5
+      ? { total: 88, low: 92, mid: 84, high: 62 }
+      : amountMm >= 1.6
+        ? { total: 70, low: 76, mid: 64, high: 40 }
+        : { total: 54, low: 58, mid: 46, high: 24 };
+    nextTemplate.cloudCoverPct = Math.max(Number(nextTemplate.cloudCoverPct) || 0, cloudFloor.total);
+    nextTemplate.cloudCoverLowPct = Math.max(Number(nextTemplate.cloudCoverLowPct) || 0, cloudFloor.low);
+    nextTemplate.cloudCoverMidPct = Math.max(Number(nextTemplate.cloudCoverMidPct) || 0, cloudFloor.mid);
+    nextTemplate.cloudCoverHighPct = Math.max(Number(nextTemplate.cloudCoverHighPct) || 0, cloudFloor.high);
+    nextTemplate.rainMm = Number((amountMm * 0.52).toFixed(2));
+    nextTemplate.showersMm = Number((amountMm * 0.18).toFixed(2));
+    nextTemplate.snowfallCm = Number((amountMm * 0.62).toFixed(2));
+    nextTemplate.visibilityM = Math.max(900, Math.round((Number(template.visibilityM) || 5200) - amountMm * 520));
+    nextTemplate.humidityPct = Math.max(Number(nextTemplate.humidityPct) || 0, 92);
+    return nextTemplate;
+  }
+
+  const cloudFloor = resolvedDebugId === "storm" || resolvedDebugId === "hail"
+    ? { total: 100, low: 100, mid: 98, high: 90 }
+    : amountMm >= 4.5
+      ? { total: 88, low: 92, mid: 82, high: 64 }
+      : amountMm >= 1.6
+        ? { total: 70, low: 76, mid: 60, high: 40 }
+        : { total: 42, low: 48, mid: 34, high: 20 };
+  nextTemplate.cloudCoverPct = Math.max(Number(nextTemplate.cloudCoverPct) || 0, cloudFloor.total);
+  nextTemplate.cloudCoverLowPct = Math.max(Number(nextTemplate.cloudCoverLowPct) || 0, cloudFloor.low);
+  nextTemplate.cloudCoverMidPct = Math.max(Number(nextTemplate.cloudCoverMidPct) || 0, cloudFloor.mid);
+  nextTemplate.cloudCoverHighPct = Math.max(Number(nextTemplate.cloudCoverHighPct) || 0, cloudFloor.high);
+
+  const rainRatio = resolvedDebugId === "storm"
+    ? 0.76
+    : resolvedDebugId === "hail"
+      ? 0.62
+      : 0.86;
+  const showerRatio = resolvedDebugId === "storm"
+    ? 0.38
+    : resolvedDebugId === "hail"
+      ? 0.22
+      : 0.18;
+
+  nextTemplate.rainMm = Number((amountMm * rainRatio).toFixed(2));
+  nextTemplate.showersMm = Number((amountMm * showerRatio).toFixed(2));
+  nextTemplate.snowfallCm = 0;
+  nextTemplate.visibilityM = Math.max(
+    resolvedDebugId === "storm" ? 1200 : 2200,
+    Math.round((Number(template.visibilityM) || 7000) - amountMm * (resolvedDebugId === "storm" ? 620 : 420))
+  );
+  nextTemplate.humidityPct = Math.max(Number(nextTemplate.humidityPct) || 0, 90);
+  return nextTemplate;
+}
+
+function applyMobileWeatherCloudOverride(template = {}, cloudOverride = "", period = "day") {
+  const normalizedCloudOverride = normalizeMobileWeatherCloudDebugId(cloudOverride);
+  if (!normalizedCloudOverride) return template;
+
+  const cloudTemplates = {
+    clear: {
+      condition: period === "night" ? "Jasná noc" : "Jasno",
+      cloudCoverPct: 2,
+      cloudCoverLowPct: 0,
+      cloudCoverMidPct: 2,
+      cloudCoverHighPct: 4
+    },
+    "mostly-clear": {
+      condition: period === "night" ? "Takmer jasná noc" : "Polojasno",
+      cloudCoverPct: 14,
+      cloudCoverLowPct: 10,
+      cloudCoverMidPct: 12,
+      cloudCoverHighPct: 8
+    },
+    cloudy: {
+      condition: "Oblačno",
+      cloudCoverPct: 74,
+      cloudCoverLowPct: 70,
+      cloudCoverMidPct: 72,
+      cloudCoverHighPct: 60
+    },
+    overcast: {
+      condition: "Zamračené",
+      cloudCoverPct: 96,
+      cloudCoverLowPct: 98,
+      cloudCoverMidPct: 94,
+      cloudCoverHighPct: 88
+    }
+  };
+
+  const cloudTemplate = cloudTemplates[normalizedCloudOverride];
+  if (!cloudTemplate) return template;
+  return {
+    ...template,
+    cloudCoverPct: cloudTemplate.cloudCoverPct,
+    cloudCoverLowPct: cloudTemplate.cloudCoverLowPct,
+    cloudCoverMidPct: cloudTemplate.cloudCoverMidPct,
+    cloudCoverHighPct: cloudTemplate.cloudCoverHighPct
+  };
+}
+
+function buildMobileWeatherThemeDebugSnapshot(snapshot = null, debugOverride = null, period = "day", options = {}) {
+  const normalizedCloudOverride = normalizeMobileWeatherCloudDebugId(options?.cloudOverride || "");
+  const temperatureOverrideC = Number.isFinite(Number(options?.temperatureOverrideC)) ? Number(options.temperatureOverrideC) : null;
+  if ((!debugOverride || debugOverride.id === "auto") && !normalizedCloudOverride && temperatureOverrideC === null) return snapshot;
+
+  const now = new Date();
+  const baseSnapshot = normalizeWeatherSnapshot(snapshot || {}) || {};
+  const fallbackObservedAt = baseSnapshot.observedAt || now.toISOString();
+  const normalizedMoonOverride = String(options?.moonPhaseOverride || "").trim().toLowerCase();
+  const fallbackMoonPhase = normalizedMoonOverride || baseSnapshot.moonPhase || moonPhaseFromDateValue(fallbackObservedAt);
+  const baseTemperature = weatherTemperatureC(baseSnapshot);
+  const baseApparentTemperature = weatherApparentTemperatureC(baseSnapshot);
+
+  const templates = {
+    clear: {
+      condition: period === "night" ? "Jasná noc" : "Jasno",
+      humidityPct: 44,
+      visibilityM: 26000,
+      precipitationMm: 0,
+      rainMm: 0,
+      showersMm: 0,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 2,
+      cloudCoverPct: 2,
+      cloudCoverLowPct: 0,
+      cloudCoverMidPct: 2,
+      cloudCoverHighPct: 4
+    },
+    "mostly-clear": {
+      condition: period === "night" ? "Takmer jasná noc" : "Polojasno",
+      humidityPct: 48,
+      visibilityM: 23000,
+      precipitationMm: 0,
+      rainMm: 0,
+      showersMm: 0,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 6,
+      cloudCoverPct: 14,
+      cloudCoverLowPct: 10,
+      cloudCoverMidPct: 12,
+      cloudCoverHighPct: 8
+    },
+    cloudy: {
+      condition: "Oblačno",
+      humidityPct: 62,
+      visibilityM: 17000,
+      precipitationMm: 0,
+      rainMm: 0,
+      showersMm: 0,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 22,
+      cloudCoverPct: 74,
+      cloudCoverLowPct: 70,
+      cloudCoverMidPct: 72,
+      cloudCoverHighPct: 60
+    },
+    overcast: {
+      condition: "Zamračené",
+      humidityPct: 74,
+      visibilityM: 12000,
+      precipitationMm: 0,
+      rainMm: 0,
+      showersMm: 0,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 34,
+      cloudCoverPct: 96,
+      cloudCoverLowPct: 98,
+      cloudCoverMidPct: 94,
+      cloudCoverHighPct: 88
+    },
+    fog: {
+      condition: "Hmla",
+      humidityPct: 98,
+      visibilityM: 420,
+      precipitationMm: 0,
+      rainMm: 0,
+      showersMm: 0,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 26,
+      cloudCoverPct: 98,
+      cloudCoverLowPct: 100,
+      cloudCoverMidPct: 92,
+      cloudCoverHighPct: 84
+    },
+    rain: {
+      condition: "Dážď",
+      humidityPct: 94,
+      visibilityM: 6200,
+      precipitationMm: 1.4,
+      rainMm: 1.2,
+      showersMm: 0.5,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 96,
+      cloudCoverPct: 64,
+      cloudCoverLowPct: 68,
+      cloudCoverMidPct: 54,
+      cloudCoverHighPct: 34
+    },
+    hail: {
+      condition: "Krúpy",
+      humidityPct: 92,
+      visibilityM: 5400,
+      precipitationMm: 3.4,
+      rainMm: 2.6,
+      showersMm: 1.2,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 98,
+      cloudCoverPct: 100,
+      cloudCoverLowPct: 100,
+      cloudCoverMidPct: 100,
+      cloudCoverHighPct: 96
+    },
+    sleet: {
+      condition: "Dážď so snehom",
+      temperatureC: Number.isFinite(baseTemperature) ? Math.min(baseTemperature, 2) : 1,
+      apparentTemperatureC: Number.isFinite(baseApparentTemperature) ? Math.min(baseApparentTemperature, -1) : -1,
+      humidityPct: 92,
+      visibilityM: 4600,
+      precipitationMm: 1.8,
+      rainMm: 0.9,
+      showersMm: 0.3,
+      snowfallCm: 0.8,
+      precipitationProbabilityPct: 96,
+      cloudCoverPct: 80,
+      cloudCoverLowPct: 84,
+      cloudCoverMidPct: 70,
+      cloudCoverHighPct: 48
+    },
+    snow: {
+      condition: "Sneženie",
+      temperatureC: Number.isFinite(baseTemperature) ? Math.min(baseTemperature, -1) : -1,
+      apparentTemperatureC: Number.isFinite(baseApparentTemperature) ? Math.min(baseApparentTemperature, -4) : -4,
+      humidityPct: 90,
+      visibilityM: 5200,
+      precipitationMm: 0.7,
+      rainMm: 0,
+      showersMm: 0,
+      snowfallCm: 0.6,
+      precipitationProbabilityPct: 95,
+      cloudCoverPct: 72,
+      cloudCoverLowPct: 78,
+      cloudCoverMidPct: 62,
+      cloudCoverHighPct: 42
+    },
+    storm: {
+      condition: "Búrka",
+      humidityPct: 90,
+      visibilityM: 5000,
+      precipitationMm: 4.8,
+      rainMm: 3.8,
+      showersMm: 1.6,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 99,
+      cloudCoverPct: 100,
+      cloudCoverLowPct: 100,
+      cloudCoverMidPct: 100,
+      cloudCoverHighPct: 96
+    },
+    none: {
+      condition: period === "night" ? "Pokojná noc" : "Bez zrážok",
+      precipitationMm: 0,
+      rainMm: 0,
+      showersMm: 0,
+      snowfallCm: 0,
+      precipitationProbabilityPct: 6
+    }
+  };
+
+  const resolvedDebugId = !debugOverride || debugOverride.id === "auto"
+    ? "auto"
+    : debugOverride.id === "drizzle"
+      ? "rain"
+      : debugOverride.id;
+  const template = resolvedDebugId === "auto"
+    ? { ...baseSnapshot }
+    : (templates[resolvedDebugId] || templates.clear);
+  const resolvedTemplate = resolvedDebugId === "auto"
+    ? template
+    : applyMobileWeatherPrecipitationOverride(template, resolvedDebugId, options?.precipitationOverrideMm);
+  const withCloudOverride = normalizedCloudOverride
+    ? applyMobileWeatherCloudOverride(resolvedTemplate, normalizedCloudOverride, period)
+    : resolvedTemplate;
+  const withTemperatureOverride = temperatureOverrideC === null
+    ? withCloudOverride
+    : {
+      ...withCloudOverride,
+      temperature: `${Math.round(temperatureOverrideC)} °C`,
+      temperatureC: temperatureOverrideC,
+      apparentTemperatureC: Number.isFinite(Number(withCloudOverride.apparentTemperatureC))
+        ? temperatureOverrideC + (Number(withCloudOverride.apparentTemperatureC) - Number(withCloudOverride.temperatureC || temperatureOverrideC))
+        : temperatureOverrideC
+    };
+  return normalizeWeatherSnapshot({
+    ...baseSnapshot,
+    ...withTemperatureOverride,
+    observedAt: fallbackObservedAt,
+    dayPeriod: period,
+    isDay: period === "night" ? 0 : 1,
+    moonPhase: fallbackMoonPhase
+  });
+}
+
+function loadMobileWeatherThemeDebugOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_DEBUG_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const legacyId = String(parsed?.id || "").trim();
+    const selectedId = legacyId === "heavy-rain"
+      ? "rain"
+      : legacyId === "drizzle"
+        ? "rain"
+      : legacyId === "light-snow" || legacyId === "dense-snow"
+        ? "snow"
+        : legacyId;
+    const match = MOBILE_WEATHER_THEME_DEBUG_OPTIONS.find((item) => item.id === selectedId);
+    return match && match.id !== "auto" ? match : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function loadMobileWeatherThemeCloudOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_CLOUD_KEY);
+    const value = normalizeMobileWeatherCloudDebugId(raw || "");
+    if (MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.some((item) => item.id === value)) return value;
+
+    const legacyRaw = localStorage.getItem(MOBILE_WEATHER_THEME_DEBUG_KEY);
+    if (!legacyRaw) return "";
+    const legacyParsed = JSON.parse(legacyRaw);
+    const legacyId = normalizeMobileWeatherCloudDebugId(legacyParsed?.id || "");
+    return MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.some((item) => item.id === legacyId) ? legacyId : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function loadMobileWeatherThemePeriodOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_DEBUG_PERIOD_KEY);
+    const value = String(raw || "").trim();
+    return value === "day" || value === "night" ? value : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function loadMobileWeatherThemeWindOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_DEBUG_WIND_KEY);
+    if (raw === null || raw === "") return null;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0) return null;
+    return Math.max(0, Math.min(70, Math.round(value)));
+  } catch (error) {
+    return null;
+  }
+}
+
+function loadMobileWeatherThemePrecipOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_DEBUG_PRECIP_KEY);
+    if (raw === null || raw === "") return null;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0) return null;
+    return Math.max(0, Math.min(12, Math.round(value * 10) / 10));
+  } catch (error) {
+    return null;
+  }
+}
+
+function loadMobileWeatherThemePhaseOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_DEBUG_PHASE_KEY);
+    const value = String(raw || "").trim().toLowerCase();
+    return MOBILE_WEATHER_PHASE_DEBUG_OPTIONS.some((item) => item.id === value) ? value : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function loadMobileWeatherThemeMoonOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_DEBUG_MOON_KEY);
+    const value = String(raw || "").trim().toLowerCase();
+    return MOBILE_WEATHER_MOON_DEBUG_OPTIONS.some((item) => item.id === value) ? value : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function loadMobileWeatherThemeSeasonOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_SEASON_KEY);
+    const value = String(raw || "").trim().toLowerCase();
+    return MOBILE_WEATHER_SEASON_DEBUG_OPTIONS.some((item) => item.id === value) ? value : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function loadMobileWeatherThemeTemperatureOverride() {
+  try {
+    const raw = localStorage.getItem(MOBILE_WEATHER_THEME_DEBUG_TEMP_KEY);
+    if (raw === null || raw === undefined || String(raw).trim() === "") return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? Math.max(-15, Math.min(38, Math.round(value))) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function loadMobileWeatherSceneOnlyPreference() {
+  try {
+    return localStorage.getItem(MOBILE_WEATHER_SCENE_ONLY_KEY) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function saveMobileWeatherThemeDebugOverride(nextId = "auto") {
+  const match = MOBILE_WEATHER_THEME_DEBUG_OPTIONS.find((item) => item.id === String(nextId || "").trim()) || MOBILE_WEATHER_THEME_DEBUG_OPTIONS[0];
+  try {
+    if (!match || match.id === "auto") {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_DEBUG_KEY, JSON.stringify({ id: match.id }));
+  } catch (error) {
+    // Dočasný prepínač vzhľadu nech appku neblokuje, keď localStorage zlyhá.
+  }
+}
+
+function saveMobileWeatherThemeCloudOverride(nextId = "") {
+  const normalizedId = normalizeMobileWeatherCloudDebugId(nextId);
+  const isValid = MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.some((item) => item.id === normalizedId);
+  try {
+    if (!isValid || !normalizedId) {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_CLOUD_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_CLOUD_KEY, normalizedId);
+  } catch (error) {
+    // Dočasný prepínač vzhľadu nech appku neblokuje, keď localStorage zlyhá.
+  }
+}
+
+function saveMobileWeatherThemeWindOverride(nextValue = null) {
+  try {
+    if (nextValue === null || nextValue === undefined || String(nextValue).trim() === "") {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_WIND_KEY);
+      return;
+    }
+    const value = Number(nextValue);
+    if (!Number.isFinite(value) || value < 0) {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_WIND_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_DEBUG_WIND_KEY, String(Math.max(0, Math.min(70, Math.round(value)))));
+  } catch (error) {
+    // Dočasný prepínač vetra nech appku neblokuje.
+  }
+}
+
+function saveMobileWeatherThemePrecipOverride(nextValue = null) {
+  try {
+    if (nextValue === null || nextValue === undefined || String(nextValue).trim() === "") {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_PRECIP_KEY);
+      return;
+    }
+    const value = Number(nextValue);
+    if (!Number.isFinite(value) || value < 0) {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_PRECIP_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_DEBUG_PRECIP_KEY, String(Math.max(0, Math.min(12, Math.round(value * 10) / 10))));
+  } catch (error) {
+    // Dočasný prepínač zrážok nech appku neblokuje.
+  }
+}
+
+function saveMobileWeatherThemeTemperatureOverride(nextValue = null) {
+  try {
+    if (nextValue === null || nextValue === undefined || String(nextValue).trim() === "") {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_TEMP_KEY);
+      return;
+    }
+    const value = Number(nextValue);
+    if (!Number.isFinite(value)) {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_TEMP_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_DEBUG_TEMP_KEY, String(Math.max(-15, Math.min(38, Math.round(value)))));
+  } catch (error) {
+    // Dočasný prepínač teploty nech appku neblokuje.
+  }
+}
+
+function saveMobileWeatherThemePhaseOverride(nextValue = "") {
+  const value = String(nextValue || "").trim().toLowerCase();
+  try {
+    if (!MOBILE_WEATHER_PHASE_DEBUG_OPTIONS.some((item) => item.id === value) || value === "") {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_PHASE_KEY);
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_PERIOD_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_DEBUG_PHASE_KEY, value);
+    localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_PERIOD_KEY);
+  } catch (error) {
+    // Dočasný prepínač fázy dňa nech appku neblokuje.
+  }
+}
+
+function saveMobileWeatherThemeMoonOverride(nextValue = "") {
+  const value = String(nextValue || "").trim().toLowerCase();
+  try {
+    if (!MOBILE_WEATHER_MOON_DEBUG_OPTIONS.some((item) => item.id === value) || value === "") {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_MOON_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_DEBUG_MOON_KEY, value);
+  } catch (error) {
+    // Dočasný prepínač mesiaca nech appku neblokuje.
+  }
+}
+
+function saveMobileWeatherThemeSeasonOverride(nextValue = "") {
+  const value = String(nextValue || "").trim().toLowerCase();
+  try {
+    if (!MOBILE_WEATHER_SEASON_DEBUG_OPTIONS.some((item) => item.id === value) || value === "") {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_SEASON_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_SEASON_KEY, value);
+  } catch (error) {
+    // Dočasný prepínač sezóny nech appku neblokuje.
+  }
+}
+
+function saveMobileWeatherSceneOnlyPreference(enabled = false) {
+  try {
+    if (!enabled) {
+      localStorage.removeItem(MOBILE_WEATHER_SCENE_ONLY_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_SCENE_ONLY_KEY, "1");
+  } catch (error) {
+    // Dočasný prepínač čistého pozadia nech appku neblokuje.
+  }
+}
+
+function applyMobileWeatherSceneMode() {
+  if (typeof document === "undefined" || !document.body) return;
+  const body = document.body;
+  const isActive = body.classList.contains("app-mobile-shell") && loadMobileWeatherSceneOnlyPreference();
+  body.classList.toggle("app-mobile-weather-scene-only", isActive);
+}
+
+function saveMobileWeatherThemePeriodOverride(nextValue = "") {
+  const value = String(nextValue || "").trim();
+  try {
+    if (value !== "day" && value !== "night") {
+      localStorage.removeItem(MOBILE_WEATHER_THEME_DEBUG_PERIOD_KEY);
+      return;
+    }
+    localStorage.setItem(MOBILE_WEATHER_THEME_DEBUG_PERIOD_KEY, value);
+  } catch (error) {
+    // Dočasný prepínač obdobia dňa nech appku neblokuje.
+  }
+}
+
+function applyMobileWeatherTheme(snapshot = null) {
+  if (typeof document === "undefined" || !document.body) return;
+  const body = document.body;
+  if (!body.classList.contains("app-mobile-shell")) {
+    body.removeAttribute("data-mobile-weather-tone");
+    body.removeAttribute("data-mobile-weather-variant");
+    body.removeAttribute("data-mobile-weather-cloud");
+    body.removeAttribute("data-mobile-weather-phenomenon");
+    body.removeAttribute("data-mobile-weather-period");
+    body.removeAttribute("data-mobile-weather-wind");
+    body.removeAttribute("data-mobile-weather-season");
+    body.removeAttribute("data-mobile-weather-heat");
+    body.removeAttribute("data-mobile-weather-phase");
+    body.removeAttribute("data-mobile-weather-debug");
+    window.weatherBackgroundEngine?.clear?.();
+    window.weatherAudioEngine?.clear?.();
+    syncMobileWeatherSoundButton();
+    return;
+  }
+
+  const debugOverride = loadMobileWeatherThemeDebugOverride();
+  const debugCloudOverride = loadMobileWeatherThemeCloudOverride();
+  const debugPhaseOverride = loadMobileWeatherThemePhaseOverride();
+  const debugSeasonOverride = loadMobileWeatherThemeSeasonOverride();
+  const debugTemperatureOverride = loadMobileWeatherThemeTemperatureOverride();
+  const debugWindSpeedOverride = loadMobileWeatherThemeWindOverride();
+  const debugPrecipitationOverride = loadMobileWeatherThemePrecipOverride();
+  const forcedMoonPhase = MOBILE_WEATHER_FIXED_MOON_PHASE;
+  const resolvedSnapshot = snapshot || homeWeatherSnapshot || null;
+  const fallbackPeriod = weatherDayPeriodFromHour(new Date().getHours());
+  const periodBase = debugOverride?.period || (resolvedSnapshot ? weatherSnapshotDayPeriod(resolvedSnapshot) : fallbackPeriod);
+  const phaseOverride = debugPhaseOverride;
+  const period = mobileWeatherPhasePeriod(phaseOverride, periodBase);
+  const themedSnapshotBase = buildMobileWeatherThemeDebugSnapshot(resolvedSnapshot, debugOverride, period, {
+    precipitationOverrideMm: debugPrecipitationOverride,
+    temperatureOverrideC: debugTemperatureOverride,
+    phaseOverride,
+    moonPhaseOverride: forcedMoonPhase,
+    cloudOverride: debugCloudOverride
+  }) || resolvedSnapshot;
+  const autoPhenomenonVariantBase = debugOverride?.id === "none"
+    ? "none"
+    : mobileWeatherPhenomenonVariantFromSnapshot(themedSnapshotBase);
+  const autoPrecipitationDebugId = debugOverride?.id || autoPhenomenonVariantBase;
+  const themedSnapshot = debugPrecipitationOverride === null || !themedSnapshotBase || debugOverride
+    ? themedSnapshotBase
+    : normalizeWeatherSnapshot({
+      ...themedSnapshotBase,
+      ...applyMobileWeatherPrecipitationOverride(themedSnapshotBase, autoPrecipitationDebugId, debugPrecipitationOverride)
+    });
+  const dryPhenomenonVariant = String(debugOverride?.variant || autoPhenomenonVariantBase || "").trim().toLowerCase();
+  const precipitationSuppressed = debugPrecipitationOverride !== null
+    && Number(debugPrecipitationOverride) <= 0.03
+    && !["fog", "mist", "none"].includes(dryPhenomenonVariant);
+  const heatLevel = themedSnapshot ? mobileWeatherHeatLevel(themedSnapshot, period) : "normal";
+  const phase = phaseOverride || mobileWeatherPhaseFromSnapshot(themedSnapshot, period);
+  const cloudVisual = MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.find((item) => item.id === debugCloudOverride) || null;
+  const autoCloudVariant = cloudVisual?.variant || mobileWeatherCloudVariantFromSnapshot(themedSnapshot, period);
+  const autoPhenomenonVariant = precipitationSuppressed || debugOverride?.id === "none"
+    ? "none"
+    : mobileWeatherPhenomenonVariantFromSnapshot(themedSnapshot);
+  const tone = debugCloudOverride
+    ? (cloudVisual?.tone || mobileWeatherToneFromState({
+      phenomenonVariant: "none",
+      cloudVariant: autoCloudVariant,
+      heatLevel,
+      snapshot: themedSnapshot
+    }))
+    : ((precipitationSuppressed ? "" : debugOverride?.tone) || mobileWeatherToneFromState({
+      phenomenonVariant: autoPhenomenonVariant,
+      cloudVariant: autoCloudVariant,
+      heatLevel,
+      snapshot: themedSnapshot
+    }));
+  const variant = mobileWeatherBodyVariantFromState({
+    cloudVariant: autoCloudVariant,
+    heatLevel,
+    period
+  });
+  const phenomenonVariant = precipitationSuppressed ? "none" : (debugOverride?.variant || autoPhenomenonVariant);
+  const observedAutoWindSpeed = themedSnapshot
+    ? (toFiniteWeatherNumber(themedSnapshot?.windSpeedKmh) ?? extractWeatherNumber(themedSnapshot?.wind))
+    : null;
+  const autoWindSpeed = observedAutoWindSpeed !== null
+    ? observedAutoWindSpeed
+    : weatherWindSpeedFallbackForCategory(debugOverride?.wind || "calm");
+  const windSpeed = debugWindSpeedOverride ?? autoWindSpeed;
+  const baseWind = observedAutoWindSpeed !== null
+    ? weatherWindStateFromSpeed(autoWindSpeed)
+    : (debugOverride?.wind || (themedSnapshot ? weatherWindState(themedSnapshot) : "calm"));
+  const resolvedWind = debugWindSpeedOverride === null ? baseWind : weatherWindStateFromSpeed(debugWindSpeedOverride);
+  const season = debugSeasonOverride || mobileWeatherSeasonFromDate();
+  const engineSnapshot = themedSnapshot
+    ? normalizeWeatherSnapshot({ ...themedSnapshot })
+    : themedSnapshot;
+
+  if (engineSnapshot && debugOverride?.id && debugOverride.id !== "auto") {
+    const fogLikeDebug = phenomenonVariant === "fog" || phenomenonVariant === "mist";
+    if (fogLikeDebug) {
+      engineSnapshot.humidityPct = Math.max(Number(engineSnapshot.humidityPct) || 0, 95);
+      engineSnapshot.visibilityM = 1350;
+      engineSnapshot.cloudCoverPct = Math.max(Number(engineSnapshot.cloudCoverPct) || 0, 84);
+      engineSnapshot.cloudCoverLowPct = Math.max(Number(engineSnapshot.cloudCoverLowPct) || 0, 88);
+      engineSnapshot.cloudCoverMidPct = Math.max(Number(engineSnapshot.cloudCoverMidPct) || 0, 74);
+      engineSnapshot.cloudCoverHighPct = Math.max(Number(engineSnapshot.cloudCoverHighPct) || 0, 58);
+    } else {
+      engineSnapshot.visibilityM = Math.max(
+        Number.isFinite(Number(engineSnapshot.visibilityM)) ? Number(engineSnapshot.visibilityM) : 22000,
+        22000
+      );
+      engineSnapshot.humidityPct = Math.min(
+        Number.isFinite(Number(engineSnapshot.humidityPct)) ? Number(engineSnapshot.humidityPct) : 66,
+        phenomenonVariant === "snow" || phenomenonVariant === "sleet" ? 88 : 72
+      );
+    }
+  }
+
+  body.dataset.mobileWeatherTone = tone;
+  body.dataset.mobileWeatherVariant = variant;
+  body.dataset.mobileWeatherCloud = autoCloudVariant;
+  body.dataset.mobileWeatherPhenomenon = phenomenonVariant;
+  body.dataset.mobileWeatherPeriod = period;
+  body.dataset.mobileWeatherWind = resolvedWind;
+  body.dataset.mobileWeatherSeason = season;
+  body.dataset.mobileWeatherHeat = heatLevel;
+  body.dataset.mobileWeatherPhase = phase;
+  body.dataset.mobileWeatherDebug = debugOverride?.id || "auto";
+
+  const weatherBackgroundInput = buildMobileWeatherBackgroundInput({
+    snapshot: engineSnapshot,
+    tone,
+    variant: autoCloudVariant,
+    phenomenonVariant,
+    season,
+    period,
+    phase,
+    wind: resolvedWind,
+    windSpeed,
+    precipitationLocked: debugPrecipitationOverride !== null,
+    moonPhaseOverride: forcedMoonPhase,
+    cloudLocked: debugCloudOverride !== ""
+  });
+
+  window.weatherBackgroundEngine?.apply?.(weatherBackgroundInput);
+  window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
+  if (mobileWeatherSoundEnabled) {
+    window.weatherAudioEngine?.apply?.(weatherBackgroundInput);
+    window.weatherAudioEngine?.setMasterVolume?.(mobileWeatherSoundVolume);
+  } else {
+    window.weatherAudioEngine?.clear?.();
+  }
+  syncMobileWeatherSoundButton();
+  syncMainMenuWeatherAudioControls();
 }
 
 function weatherIllustrationMarkup(weather) {
@@ -3527,7 +6763,21 @@ function renderMainMenuWeatherMini(weather, options = {}) {
   const sunshine = formatSunshineHours(weather.sunshineHours);
   const dayPeriod = weatherSnapshotDayPeriod(weather);
   const phaseLabel = dayPeriod === "night" ? "Noc" : "Deň";
-  const phaseIcon = dayPeriod === "night" ? "☾" : "☀";
+  const phaseIcon = dayPeriod === "night" ? ICONS.weatherMoon : ICONS.weatherSun;
+
+  if (options.heroCompact) {
+    const heroMeta = weather.wind || weather.rain || weather.humidity || "";
+    return `
+      <div class="main-menu-weather-mini__card main-menu-weather-mini__card--${weatherVisualTone(weather)} main-menu-weather-mini__card--${escapeAttribute(dayPeriod)} main-menu-weather-mini__card--hero-pill"${triggerAttributes}>
+        <div class="main-menu-weather-mini__hero-pill">
+          <span class="main-menu-weather-mini__hero-phase main-menu-weather-mini__hero-phase--${escapeAttribute(dayPeriod)}" aria-label="${escapeAttribute(phaseLabel)}" title="${escapeAttribute(phaseLabel)}"><span aria-hidden="true">${escapeHtml(phaseIcon)}</span></span>
+          <strong class="main-menu-weather-mini__hero-temperature">${escapeHtml(weather.temperature || "—")}</strong>
+          <span class="main-menu-weather-mini__hero-condition">${escapeHtml(weather.condition || "Počasie")}</span>
+          ${heroMeta ? `<span class="main-menu-weather-mini__hero-meta">${escapeHtml(heroMeta)}</span>` : ""}
+        </div>
+      </div>
+    `;
+  }
 
   return `
     <div class="main-menu-weather-mini__card main-menu-weather-mini__card--${weatherVisualTone(weather)} main-menu-weather-mini__card--${escapeAttribute(dayPeriod)}"${triggerAttributes}>
@@ -3625,7 +6875,15 @@ function journalThemeChipTitle(chip) {
   return label.slice(separatorIndex + 1).trim();
 }
 
-function renderJournalEntryTypePicker(selectedType = "note") {
+function renderJournalEntryTypePicker(selectedType = "note", options = {}) {
+  const mobileMinimal = Boolean(options?.mobileMinimal);
+  if (mobileMinimal) {
+    return `
+      <div class="journal-entry-type-field journal-entry-type-field--hidden" hidden aria-hidden="true">
+        ${singleChoiceChipOptions("entryType", JOURNAL_ENTRY_TYPE_OPTIONS, selectedType || "note")}
+      </div>
+    `;
+  }
   return `
     <div class="journal-entry-type-field">
       <p class="journal-entry-type-field__label">Typ zápisu</p>
@@ -3667,10 +6925,10 @@ function renderJournalWalkFields(walkValue = null) {
             <p class="journal-walk-gps__hint">Ťukni Štart prechádzky, choď a foť. GPS bude priebežne zbierať body a čas aj dĺžka sa spočítajú samy.</p>
           </div>
           <div class="journal-walk-gps__actions">
-            <button class="button journal-walk-gps__button journal-walk-gps__button--start" type="button" data-walk-gps-action="start"><span aria-hidden="true">▶</span><span>Štart</span></button>
-            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--pause" type="button" data-walk-gps-action="pause"><span aria-hidden="true">⏸</span><span>Pauza</span></button>
-            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--resume" type="button" data-walk-gps-action="resume"><span aria-hidden="true">⏵</span><span>Pokračovať</span></button>
-            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--stop" type="button" data-walk-gps-action="stop"><span aria-hidden="true">⏹</span><span>Koniec</span></button>
+            <button class="button journal-walk-gps__button journal-walk-gps__button--start" type="button" data-walk-gps-action="start"><span aria-hidden="true">${ICONS.walkStart}</span><span>Štart</span></button>
+            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--pause" type="button" data-walk-gps-action="pause"><span aria-hidden="true">${ICONS.walkPause}</span><span>Pauza</span></button>
+            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--resume" type="button" data-walk-gps-action="resume"><span aria-hidden="true">${ICONS.walkResume}</span><span>Pokračovať</span></button>
+            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--stop" type="button" data-walk-gps-action="stop"><span aria-hidden="true">${ICONS.walkStop}</span><span>Koniec</span></button>
           </div>
         </div>
         <div class="journal-walk-gps__auto" id="journal-overlay-gps-auto">
@@ -3871,9 +7129,9 @@ function renderJournalWeatherWidgets(weather) {
 
   const parts = [
     weather.condition ? { icon: weatherIconSymbol(weather), text: weather.condition } : null,
-    weather.temperature ? { icon: "🌡", text: weather.temperature } : null,
-    weather.rain ? { icon: "💧", text: weather.rain } : null,
-    weather.wind ? { icon: "💨", text: weather.wind } : null
+    weather.temperature ? { icon: ICONS.weatherTemp, text: weather.temperature } : null,
+    weather.rain ? { icon: ICONS.weatherRain, text: weather.rain } : null,
+    weather.wind ? { icon: ICONS.weatherWind, text: weather.wind } : null
   ].filter(Boolean);
 
   if (!parts.length) return "";
@@ -3907,39 +7165,56 @@ function formatJournalWalkDuration(durationMinutes) {
   return `${hours} h ${minutes} min`;
 }
 
-function renderJournalWalkSummary(walkValue, { compact = false } = {}) {
+function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0 } = {}) {
   const walk = normalizeJournalWalk({ walk: walkValue }) || null;
   if (!walk) return "";
 
-  const routeLabel = walk.startPlace && walk.endPlace
-    ? `${walk.startPlace} → ${walk.endPlace}`
-    : walk.startPlace || walk.endPlace || "";
+  const startLabel = displayWalkPlaceLabel(walk.startPlace);
+  const endLabel = displayWalkPlaceLabel(walk.endPlace);
+  const routeLabel = startLabel && endLabel
+    ? `${startLabel} › ${endLabel}`
+    : startLabel || endLabel || "";
   const gpsPoints = Array.isArray(walk.gpsPoints) ? walk.gpsPoints : [];
+  const startedAt = String(walk.startedAt || gpsPoints[0]?.recordedAt || "").trim();
+  const endedAt = String(walk.endedAt || gpsPoints[gpsPoints.length - 1]?.recordedAt || "").trim();
+  const timeRangeLabel = (() => {
+    const startTime = formatWalkDateTime(startedAt);
+    const endTime = formatWalkDateTime(endedAt);
+    if (startTime && endTime) return `${startTime} - ${endTime}`;
+    return startTime || endTime || "";
+  })();
 
-  const pills = [
-    walk.distanceKm !== null ? { icon: "↔", text: formatJournalWalkDistance(walk.distanceKm) } : null,
-    walk.durationMinutes !== null ? { icon: "⏱", text: formatJournalWalkDuration(walk.durationMinutes) } : null,
-    gpsPoints.length ? { icon: "📍", text: countedLabel(gpsPoints.length, "GPS bod", "GPS body", "GPS bodov") } : null,
-    walk.temperature ? { icon: "🌡", text: walk.temperature } : null,
-    walk.wind ? { icon: "💨", text: walk.wind } : null,
-    walk.precipitation ? { icon: "💧", text: walk.precipitation } : null,
-    walk.conditions ? { icon: "☁", text: walk.conditions } : null
+  const compactPills = [
+    timeRangeLabel ? { icon: ICONS.walkDuration, text: timeRangeLabel } : null,
+    walk.distanceKm !== null ? { icon: "-", text: formatJournalWalkDistance(walk.distanceKm) } : null,
+    walk.durationMinutes !== null ? { icon: ICONS.walkDuration, text: formatJournalWalkDuration(walk.durationMinutes) } : null,
+    gpsPoints.length ? { icon: ICONS.walkGps, text: countedLabel(gpsPoints.length, "GPS bod", "GPS body", "GPS bodov") } : null
   ].filter(Boolean);
+
+  const detailPills = [
+    ...compactPills,
+    walk.temperature ? { icon: ICONS.weatherTemp, text: walk.temperature } : null,
+    walk.wind ? { icon: ICONS.weatherWind, text: walk.wind } : null,
+    walk.precipitation ? { icon: ICONS.weatherRain, text: walk.precipitation } : null,
+    walk.conditions ? { icon: weatherIconSymbol({ condition: walk.conditions }), text: walk.conditions } : null
+  ].filter(Boolean);
+  const pills = compact ? compactPills : detailPills;
 
   const routePoints = compact ? walk.routePoints.slice(0, 4) : walk.routePoints;
   const gpsPreviewPoints = routePoints.length
     ? []
-    : (compact ? gpsPoints.slice(0, 2) : gpsPoints.slice(0, 4)).map((point, index) => formatWalkGpsPointLabel(point, index));
-  const previewPoints = routePoints.length ? routePoints : gpsPreviewPoints;
+    : (compact ? gpsPoints.slice(0, 2) : gpsPoints.slice(0, 4)).map((point, index) => formatWalkGpsPointLabel(point, index, gpsPoints.length));
+  const previewPoints = compact
+    ? []
+    : (routePoints.length ? routePoints : gpsPreviewPoints);
   const extraPointCount = routePoints.length
     ? (compact && walk.routePoints.length > routePoints.length ? walk.routePoints.length - routePoints.length : 0)
     : (compact && gpsPoints.length > gpsPreviewPoints.length ? gpsPoints.length - gpsPreviewPoints.length : 0);
 
   return `
     <section class="journal-walk ${compact ? "journal-walk--compact" : ""}">
-      ${routeLabel ? `
+      ${routeLabel && !compact ? `
         <div class="journal-walk__route">
-          <span class="journal-walk__route-icon" aria-hidden="true">🥾</span>
           <strong>${escapeHtml(routeLabel)}</strong>
         </div>
       ` : ""}
@@ -3953,7 +7228,7 @@ function renderJournalWalkSummary(walkValue, { compact = false } = {}) {
           `).join("")}
         </div>
       ` : ""}
-      ${renderWalkMapMarkup(walk, { compact })}
+      ${renderWalkMapMarkup(walk, { compact, photoCount })}
       ${previewPoints.length ? `
         <div class="journal-walk__points">
           ${previewPoints.map((point) => `<span class="journal-walk__point">${escapeHtml(point)}</span>`).join("")}
@@ -3966,15 +7241,15 @@ function renderJournalWalkSummary(walkValue, { compact = false } = {}) {
 
 function weatherIconSymbol(weather) {
   const condition = String(weather?.condition || "").toLowerCase();
-  if (!condition) return "◌";
-  if (condition.includes("búrka")) return "⛈️";
-  if (condition.includes("krúp")) return "⛈️";
-  if (condition.includes("sne")) return "🌨️";
-  if (condition.includes("dážď") || condition.includes("prehán")) return "🌧️";
-  if (condition.includes("hmla")) return "🌫️";
-  if (condition.includes("obla")) return "☁️";
-  if (condition.includes("jasno")) return "☀️";
-  return "⛅";
+  if (!condition) return ICONS.weatherPartly;
+  if (condition.includes("búrka")) return ICONS.weatherStorm;
+  if (condition.includes("krúp")) return ICONS.weatherStorm;
+  if (condition.includes("sne")) return ICONS.weatherSnow;
+  if (condition.includes("dážď") || condition.includes("prehán")) return ICONS.weatherRain;
+  if (condition.includes("hmla")) return ICONS.weatherMist;
+  if (condition.includes("obla")) return ICONS.weatherCloud;
+  if (condition.includes("jasno")) return ICONS.weatherSun;
+  return ICONS.weatherPartly;
 }
 
 function journalLinkChips(entry) {
@@ -4052,11 +7327,14 @@ function journalDisplayChips(entry, { compact = false } = {}) {
   });
 }
 
-function renderJournalChip(chip) {
+function renderJournalChip(chip, options = {}) {
   if (chip?.themeKey) {
     const kind = String(chip.themeKey || "").split(":")[0];
     const kindClass = kind ? ` tag--link-${kind}` : "";
-    return `<button class="tag tag--journal-meta tag--interactive${kindClass}" type="button" data-open-thing="${escapeAttribute(chip.themeKey)}">${escapeHtml(chip.label)}</button>`;
+    const behavior = String(options.behavior || "").trim();
+    const useJournalFilter = behavior === "journal-filter" && kind && kind !== "variety";
+    const attributeName = useJournalFilter ? "data-journal-filter-tag" : "data-open-thing";
+    return `<button class="tag tag--journal-meta tag--interactive${kindClass}" type="button" ${attributeName}="${escapeAttribute(chip.themeKey)}">${escapeHtml(chip.label)}</button>`;
   }
   return `<span class="tag tag--journal-meta">${escapeHtml(chip?.label || "")}</span>`;
 }
@@ -4542,16 +7820,18 @@ function relatedTasksForTheme(record) {
 
 function renderChildCategoryCard(category) {
   return `
-    <article class="catalog-card catalog-card--child catalog-card--clickable catalog-card--${category.nodeType || "kind"}" data-open-category="${category.id}" tabindex="0" role="button" aria-label="Otvoriť kategóriu ${escapeHtml(category.name)}" style="--category-accent:${escapeAttribute(category.color || "#7e9f4b")}">
-      <div class="catalog-card__image">
-        <img src="${escapeAttribute(categoryCardImage(category))}" alt="${escapeHtml(category.name)}">
-      </div>
-      <div class="catalog-card__body catalog-card__body--category">
-        <div class="catalog-card__head catalog-card__head--category">
-          <h3 class="catalog-card__title catalog-card__title--body">${escapeHtml(category.name)}</h3>
+    <article class="catalog-card catalog-card--child catalog-card--clickable catalog-card--${category.nodeType || "kind"}" style="--category-accent:${escapeAttribute(category.color || "#7e9f4b")}">
+      <button class="catalog-card__main-hit" type="button" data-open-category="${category.id}" aria-label="Otvoriť kategóriu ${escapeHtml(category.name)}">
+        <div class="catalog-card__image">
+          <img src="${escapeAttribute(categoryCardImage(category))}" alt="${escapeHtml(category.name)}">
         </div>
-        <p class="catalog-card__count">${escapeHtml(categoryVarietyCountLabel(category.id))}</p>
-      </div>
+        <div class="catalog-card__body catalog-card__body--category">
+          <div class="catalog-card__head catalog-card__head--category">
+            <h3 class="catalog-card__title catalog-card__title--body">${escapeHtml(category.name)}</h3>
+          </div>
+          <p class="catalog-card__count">${escapeHtml(categoryVarietyCountLabel(category.id))}</p>
+        </div>
+      </button>
     </article>
   `;
 }
@@ -4583,15 +7863,18 @@ function syncCatalogCardImagePresentation(root = document) {
       const width = img.naturalWidth || img.width || 0;
       const height = img.naturalHeight || img.height || 0;
       const source = img.currentSrc || img.src || "";
+      const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
       if (!source) return;
 
       frame.style.setProperty("--card-image", `url(${JSON.stringify(source)})`);
+      frame.style.setProperty("--card-image-ratio", width && height ? `${width} / ${height}` : "1 / 1");
       frame.classList.remove("catalog-card__image--soft-fit", "catalog-card__image--landscape", "catalog-card__image--portrait");
 
       if (!width || !height) return;
 
       const ratio = width / height;
-      if (ratio > 1.18 || ratio < 0.86) {
+      const portraitThreshold = isMobileShell ? 1.05 : 0.86;
+      if (ratio > 1.18 || ratio < portraitThreshold) {
         frame.classList.add("catalog-card__image--soft-fit");
         frame.classList.add(ratio > 1.18 ? "catalog-card__image--landscape" : "catalog-card__image--portrait");
       }
@@ -4603,6 +7886,36 @@ function syncCatalogCardImagePresentation(root = document) {
       img.addEventListener("load", syncFrame, { once: true });
     }
   });
+}
+
+function syncDetailEditorImagePresentation(previewEl) {
+  const img = previewEl instanceof HTMLImageElement ? previewEl : null;
+  const frame = img?.closest(".detail-image--editor");
+  if (!img || !frame) return;
+
+  const syncFrame = () => {
+    const width = img.naturalWidth || img.width || 0;
+    const height = img.naturalHeight || img.height || 0;
+    const source = img.currentSrc || img.src || "";
+    if (source) {
+      frame.style.setProperty("--detail-image", `url(${JSON.stringify(source)})`);
+    }
+    frame.style.setProperty("--detail-image-ratio", width && height ? `${width} / ${height}` : "1 / 1");
+    frame.classList.remove("detail-image--soft-fit", "detail-image--landscape", "detail-image--portrait");
+    if (!width || !height) return;
+
+    const ratio = width / height;
+    if (ratio > 1.18 || ratio < 1.05) {
+      frame.classList.add("detail-image--soft-fit");
+      frame.classList.add(ratio > 1.18 ? "detail-image--landscape" : "detail-image--portrait");
+    }
+  };
+
+  if (img.complete) {
+    syncFrame();
+  } else {
+    img.addEventListener("load", syncFrame, { once: true });
+  }
 }
 
 function renderVarietyCard(variety) {
@@ -4635,22 +7948,25 @@ function renderVarietyCard(variety) {
     variety.transplantedAt ? `Vysadené: ${formatDate(variety.transplantedAt)}.` : "",
     variety.harvestedAt ? `Zberané: ${formatDate(variety.harvestedAt)}.` : ""
   ].filter(Boolean);
-  const summaryTagsHtml = summaryTags.length ? summaryTags.join("") : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
+  const summaryTagsHtml = summaryTags.length ? summaryTags.join("") : "";
+  const quickSectionHtml = `<div class="catalog-card__quick ${summaryTags.length ? "" : "is-empty"}">${summaryTagsHtml || '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>'}</div>`;
   const selectedDetailsHtml = selectedDetails.length ? escapeHtml(selectedDetails.join(" ")) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
   const previewTextHtml = previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
   return `
-    <article class="catalog-card catalog-card--clickable catalog-card--variety" data-open-variety="${variety.id}" tabindex="0" role="button" aria-label="Otvoriť odrodu ${escapeHtml(variety.name)}" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
-      <div class="catalog-card__image">
-        <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(variety.name)}">
-        <div class="catalog-card__shade">
-          <h3 class="catalog-card__title">${escapeHtml(variety.name)}</h3>
+    <article class="catalog-card catalog-card--variety" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
+      <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť odrodu ${escapeHtml(variety.name)}">
+        <div class="catalog-card__image">
+          <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(variety.name)}">
+          <div class="catalog-card__shade">
+            <h3 class="catalog-card__title">${escapeHtml(variety.name)}</h3>
+          </div>
         </div>
-      </div>
-      <div class="catalog-card__quick ${summaryTags.length ? "" : "is-empty"}">${summaryTagsHtml}</div>
-      <div class="catalog-card__body">
-        <p class="catalog-card__meta ${selectedDetails.length ? "" : "is-empty"}">${selectedDetailsHtml}</p>
-        <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewTextHtml}</p>
-      </div>
+        ${quickSectionHtml}
+        <div class="catalog-card__body">
+          <p class="catalog-card__meta ${selectedDetails.length ? "" : "is-empty"}">${selectedDetailsHtml}</p>
+          <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewTextHtml}</p>
+        </div>
+      </button>
     </article>
   `;
 }
@@ -4694,7 +8010,10 @@ function renderUniversalCard(item, category, previewText) {
     item.recordedAt ? `${cardDateLabel(cardType(item))}: ${formatDate(item.recordedAt)}.` : "",
     isBirdCard && item.birdPlace ? `Miesto: ${item.birdPlace}.` : ""
   ].filter(Boolean);
-  const summaryTagsHtml = summaryTags.length ? summaryTags.join("") : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
+  const summaryTagsHtml = summaryTags.length ? summaryTags.join("") : "";
+  const quickSectionHtml = summaryTags.length
+    ? `<div class="catalog-card__quick">${summaryTagsHtml}</div>`
+    : "";
   const selectedDetailsHtml = selectedDetails.length ? escapeHtml(selectedDetails.join(" ")) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
   const previewTextHtml = previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
   const birdIdentityHtml = isBirdCard && birdLatinName
@@ -4705,7 +8024,7 @@ function renderUniversalCard(item, category, previewText) {
         `
     : "";
   const birdExternalLinkHtml = birdExternalUrl
-    ? `<a class="catalog-card__external-link catalog-card__external-link--bird-card" href="${escapeAttribute(birdExternalUrl)}" target="_blank" rel="noreferrer noopener" data-stop-card-open>Otvoriť v eBirde ↗</a>`
+    ? `<a class="catalog-card__external-link catalog-card__external-link--bird-card" href="${escapeAttribute(birdExternalUrl)}" target="_blank" rel="noreferrer noopener" data-stop-card-open>${ICONS.cardBird} Otvoriť v eBirde</a>`
     : "";
   return `
     <article class="catalog-card catalog-card--clickable catalog-card--variety ${isBirdCard ? "catalog-card--bird" : ""}" data-open-variety="${item.id}" tabindex="0" role="button" aria-label="Otvoriť kartu ${escapeHtml(entryDisplayName(item))}" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
@@ -4716,7 +8035,7 @@ function renderUniversalCard(item, category, previewText) {
           ${birdIdentityHtml}
         </div>
       </div>
-      <div class="catalog-card__quick ${summaryTags.length ? "" : "is-empty"}">${summaryTagsHtml}</div>
+      ${quickSectionHtml}
       <div class="catalog-card__body">
         <p class="catalog-card__meta ${selectedDetails.length ? "" : "is-empty"}">${selectedDetailsHtml}</p>
         ${birdExternalLinkHtml}
@@ -4735,19 +8054,21 @@ function renderQuickEntryCard(variety) {
     imageCount ? `<span class="tag">${countedLabel(imageCount, "fotka", "fotky", "fotiek")}</span>` : ""
   ].filter(Boolean);
   return `
-    <article class="catalog-card catalog-card--clickable catalog-card--variety catalog-card--quick-entry" data-open-variety="${variety.id}" tabindex="0" role="button" aria-label="Otvoriť záznam ${escapeHtml(entryDisplayName(variety))}" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
-      <div class="catalog-card__image">
-        <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(entryDisplayName(variety))}">
-        <div class="catalog-card__shade">
-          <p class="eyebrow">${escapeHtml(entryKindLabel(variety))}</p>
-          <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(variety))}</h3>
+    <article class="catalog-card catalog-card--variety catalog-card--quick-entry" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
+      <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť záznam ${escapeHtml(entryDisplayName(variety))}">
+        <div class="catalog-card__image">
+          <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(entryDisplayName(variety))}">
+          <div class="catalog-card__shade">
+            <p class="eyebrow">${escapeHtml(entryKindLabel(variety))}</p>
+            <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(variety))}</h3>
+          </div>
         </div>
-      </div>
-      <div class="catalog-card__quick">${quickTags.join("")}</div>
-      <div class="catalog-card__body">
-        <p class="catalog-card__meta">${escapeHtml(categoryName(variety.categoryId))}</p>
-        <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>'}</p>
-      </div>
+        <div class="catalog-card__quick">${quickTags.join("")}</div>
+        <div class="catalog-card__body">
+          <p class="catalog-card__meta">${escapeHtml(categoryName(variety.categoryId))}</p>
+          <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>'}</p>
+        </div>
+      </button>
     </article>
   `;
 }
@@ -4762,19 +8083,21 @@ function renderGalleryEntryCard(variety) {
     imageCount ? `<span class="tag">${countedLabel(imageCount, "fotka", "fotky", "fotiek")}</span>` : ""
   ].filter(Boolean);
   return `
-    <article class="catalog-card catalog-card--clickable catalog-card--variety catalog-card--gallery-entry" data-open-variety="${variety.id}" tabindex="0" role="button" aria-label="Otvoriť galériu ${escapeHtml(entryDisplayName(variety))}" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
-      <div class="catalog-card__image">
-        <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(entryDisplayName(variety))}">
-        <div class="catalog-card__shade">
-          <p class="eyebrow">Galéria</p>
-          <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(variety))}</h3>
+    <article class="catalog-card catalog-card--variety catalog-card--gallery-entry" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
+      <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť galériu ${escapeHtml(entryDisplayName(variety))}">
+        <div class="catalog-card__image">
+          <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(entryDisplayName(variety))}">
+          <div class="catalog-card__shade">
+            <p class="eyebrow">Galéria</p>
+            <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(variety))}</h3>
+          </div>
         </div>
-      </div>
-      <div class="catalog-card__quick">${galleryTags.join("")}</div>
-      <div class="catalog-card__body">
-        <p class="catalog-card__meta">${escapeHtml(categoryName(variety.categoryId))}</p>
-        <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>'}</p>
-      </div>
+        <div class="catalog-card__quick">${galleryTags.join("")}</div>
+        <div class="catalog-card__body">
+          <p class="catalog-card__meta">${escapeHtml(categoryName(variety.categoryId))}</p>
+          <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>'}</p>
+        </div>
+      </button>
     </article>
   `;
 }
@@ -4924,13 +8247,19 @@ function renderJournalSidebarCard(entry) {
   const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
   const chips = journalDisplayChips(normalizedEntry);
   const previewText = trimText(normalizedEntry.text || "", 120);
+  const isWalkEntry = normalizedEntry.entryType === "walk";
+  const displayTitle = isWalkEntry
+    ? "Prechádzka"
+    : (journalDisplayTitle(normalizedEntry) || "Záhradný zápis");
+  const walkTimeRange = isWalkEntry ? walkTimeRangeLabel(normalizedEntry.walk) : "";
+  const sidebarDateLabel = [formatDate(normalizedEntry.date), walkTimeRange].filter(Boolean).join(" • ");
   return `
     <article class="sidebar-preview-card sidebar-preview-card--journal">
       <div class="sidebar-preview-card__journal-top">
-        <p class="sidebar-preview-card__meta sidebar-preview-card__meta--journal">${escapeHtml(formatDate(normalizedEntry.date))}</p>
+        <p class="sidebar-preview-card__meta sidebar-preview-card__meta--journal">${escapeHtml(sidebarDateLabel)}</p>
         ${renderMoodBadge(normalizedEntry.mood, "sidebar-preview-card__mood")}
       </div>
-      <p class="sidebar-preview-card__title sidebar-preview-card__title--journal">${escapeHtml(normalizedEntry.title || "Záhradný zápis")}</p>
+      <p class="sidebar-preview-card__title sidebar-preview-card__title--journal">${escapeHtml(displayTitle)}</p>
       ${previewText ? `<p class="sidebar-preview-card__excerpt">${escapeHtml(previewText)}</p>` : ""}
       ${chips.length ? `<div class="sidebar-preview-card__footer"><div class="home-chip-row">${chips.map(renderJournalChip).join("")}</div></div>` : ""}
     </article>
@@ -5140,7 +8469,8 @@ function weatherInsightWeekTip(week, eyebrow = "") {
   };
 }
 
-function buildSmartInsights() {
+function buildSmartInsights(weather = insightWeatherSignals(), options = {}) {
+  const includeAlerts = options?.includeAlerts !== false;
   const tips = [];
   const seenKeys = new Set();
   const pushTip = (target, tip) => {
@@ -5157,15 +8487,16 @@ function buildSmartInsights() {
     });
   };
 
-  const weather = insightWeatherSignals();
-  weather.alerts.slice(0, 4).forEach((alert, index) => {
-    pushTip(tips, {
-      key: `weather-alert-${index}-${slugify(alert.title || "")}`,
-      eyebrow: alert.eyebrow || "Počasie",
-      title: alert.title || "Upozornenie",
-      body: alert.body || ""
+  if (includeAlerts) {
+    weather.alerts.slice(0, 4).forEach((alert, index) => {
+      pushTip(tips, {
+        key: `weather-alert-${index}-${slugify(alert.title || "")}`,
+        eyebrow: alert.eyebrow || "Počasie",
+        title: alert.title || "Upozornenie",
+        body: alert.body || ""
+      });
     });
-  });
+  }
 
   const currentWeekTip = weatherInsightWeekTip(weather.currentWeek, "Tento týždeň");
   if (currentWeekTip) pushTip(tips, currentWeekTip);
@@ -5218,23 +8549,75 @@ function buildSmartInsights() {
   return tips.slice(0, 8);
 }
 
+function renderInsightSignalPill(alert) {
+  const visual = weatherAlertVisual(alert);
+  const title = String(alert?.title || visual.label || "Upozornenie").trim();
+  return `
+    <span class="insight-signal-pill insight-signal-pill--${escapeAttribute(visual.tone || alert?.tone || "soft")}">
+      <span class="insight-signal-pill__icon" aria-hidden="true">${escapeHtml(visual.icon || ICONS.weatherPartly)}</span>
+      <span class="insight-signal-pill__label">${escapeHtml(trimText(title, 32))}</span>
+    </span>
+  `;
+}
+
+function renderInsightSignalDock(alerts = []) {
+  if (!alerts.length) return "";
+  const primaryAlert = alerts[0];
+  const primaryVisual = weatherAlertVisual(primaryAlert);
+  const primaryTone = String(primaryVisual.tone || primaryAlert?.tone || "soft").trim();
+  const primaryTitle = String(primaryAlert?.title || primaryVisual.label || "Upozornenie").trim();
+  const summaryTitle = alerts.length === 1
+    ? primaryTitle
+    : `Dnes ${countedLabel(alerts.length, "dôležitý signál", "dôležité signály", "dôležitých signálov")}`;
+  return `
+    <section class="insight-signal-dock insight-signal-dock--${escapeAttribute(primaryTone)}" aria-label="Rýchle varovania">
+      <div class="insight-signal-dock__hero">
+        <span class="insight-signal-dock__icon" aria-hidden="true">${escapeHtml(primaryVisual.icon || ICONS.weatherPartly)}</span>
+        <span class="insight-signal-dock__copy">
+          <span class="insight-signal-dock__eyebrow">${escapeHtml(alerts.length === 1 ? String(primaryAlert?.eyebrow || "Počasie").trim() : "Rýchly prehľad")}</span>
+          <strong>${escapeHtml(summaryTitle)}</strong>
+        </span>
+        ${alerts.length > 1 ? `
+          <span class="insight-signal-dock__cluster" aria-hidden="true">
+            ${alerts.slice(0, 3).map((alert) => {
+              const visual = weatherAlertVisual(alert);
+              return `<span class="insight-signal-dock__cluster-item insight-signal-dock__cluster-item--${escapeAttribute(visual.tone || alert?.tone || "soft")}">${escapeHtml(visual.icon || ICONS.weatherPartly)}</span>`;
+            }).join("")}
+          </span>
+        ` : ""}
+      </div>
+      ${alerts.length > 1 ? `
+        <div class="insight-signal-dock__pills">
+          ${alerts.map((alert) => renderInsightSignalPill(alert)).join("")}
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
 function renderInsights() {
   if (!insightStripEl) return;
-  const tips = buildSmartInsights();
+  const weather = insightWeatherSignals();
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  const compactAlerts = isMobileShell ? [] : [];
+  const tips = buildSmartInsights(weather, { includeAlerts: !isMobileShell || compactAlerts.length === 0 });
   if (insightTipIndex >= tips.length) {
     insightTipIndex = 0;
   }
-  insightStripEl.innerHTML = tips.length
+  insightStripEl.innerHTML = (tips.length || compactAlerts.length)
     ? `
-      <div class="insight-strip__ticker">
-        ${tips.map((tip, index) => `
-          <article class="insight-strip__slide ${index === insightTipIndex ? "is-active" : ""}">
-            <p class="insight-strip__eyebrow">${escapeHtml(tip.eyebrow)}</p>
-            <h4>${escapeHtml(tip.title)}</h4>
-            <p>${escapeHtml(tip.body)}</p>
-          </article>
-        `).join("")}
-      </div>
+      ${compactAlerts.length ? renderInsightSignalDock(compactAlerts) : ""}
+      ${tips.length ? `
+        <div class="insight-strip__ticker">
+          ${tips.map((tip, index) => `
+            <article class="insight-strip__slide ${index === insightTipIndex ? "is-active" : ""}">
+              <p class="insight-strip__eyebrow">${escapeHtml(tip.eyebrow)}</p>
+              <h4>${escapeHtml(tip.title)}</h4>
+              <p>${escapeHtml(tip.body)}</p>
+            </article>
+          `).join("")}
+        </div>
+      ` : ""}
     `
     : '<div class="empty-state empty-state--compact">Tipy sa objavia podľa počasia a týždenného vývoja.</div>';
 }
@@ -5246,7 +8629,10 @@ function syncOverviewHighlights() {
   }
 
   const memoryItems = latestJournalImages();
-  const tips = buildSmartInsights();
+  const weather = insightWeatherSignals();
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  const compactAlerts = isMobileShell ? [] : [];
+  const tips = buildSmartInsights(weather, { includeAlerts: !isMobileShell || compactAlerts.length === 0 });
   const canRotateMemories = memoryItems.length > 1;
   const canRotateTips = tips.length > 1;
 
@@ -5597,7 +8983,7 @@ function openAddEntryFlow(editingEntryId = "") {
             <input name="weatherLongitude" type="hidden">
             <label class="upload-field upload-field--compact">
               <span class="upload-field__label">Fotky k zápisu</span>
-              <input name="imageFiles" type="file" accept="image/*" capture="environment" multiple>
+              <input name="imageFiles" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple>
             </label>
             <div id="add-entry-image-preview" class="journal-form__image-list" hidden></div>
             <details class="entry-advanced" id="add-entry-advanced">
@@ -5978,7 +9364,7 @@ function openThingOverview(thingKey) {
   const record = buildThingRecords().find((item) => item.key === thingKey);
   if (!record) return;
   if (journalOverlayRoot()) {
-    closeJournalOverlay();
+    closeJournalOverlay({ fromHistory: true });
   }
 
   if (record.kind === "category") {
@@ -6190,12 +9576,36 @@ function openVarietyOverviewModal({ title, items, emptyMessage, detailBuilder })
 function openCategoryManager(categoryId = null, forcedParentId = "") {
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--editor");
+  const isMobileEditorShell = document.body.classList.contains("app-mobile-shell");
   const existing = categoryId ? state.categories.find((item) => item.id === categoryId) : null;
   const colorChoices = ["#d45d2c", "#c84136", "#78a24d", "#4f8e4c", "#ea8a2d", "#d2af37", "#4b8f6a", "#7d8c97", "#b06aa0", "#8f806b"];
   const siblingSet = existing ? siblingCategories(existing) : [];
   const siblingIndex = existing ? siblingSet.findIndex((item) => item.id === existing.id) : -1;
   const canMoveUp = siblingIndex > 0;
   const canMoveDown = siblingIndex !== -1 && siblingIndex < siblingSet.length - 1;
+  const colorFieldMarkup = isMobileEditorShell
+    ? `<input name="color" type="hidden" value="${escapeAttribute(existing?.color || "#7e9f4b")}">`
+    : `
+            <div class="field-block field-block--full category-manager__field category-manager__field--color">
+              <span>Farba orámovania</span>
+              <div class="color-picker" id="category-color-picker">
+                ${colorChoices.map((color) => `
+                  <button
+                    class="color-swatch ${String(existing?.color || "#7e9f4b").toLowerCase() === color.toLowerCase() ? "is-active" : ""}"
+                    type="button"
+                    data-color-choice="${color}"
+                    style="--swatch:${escapeAttribute(color)}"
+                    aria-label="Vybrať farbu ${escapeAttribute(color)}"
+                    title="${escapeAttribute(color)}"
+                  ></button>
+                `).join("")}
+                <label class="color-picker__custom" title="Vlastná farba">
+                  <span>Vlastná</span>
+                  <input name="color" type="color" value="${escapeAttribute(existing?.color || "#7e9f4b")}">
+                </label>
+              </div>
+            </div>
+          `;
 
   detailContent.innerHTML = `
     <div class="detail-layout detail-layout--compact">
@@ -6234,28 +9644,10 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
                 <p class="category-order-actions__hint">Šípky menia len poradie v rámci rovnakej nadradenej kategórie.</p>
               </div>
             ` : ""}
-            <div class="field-block field-block--full category-manager__field category-manager__field--color">
-              <span>Farba orámovania</span>
-              <div class="color-picker" id="category-color-picker">
-                ${colorChoices.map((color) => `
-                  <button
-                    class="color-swatch ${String(existing?.color || "#7e9f4b").toLowerCase() === color.toLowerCase() ? "is-active" : ""}"
-                    type="button"
-                    data-color-choice="${color}"
-                    style="--swatch:${escapeAttribute(color)}"
-                    aria-label="Vybrať farbu ${escapeAttribute(color)}"
-                    title="${escapeAttribute(color)}"
-                  ></button>
-                `).join("")}
-                <label class="color-picker__custom" title="Vlastná farba">
-                  <span>Vlastná</span>
-                  <input name="color" type="color" value="${escapeAttribute(existing?.color || "#7e9f4b")}">
-                </label>
-              </div>
-            </div>
+            ${colorFieldMarkup}
             <div class="field-block category-manager__field category-manager__field--image">
               <span>Profilová fotka kategórie</span>
-              <input name="imageFile" type="file" accept="image/*" capture="environment">
+              <input name="imageFile" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}">
               <div class="category-manager__image-actions">
                 <button class="button button--ghost button--tiny" type="button" id="clear-category-image" ${existing?.image ? "" : "hidden"}>Vymazať obrázok</button>
               </div>
@@ -6449,6 +9841,8 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   detailModal.classList.add("detail-modal--editor");
   const existing = varietyId ? state.varieties.find((item) => item.id === varietyId) : null;
   const currentEntryKind = existing ? entryKind(existing) : forcedEntryKind;
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const showMobileAddTypeBar = !existing && currentEntryKind === "detail" && isMobileShell;
   const categoryId = forcedCategoryId || existing?.categoryId || activeCategoryId;
   const selectedPlaces = normalizePlaceList(existing?.places?.length ? existing.places : existing?.place);
   const selectedStatuses = varietyStatusValues(existing);
@@ -6457,6 +9851,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   let draggedImageIndex = null;
 
   detailContent.innerHTML = `
+    ${showMobileAddTypeBar ? mobileAddCardTypeBarMarkup("variety") : ""}
     <div class="detail-layout detail-layout--editor">
       <div class="detail-image detail-image--editor">
         <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
@@ -6471,7 +9866,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
             <button class="button" type="submit" form="variety-form">${existing ? "Uložiť" : currentEntryKind === "detail" ? "Pridať odrodu" : currentEntryKind === "quick" ? "Pridať rýchly záznam" : "Pridať galériu"}</button>
           </div>
         </div>
-        ${currentEntryKind === "detail" ? `
+        ${currentEntryKind === "detail" && !showMobileAddTypeBar ? `
           <div class="entry-mode-switch entry-mode-switch--cards" id="card-type-switch">
             ${cardTypeOptionsMarkup("variety")}
           </div>
@@ -6562,7 +9957,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
             <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="${currentEntryKind === "detail" ? "Poznámky: chuť, rodivosť, čo jej sadlo, či ju chceš znova..." : currentEntryKind === "quick" ? "Krátky popis, kde rastie alebo čo si chceš zapamätať..." : "Voliteľný popis galérie..."}">${escapeHtml(existing?.notes || "")}</textarea>
           </label>
           <label class="upload-field upload-field--compact">
-            <input name="imageFile" type="file" accept="image/*" capture="environment" multiple>
+            <input name="imageFile" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple>
           </label>
           <div class="editor-gallery" id="variety-gallery-editor"></div>
           ${existing ? `
@@ -6614,6 +10009,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
       previousImageButton.hidden = true;
       nextImageButton.hidden = true;
       galleryCount.hidden = true;
+      syncDetailEditorImagePresentation(preview);
       return;
     }
 
@@ -6624,6 +10020,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     nextImageButton.hidden = draftImages.length < 2;
     galleryCount.hidden = false;
     galleryCount.textContent = `${activeImageIndex + 1}/${draftImages.length}`;
+    syncDetailEditorImagePresentation(preview);
   };
 
   const moveDraftImage = (fromIndex, toIndex) => {
@@ -6749,7 +10146,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     renderVarietyGalleryEditor();
   });
 
-  document.getElementById("card-type-switch")?.querySelectorAll("[data-card-type]").forEach((button) => {
+  detailContent.querySelectorAll("[data-card-type]").forEach((button) => {
     button.addEventListener("click", () => {
       const selectedType = button.dataset.cardType || "variety";
       if (selectedType === "variety") return;
@@ -6920,7 +10317,7 @@ function openBatchSowingManager(categoryId = activeCategoryId) {
           <section class="batch-sowing-manager__selection-card">
             <div class="batch-sowing-manager__selection-head">
               <p class="batch-sowing__summary" id="batch-sowing-summary"></p>
-              <div class="catalog-card__actions batch-sowing__toolbar">
+              <div class="catalog-card__actions batch-sowing__toolbar batch-sowing__toolbar--triple">
                 <button class="button button--soft" type="button" id="batch-select-sown">Označ vysiate</button>
                 <button class="button button--soft" type="button" id="batch-select-all">Vybrať všetky</button>
                 <button class="button button--soft" type="button" id="batch-clear-selection">Vyčistiť výber</button>
@@ -7132,7 +10529,7 @@ function openBatchMoveManager(categoryId = activeCategoryId) {
           <section class="batch-sowing-manager__selection-card">
             <div class="batch-sowing-manager__selection-head">
               <p class="batch-sowing__summary" id="batch-move-summary"></p>
-              <div class="catalog-card__actions batch-sowing__toolbar">
+              <div class="catalog-card__actions batch-sowing__toolbar batch-sowing__toolbar--double">
                 <button class="button button--soft" type="button" id="batch-move-select-all">Vybrať všetky</button>
                 <button class="button button--soft" type="button" id="batch-move-clear">Vyčistiť výber</button>
               </div>
@@ -7690,16 +11087,45 @@ function universalCardTitle(cardTypeValue) {
   return labels[cardTypeValue] || "Pridať kartu";
 }
 
-function cardTypeOptionsMarkup(selectedType) {
+function cardTypeSwitchIcon(cardTypeValue) {
+  const icons = {
+    variety: ICONS.cardVariety,
+    mushroom: ICONS.cardMushroom,
+    "wild-plant": ICONS.cardWildPlant,
+    bird: ICONS.cardBird,
+    insect: ICONS.cardInsect,
+    "pest-problem": ICONS.cardPest,
+    "processing-recipe": ICONS.cardRecipe
+  };
+  return icons[String(cardTypeValue || "").trim()] || ICONS.cardVariety;
+}
+
+function cardTypeOptionsMarkup(selectedType, { withIcons = false } = {}) {
   return CARD_TYPE_OPTIONS.map((option) => `
     <button
       class="entry-mode-switch__button ${option.value === selectedType ? "is-active" : ""}"
       type="button"
       data-card-type="${escapeAttribute(option.value)}"
+      aria-pressed="${option.value === selectedType ? "true" : "false"}"
     >
-      ${escapeHtml(option.label)}
+      ${withIcons ? `
+        <span class="entry-mode-switch__button-content">
+          <span class="entry-mode-switch__button-icon" aria-hidden="true">${cardTypeSwitchIcon(option.value)}</span>
+          <span class="entry-mode-switch__button-label">${escapeHtml(option.label)}</span>
+        </span>
+      ` : escapeHtml(option.label)}
     </button>
   `).join("");
+}
+
+function mobileAddCardTypeBarMarkup(selectedType) {
+  return `
+    <div class="detail-editor-mobile-switch">
+      <div class="entry-mode-switch entry-mode-switch--topbar" data-card-type-switch="mobile-topbar">
+        ${cardTypeOptionsMarkup(selectedType, { withIcons: true })}
+      </div>
+    </div>
+  `;
 }
 
 function cardCreateLabel(cardTypeValue) {
@@ -8890,10 +12316,14 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     if (selectedType === "bird") {
       selectedCategoryId = String(resolvePreferredCategoryIdForCardType("bird", selectedCategoryId) || FALLBACK_CATEGORY_ID).trim() || FALLBACK_CATEGORY_ID;
     }
+    const showMobileAddTypeBar = !existing
+      && typeof document !== "undefined"
+      && document.body.classList.contains("app-mobile-shell");
     const birdTitleLink = selectedType === "bird"
       ? String(existing?.birdExternalUrl || "").trim()
       : "";
     detailContent.innerHTML = `
+      ${showMobileAddTypeBar ? mobileAddCardTypeBarMarkup(selectedType) : ""}
       <div class="detail-layout detail-layout--editor">
         <div class="detail-image detail-image--editor">
           <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
@@ -8908,9 +12338,11 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               <button class="button" type="submit" form="universal-card-form">${existing ? "Uložiť" : cardCreateLabel(selectedType)}</button>
             </div>
           </div>
-          <div class="entry-mode-switch entry-mode-switch--cards" id="card-type-switch">
-            ${cardTypeOptionsMarkup(selectedType)}
-          </div>
+          ${!showMobileAddTypeBar ? `
+            <div class="entry-mode-switch entry-mode-switch--cards" id="card-type-switch">
+              ${cardTypeOptionsMarkup(selectedType)}
+            </div>
+          ` : ""}
           <form class="detail-form detail-form--editor" id="universal-card-form">
             <div class="detail-grid">
               ${selectedType === "bird" ? `
@@ -8972,7 +12404,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="Krátka poznámka, čo si chceš zapamätať...">${escapeHtml(existing?.notes || "")}</textarea>
             </label>
             <label class="upload-field upload-field--compact">
-              <input name="imageFile" type="file" accept="image/*" capture="environment" multiple>
+              <input name="imageFile" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple>
             </label>
             <div class="editor-gallery" id="variety-gallery-editor"></div>
             ${existing ? `
@@ -9011,6 +12443,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
         galleryCount.hidden = false;
         galleryCount.textContent = `${activeImageIndex + 1}/${draftImages.length}`;
       }
+      syncDetailEditorImagePresentation(preview);
     };
 
     const moveDraftImage = (fromIndex, toIndex) => {
@@ -9114,7 +12547,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       renderUniversalGalleryEditor();
     });
 
-    document.getElementById("card-type-switch")?.querySelectorAll("[data-card-type]").forEach((button) => {
+    detailContent.querySelectorAll("[data-card-type]").forEach((button) => {
       button.addEventListener("click", () => {
         const nextType = button.dataset.cardType || selectedType;
         if (nextType === selectedType) return;
@@ -9849,10 +13282,12 @@ function renderJournalItem(entry, deleteAttr, editAttr = "") {
   const editAttribute = editAttr ? `${editAttr}="${escapeAttribute(entry.id)}"` : "";
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
+  const displayTitle = journalDisplayTitle(normalizedEntry);
   const titleOnlyClass = !images.length && !video && !String(normalizedEntry.text || "").trim() && !walkMarkup ? "journal-item--title-only" : "";
   const chips = journalDisplayChips(normalizedEntry);
-  const weatherWidgets = renderJournalWeatherWidgets(normalizedEntry.weather);
+  const weatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry));
+  const headerWeatherWidgets = weatherWidgets;
   const footerChips = chips;
   return `
     <article class="journal-item ${images.length ? "journal-item--with-image" : ""} ${titleOnlyClass}">
@@ -9860,10 +13295,10 @@ function renderJournalItem(entry, deleteAttr, editAttr = "") {
         <div class="journal-item__header-main">
           <div class="journal-item__topline">
             <span class="journal-item__date-badge">${journalDateLabel(normalizedEntry.date)}</span>
-            ${weatherWidgets}
+            ${headerWeatherWidgets}
           </div>
           <div class="journal-item__title-wrap">
-            <strong class="journal-item__title">${escapeHtml(normalizedEntry.title)}</strong>
+            <strong class="journal-item__title">${escapeHtml(displayTitle)}</strong>
             ${renderMoodBadge(normalizedEntry.mood)}
           </div>
         </div>
@@ -9887,12 +13322,12 @@ function renderJournalItem(entry, deleteAttr, editAttr = "") {
       </div>
       ${normalizedEntry.text ? `<p class="task-item__meta journal-item__meta">${escapeHtml(normalizedEntry.text)}</p>` : ""}
       ${walkMarkup}
-      ${renderJournalVideoPlayer(video, `Video zápisu ${normalizedEntry.title || "Zápis"}`)}
+      ${renderJournalVideoPlayer(video, `Video zápisu ${displayTitle}`)}
       ${images.length ? `
         <div class="journal-item__gallery">
           ${images.slice(0, 4).map((image, index) => `
-            <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(normalizedEntry.title)}">
-              <img src="${escapeAttribute(image)}" alt="${escapeAttribute(normalizedEntry.title)}">
+            <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(displayTitle)}">
+              <img src="${escapeAttribute(image)}" alt="${escapeAttribute(displayTitle)}">
             </button>
           `).join("")}
           ${images.length > 4 ? `<span class="journal-item__more">+${images.length - 4}</span>` : ""}
@@ -9906,13 +13341,13 @@ function renderJournalItem(entry, deleteAttr, editAttr = "") {
 function renderJournalManagerCard(entry, deleteAttr = "data-delete-worklog-journal") {
   const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
   const rawId = String(normalizedEntry.id || makeId("journal"));
-  const rawTitle = String(normalizedEntry.title || "Zápis").trim() || "Zápis";
+  const rawTitle = journalDisplayTitle(normalizedEntry);
   const rawText = String(normalizedEntry.text || "").trim();
   const previewText = rawText.length > 220 ? `${rawText.slice(0, 217).trimEnd()}...` : rawText;
   const rawDate = String(normalizedEntry.date || todayISO()).trim() || todayISO();
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
   const chips = journalDisplayChips(normalizedEntry);
   const deleteAttribute = deleteAttr ? `${deleteAttr}="${escapeAttribute(rawId)}"` : "";
 
@@ -9962,8 +13397,9 @@ function renderJournalItemSimple(entry, deleteAttr = "", editAttr = "") {
   const editAttribute = editAttr ? `${editAttr}="${escapeAttribute(entry.id)}"` : "";
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
   const previewText = trimText(normalizedEntry.text || "", 180);
+  const displayTitle = journalDisplayTitle(normalizedEntry);
 
   return `
     <article class="journal-item journal-item--simple">
@@ -9973,7 +13409,7 @@ function renderJournalItemSimple(entry, deleteAttr = "", editAttr = "") {
             <span class="journal-item__date-badge">${journalDateLabel(normalizedEntry.date)}</span>
           </div>
           <div class="journal-item__title-wrap">
-            <strong class="journal-item__title">${escapeHtml(normalizedEntry.title || "Zápis")}</strong>
+            <strong class="journal-item__title">${escapeHtml(displayTitle)}</strong>
             ${renderMoodBadge(normalizedEntry.mood)}
           </div>
         </div>
@@ -9997,11 +13433,11 @@ function renderJournalItemSimple(entry, deleteAttr = "", editAttr = "") {
       </div>
       ${previewText ? `<p class="task-item__meta journal-item__meta">${escapeHtml(previewText)}</p>` : ""}
       ${walkMarkup}
-      ${renderJournalVideoPlayer(video, `Video zápisu ${normalizedEntry.title || "Zápis"}`)}
+      ${renderJournalVideoPlayer(video, `Video zápisu ${displayTitle}`)}
       ${images[0] ? `
         <div class="journal-item__gallery">
-          <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(normalizedEntry.title || "Zápis")}">
-            <img src="${escapeAttribute(images[0])}" alt="${escapeAttribute(normalizedEntry.title || "Zápis")}">
+          <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(displayTitle)}">
+            <img src="${escapeAttribute(images[0])}" alt="${escapeAttribute(displayTitle)}">
           </button>
           ${images.length > 1 ? `<span class="journal-item__more">+${images.length - 1}</span>` : ""}
         </div>
@@ -10016,8 +13452,9 @@ function renderJournalItemEmergency(entry, deleteAttr = "", editAttr = "") {
   const editAttribute = editAttr ? `${editAttr}="${escapeAttribute(entry.id)}"` : "";
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
   const previewText = trimText(normalizedEntry.text || "", 220);
+  const displayTitle = journalDisplayTitle(normalizedEntry);
 
   return `
     <article style="display:grid;gap:10px;padding:16px 18px;border:1px solid rgba(122,103,74,0.14);border-radius:22px;background:linear-gradient(180deg, rgba(255,252,247,0.98), rgba(245,239,227,0.98));box-shadow:0 8px 18px rgba(39,32,19,0.05);">
@@ -10027,7 +13464,7 @@ function renderJournalItemEmergency(entry, deleteAttr = "", editAttr = "") {
             <span style="display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 14px;border-radius:999px;background:rgba(247,242,229,0.98);border:1px solid rgba(138,121,88,0.24);color:#74624a;font-size:0.88rem;font-weight:800;white-space:nowrap;">${journalDateLabel(normalizedEntry.date)}</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;min-width:0;">
-            <strong style="margin:0;color:#1f2918;font-size:1.08rem;line-height:1.24;">${escapeHtml(normalizedEntry.title || "Zápis")}</strong>
+            <strong style="margin:0;color:#1f2918;font-size:1.08rem;line-height:1.24;">${escapeHtml(displayTitle)}</strong>
             ${renderMoodBadge(normalizedEntry.mood)}
           </div>
         </div>
@@ -10051,11 +13488,11 @@ function renderJournalItemEmergency(entry, deleteAttr = "", editAttr = "") {
       </div>
       ${previewText ? `<p style="margin:0;color:#65735b;line-height:1.45;">${escapeHtml(previewText)}</p>` : ""}
       ${walkMarkup}
-      ${renderJournalVideoPlayer(video, `Video zápisu ${normalizedEntry.title || "Zápis"}`)}
+      ${renderJournalVideoPlayer(video, `Video zápisu ${displayTitle}`)}
       ${images[0] ? `
         <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
-          <button type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(normalizedEntry.title || "Zápis")}" style="width:132px;height:132px;padding:0;border:1px solid rgba(122,103,74,0.14);border-radius:18px;overflow:hidden;background:#fff;cursor:pointer;">
-            <img src="${escapeAttribute(images[0])}" alt="${escapeAttribute(normalizedEntry.title || "Zápis")}" style="display:block;width:100%;height:100%;object-fit:cover;object-position:center;">
+          <button type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(displayTitle)}" style="width:132px;height:132px;padding:0;border:1px solid rgba(122,103,74,0.14);border-radius:18px;overflow:hidden;background:#fff;cursor:pointer;">
+            <img src="${escapeAttribute(images[0])}" alt="${escapeAttribute(displayTitle)}" style="display:block;width:100%;height:100%;object-fit:cover;object-position:center;">
           </button>
           ${images.length > 1 ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:52px;height:52px;padding:0 12px;border-radius:16px;background:rgba(255,248,221,0.94);border:1px solid rgba(186,155,90,0.32);color:#7f6324;font-weight:800;">+${images.length - 1}</span>` : ""}
         </div>
@@ -10297,24 +13734,32 @@ function renderCategoryChoiceTreeNodes(inputName, parentId = "", selectedSet = n
 }
 
 function renderCategoryChoiceChips(inputName, selectedValues = [], selectionMode = "multiple") {
+  const isMobileTree = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
   const selected = new Set(normalizeIdList(selectedValues));
   const expanded = new Set();
   normalizeIdList(selectedValues).forEach((id) => {
     const category = state.categories.find((item) => item.id === id);
     categoryAncestorIds(category).forEach((ancestorId) => expanded.add(ancestorId));
   });
+  if (isMobileTree) {
+    orderedPickerCategories()
+      .filter((item) => !String(item.parentCategoryId || "").trim())
+      .forEach((item) => expanded.add(item.id));
+  }
 
   return `
-    <div class="category-tree-picker" data-category-tree-picker data-category-tree-selection="${escapeAttribute(selectionMode)}">
+    <div class="category-tree-picker ${isMobileTree ? "category-tree-picker--mobile" : ""}" data-category-tree-picker data-category-tree-selection="${escapeAttribute(selectionMode)}">
       <div class="category-tree-picker__panel" data-category-tree-panel>
         <div class="category-tree-picker__selected" data-category-tree-selected>
           ${renderCategoryChoiceSelectedTags(selectedValues)}
         </div>
         ${renderCategoryChoiceScopeTabs()}
+        ${isMobileTree ? "" : `
         <div class="category-tree-picker__actions">
           <button class="category-tree-picker__action" type="button" data-category-tree-expand-all>Rozbaliť všetky vetvy</button>
           <button class="category-tree-picker__action" type="button" data-category-tree-collapse-all>Zbaliť všetko</button>
         </div>
+        `}
         <p class="category-tree-picker__search-empty" data-category-tree-empty hidden>Nenašla sa žiadna zhoda v strome.</p>
         <div class="category-tree-picker__tree">
           ${renderCategoryChoiceTreeNodes(inputName, "", selected, expanded, 0)}
@@ -10874,11 +14319,11 @@ function nodeTypeOptions(current) {
 function ratingOptions(current) {
   return [
     [0, "Bez rankingu"],
-    [1, "★☆☆☆☆"],
-    [2, "★★☆☆☆"],
-    [3, "★★★☆☆"],
-    [4, "★★★★☆"],
-    [5, "★★★★★"]
+    [1, ICONS.stars1],
+    [2, ICONS.stars2],
+    [3, ICONS.stars3],
+    [4, ICONS.stars4],
+    [5, ICONS.stars5]
   ].map(([value, label]) => `<option value="${value}" ${Number(value) === Number(current) ? "selected" : ""}>${label}</option>`).join("");
 }
 
@@ -11049,13 +14494,14 @@ function trimText(text, maxLength) {
 }
 
 function stars(value) {
-  return "★".repeat(value) + "☆".repeat(5 - value);
+  const rating = Math.max(0, Math.min(5, Number(value) || 0));
+  return "\u2605".repeat(rating) + "\u2606".repeat(5 - rating);
 }
 
 function renderStarRating(value, compact = false) {
   const rating = Math.max(0, Math.min(5, Number(value) || 0));
   const sizeClass = compact ? " star-rating--compact" : "";
-  return `<span class="star-rating${sizeClass}" aria-label="Ranking ${rating} z 5">${Array.from({ length: 5 }, (_, index) => `<span class="star-rating__star ${index < rating ? "is-active" : ""}" aria-hidden="true">★</span>`).join("")}</span>`;
+  return `<span class="star-rating${sizeClass}" aria-label="Ranking ${rating} z 5">${Array.from({ length: 5 }, (_, index) => `<span class="star-rating__star ${index < rating ? "is-active" : ""}" aria-hidden="true">${index < rating ? "\u2605" : "\u2606"}</span>`).join("")}</span>`;
 }
 
 function renderRatingPicker(currentValue = 0) {
@@ -11065,7 +14511,7 @@ function renderRatingPicker(currentValue = 0) {
       <input type="hidden" name="rating" value="${rating}">
       ${Array.from({ length: 5 }, (_, index) => {
         const value = index + 1;
-        return `<button class="rating-picker__star ${value <= rating ? "is-active" : ""}" type="button" data-rating-value="${value}" aria-label="Hodnotenie ${value} z 5">★</button>`;
+        return `<button class="rating-picker__star ${value <= rating ? "is-active" : ""}" type="button" data-rating-value="${value}" aria-label="Hodnotenie ${value} z 5">${value <= rating ? "\u2605" : "\u2606"}</button>`;
       }).join("")}
     </div>
   `;
@@ -11258,63 +14704,63 @@ function categoryIllustrationPreset(category) {
   const matches = (...values) => values.some((value) => slug.includes(value));
   const make = (emoji, accent, bgStart, bgEnd, halo, label = name) => ({ emoji, accent, bgStart, bgEnd, halo, label });
 
-  if (categoryId === "root-zahrada") return make("🪴", "#5f8d39", "#f8f2e6", "#e7f1d7", "#dfeac1", "Záhrada");
-  if (categoryId === "root-priroda") return make("🍃", "#4f8a68", "#f2f6ef", "#dfefe5", "#d4e7db", "Príroda");
-  if (categoryId === "root-uroda") return make("🧺", "#b57a32", "#fbf1e3", "#f6ead7", "#ead8ba", "Úroda a spracovanie");
-  if (categoryId === "root-ine") return make("📁", "#7d8c97", "#f1f4f6", "#e4eaee", "#d8e0e6", "Iné");
-  if (categoryId === "cat-uzitkove") return make("🥬", "#769a4a", "#f8f4e8", "#edf4dd", "#d9e7bf", "Úžitkové rastliny");
-  if (categoryId === "root-okrasne" || categoryId === "cat-okrasne") return make("🌸", "#b06aa0", "#fbf0f6", "#f5e5f1", "#ead0e3", "Okrasné rastliny");
-  if (categoryId === "cat-skodcovia-problemy") return make("🐛", "#9b6e45", "#fbf1e8", "#f4e6d8", "#ead6c0", "Škodcovia a problémy");
-  if (categoryId === "cat-huby") return make("🍄", "#8a7457", "#f8f2ea", "#eee4d8", "#dfd0be", "Huby a hríby");
-  if (categoryId === "cat-divoke-rastliny") return make("🌿", "#6a9a57", "#f3f7ef", "#e4efde", "#d4e5ca", "Divoké rastliny");
-  if (categoryId === "cat-zvierata") return make("🐦", "#8f7b63", "#f7f2eb", "#ece4da", "#ddd0bf", "Vtáky");
-  if (categoryId === "cat-hmyz") return make("🦋", "#b18b38", "#fbf5e7", "#f4ebd2", "#ebddb2", "Hmyz");
-  if (categoryId === "cat-zber") return make("🧺", "#a77b2e", "#fbf3e3", "#f4e8ca", "#e8d6ab", "Zber");
-  if (categoryId === "cat-recepty") return make("🍲", "#ba6a45", "#fcf0e8", "#f7e1d7", "#efd0c1", "Recepty");
-  if (categoryId === "cat-zavaranie") return make("🥫", "#c45d47", "#fdf0ec", "#f8dfd8", "#f0cdc5", "Zaváranie");
-  if (categoryId === "cat-susenie") return make("🌾", "#bf8b3f", "#fbf4e5", "#f3ead0", "#e8d8af", "Sušenie");
-  if (categoryId === "cat-caje") return make("🍵", "#7b9450", "#f4f7eb", "#e9efd9", "#d8e2c0", "Čaje");
-  if (categoryId === "cat-tinktury") return make("🧪", "#846a9e", "#f4eef8", "#e7dcf1", "#d8cae6", "Tinktúry");
-  if (categoryId === "cat-kompost-hnojiva") return make("🍂", "#6f7f4e", "#f3f0e6", "#e6e8d8", "#d8dbc0", "Kompost a hnojivá");
+  if (categoryId === "root-zahrada") return make(ICONS.categoryGarden, "#5f8d39", "#f8f2e6", "#e7f1d7", "#dfeac1", "Záhrada");
+  if (categoryId === "root-priroda") return make(ICONS.categoryNature, "#4f8a68", "#f2f6ef", "#dfefe5", "#d4e7db", "Príroda");
+  if (categoryId === "root-uroda") return make(ICONS.categoryHarvest, "#b57a32", "#fbf1e3", "#f6ead7", "#ead8ba", "Úroda a spracovanie");
+  if (categoryId === "root-ine") return make(ICONS.categoryOther, "#7d8c97", "#f1f4f6", "#e4eaee", "#d8e0e6", "Iné");
+  if (categoryId === "cat-uzitkove") return make(ICONS.categoryUseful, "#769a4a", "#f8f4e8", "#edf4dd", "#d9e7bf", "Úžitkové rastliny");
+  if (categoryId === "root-okrasne" || categoryId === "cat-okrasne") return make(ICONS.categoryFlowers, "#b06aa0", "#fbf0f6", "#f5e5f1", "#ead0e3", "Okrasné rastliny");
+  if (categoryId === "cat-skodcovia-problemy") return make(ICONS.categoryPests, "#9b6e45", "#fbf1e8", "#f4e6d8", "#ead6c0", "Škodcovia a problémy");
+  if (categoryId === "cat-huby") return make(ICONS.categoryMushrooms, "#8a7457", "#f8f2ea", "#eee4d8", "#dfd0be", "Huby a hríby");
+  if (categoryId === "cat-divoke-rastliny") return make(ICONS.categoryWildPlants, "#6a9a57", "#f3f7ef", "#e4efde", "#d4e5ca", "Divoké rastliny");
+  if (categoryId === "cat-zvierata") return make(ICONS.categoryBirds, "#8f7b63", "#f7f2eb", "#ece4da", "#ddd0bf", "Vtáky");
+  if (categoryId === "cat-hmyz") return make(ICONS.categoryInsects, "#b18b38", "#fbf5e7", "#f4ebd2", "#ebddb2", "Hmyz");
+  if (categoryId === "cat-zber") return make(ICONS.categoryHarvesting, "#a77b2e", "#fbf3e3", "#f4e8ca", "#e8d6ab", "Zber");
+  if (categoryId === "cat-recepty") return make(ICONS.categoryRecipes, "#ba6a45", "#fcf0e8", "#f7e1d7", "#efd0c1", "Recepty");
+  if (categoryId === "cat-zavaranie") return make(ICONS.categoryCanning, "#c45d47", "#fdf0ec", "#f8dfd8", "#f0cdc5", "Zaváranie");
+  if (categoryId === "cat-susenie") return make(ICONS.categoryDrying, "#bf8b3f", "#fbf4e5", "#f3ead0", "#e8d8af", "Sušenie");
+  if (categoryId === "cat-caje") return make(ICONS.categoryTea, "#7b9450", "#f4f7eb", "#e9efd9", "#d8e2c0", "Čaje");
+  if (categoryId === "cat-tinktury") return make(ICONS.categoryTincture, "#846a9e", "#f4eef8", "#e7dcf1", "#d8cae6", "Tinktúry");
+  if (categoryId === "cat-kompost-hnojiva") return make(ICONS.categoryCompost, "#6f7f4e", "#f3f0e6", "#e6e8d8", "#d8dbc0", "Kompost a hnojivá");
 
-  if (matches("paprik")) return make("🌶️", "#d45d2c", "#fff2ec", "#f7e3d7", "#ffd7cb");
-  if (matches("rajcin")) return make("🍅", "#c84136", "#fff0ec", "#f8e0d8", "#f6d0c6");
-  if (matches("uhork", "cuket")) return make("🥒", "#5f934e", "#f4f8ed", "#e7efdd", "#d7e6c8");
-  if (matches("salat", "listov", "spinat", "mangold")) return make("🥬", "#73a84e", "#f3f8eb", "#e3efda", "#d3e5c2");
-  if (matches("mrkv", "korenov", "redkov", "cvikl", "petrzl", "pastrnak", "celer")) return make("🥕", "#d98a2d", "#fff4ea", "#f6e7d2", "#f0d7b5");
-  if (matches("struk", "hrach", "fazul", "sosovic", "cicer", "bob", "soja")) return make("🫛", "#7ea052", "#f4f8ee", "#e8efd8", "#d8e3be");
-  if (matches("hlubov", "kapust", "brokolic", "karfiol", "kalerab", "kel")) return make("🥦", "#7ea061", "#f3f8ef", "#e4efde", "#d2e3cc", "Hľúbová zelenina");
-  if (matches("kukuric", "obiln")) return make("🌽", "#d2af37", "#fdf6e4", "#f6ebc9", "#efdca1");
-  if (matches("bylink", "bazalk", "mata", "medovk", "tymian", "rozmarin", "salvia", "levand")) return make("🌿", "#4b8f6a", "#eef7f1", "#dff0e6", "#cde3d5");
-  if (matches("okras", "kvet", "ruza", "tulipan", "dalia", "georgin")) return make("🌸", "#b06aa0", "#fbf0f6", "#f4e3ee", "#e8d0e0");
-  if (matches("skodc", "problem", "chorob", "plesen")) return make("🐛", "#9b6e45", "#fbf2e8", "#f4e5d8", "#ead4c0");
-  if (matches("hub", "hrib")) return make("🍄", "#8a7457", "#f8f2ea", "#eee4d8", "#dfd0be");
-  if (matches("divok", "lucn", "lesn", "plan")) return make("🌿", "#6a9a57", "#f3f7ef", "#e4efde", "#d4e5ca");
-  if (matches("zvier", "vtak", "srn", "jele", "mack", "lis", "jazve")) return make("🐦", "#8f7b63", "#f7f2eb", "#ece4da", "#ddd0bf");
-  if (matches("hmyz", "motyl", "vcel", "cmel", "lien", "mrav")) return make("🦋", "#b18b38", "#fbf5e7", "#f4ebd2", "#ebddb2");
-  if (matches("zber")) return make("🧺", "#a77b2e", "#fbf3e3", "#f4e8ca", "#e8d6ab");
-  if (matches("recept", "sirup", "jedl", "pecen")) return make("🍲", "#ba6a45", "#fcf0e8", "#f7e1d7", "#efd0c1");
-  if (matches("zavar", "kompot", "dzem", "lekvar")) return make("🥫", "#c45d47", "#fdf0ec", "#f8dfd8", "#f0cdc5");
-  if (matches("susen", "sus")) return make("🌾", "#bf8b3f", "#fbf4e5", "#f3ead0", "#e8d8af");
-  if (matches("caj")) return make("🍵", "#7b9450", "#f4f7eb", "#e9efd9", "#d8e2c0");
-  if (matches("tinktur")) return make("🧪", "#846a9e", "#f4eef8", "#e7dcf1", "#d8cae6");
-  if (matches("kompost", "hnoj")) return make("🍂", "#6f7f4e", "#f3f0e6", "#e6e8d8", "#d8dbc0");
-  if (matches("nezarad", "ine")) return make("📁", "#7d8c97", "#f1f4f6", "#e4eaee", "#d8e0e6");
+  if (matches("paprik")) return make(ICONS.categoryUseful, "#d45d2c", "#fff2ec", "#f7e3d7", "#ffd7cb");
+  if (matches("rajcin")) return make(ICONS.categoryHarvest, "#c84136", "#fff0ec", "#f8e0d8", "#f6d0c6");
+  if (matches("uhork", "cuket")) return make(ICONS.categoryGarden, "#5f934e", "#f4f8ed", "#e7efdd", "#d7e6c8");
+  if (matches("salat", "listov", "spinat", "mangold")) return make(ICONS.categoryWildPlants, "#73a84e", "#f3f8eb", "#e3efda", "#d3e5c2");
+  if (matches("mrkv", "korenov", "redkov", "cvikl", "petrzl", "pastrnak", "celer")) return make(ICONS.categoryUseful, "#d98a2d", "#fff4ea", "#f6e7d2", "#f0d7b5");
+  if (matches("struk", "hrach", "fazul", "sosovic", "cicer", "bob", "soja")) return make(ICONS.categoryUseful, "#7ea052", "#f4f8ee", "#e8efd8", "#d8e3be");
+  if (matches("hlubov", "kapust", "brokolic", "karfiol", "kalerab", "kel")) return make(ICONS.categoryGarden, "#7ea061", "#f3f8ef", "#e4efde", "#d2e3cc", "Hľúbová zelenina");
+  if (matches("kukuric", "obiln")) return make(ICONS.categoryHarvesting, "#d2af37", "#fdf6e4", "#f6ebc9", "#efdca1");
+  if (matches("bylink", "bazalk", "mata", "medovk", "tymian", "rozmarin", "salvia", "levand")) return make(ICONS.categoryTea, "#4b8f6a", "#eef7f1", "#dff0e6", "#cde3d5");
+  if (matches("okras", "kvet", "ruza", "tulipan", "dalia", "georgin")) return make(ICONS.categoryFlowers, "#b06aa0", "#fbf0f6", "#f4e3ee", "#e8d0e0");
+  if (matches("skodc", "problem", "chorob", "plesen")) return make(ICONS.categoryPests, "#9b6e45", "#fbf2e8", "#f4e5d8", "#ead4c0");
+  if (matches("hub", "hrib")) return make(ICONS.categoryMushrooms, "#8a7457", "#f8f2ea", "#eee4d8", "#dfd0be");
+  if (matches("divok", "lucn", "lesn", "plan")) return make(ICONS.categoryWildPlants, "#6a9a57", "#f3f7ef", "#e4efde", "#d4e5ca");
+  if (matches("zvier", "vtak", "srn", "jele", "mack", "lis", "jazve")) return make(ICONS.categoryBirds, "#8f7b63", "#f7f2eb", "#ece4da", "#ddd0bf");
+  if (matches("hmyz", "motyl", "vcel", "cmel", "lien", "mrav")) return make(ICONS.categoryInsects, "#b18b38", "#fbf5e7", "#f4ebd2", "#ebddb2");
+  if (matches("zber")) return make(ICONS.categoryHarvesting, "#a77b2e", "#fbf3e3", "#f4e8ca", "#e8d6ab");
+  if (matches("recept", "sirup", "jedl", "pecen")) return make(ICONS.categoryRecipes, "#ba6a45", "#fcf0e8", "#f7e1d7", "#efd0c1");
+  if (matches("zavar", "kompot", "dzem", "lekvar")) return make(ICONS.categoryCanning, "#c45d47", "#fdf0ec", "#f8dfd8", "#f0cdc5");
+  if (matches("susen", "sus")) return make(ICONS.categoryDrying, "#bf8b3f", "#fbf4e5", "#f3ead0", "#e8d8af");
+  if (matches("caj")) return make(ICONS.categoryTea, "#7b9450", "#f4f7eb", "#e9efd9", "#d8e2c0");
+  if (matches("tinktur")) return make(ICONS.categoryTincture, "#846a9e", "#f4eef8", "#e7dcf1", "#d8cae6");
+  if (matches("kompost", "hnoj")) return make(ICONS.categoryCompost, "#6f7f4e", "#f3f0e6", "#e6e8d8", "#d8dbc0");
+  if (matches("nezarad", "ine")) return make(ICONS.categoryOther, "#7d8c97", "#f1f4f6", "#e4eaee", "#d8e0e6");
 
-  if (inBranch("root-plodova")) return make("🍅", "#c65a37", "#fff1eb", "#f7e4d8", "#f2d4c8");
-  if (inBranch("root-korenova")) return make("🥕", "#d58b32", "#fff4ea", "#f6e7d2", "#ecd2b0");
-  if (inBranch("root-listova")) return make("🥬", "#73a84e", "#f3f8eb", "#e3efda", "#d3e5c2");
-  if (inBranch("root-bylinky")) return make("🌿", "#4b8f6a", "#eef7f1", "#dff0e6", "#cde3d5");
-  if (inBranch("root-strukoviny")) return make("🫛", "#7ea052", "#f4f8ee", "#e8efd8", "#d8e3be");
-  if (inBranch("root-hluzova")) return make("🥦", "#a77a53", "#f8f2ea", "#eee6db", "#e1d4c7", "Hľúbová zelenina");
-  if (inBranch("sub-uzitkove-ostatne")) return make("🌽", "#9aa25b", "#f8f5e9", "#eef0db", "#dfe2bf");
-  if (inBranch("cat-uzitkove", "root-zahrada")) return make("🪴", category?.color || "#769a4a", "#f8f4e8", "#edf4dd", "#d9e7bf");
-  if (inBranch("root-okrasne")) return make("🌸", "#b06aa0", "#fbf0f6", "#f4e3ee", "#e8d0e0");
-  if (inBranch("root-priroda")) return make("🍃", category?.color || "#4f8a68", "#f2f6ef", "#dfefe5", "#d4e7db");
-  if (inBranch("root-uroda")) return make("🧺", category?.color || "#b57a32", "#fbf1e3", "#f6ead7", "#ead8ba");
-  if (inBranch("root-ine")) return make("📁", "#7d8c97", "#f1f4f6", "#e4eaee", "#d8e0e6");
+  if (inBranch("root-plodova")) return make(ICONS.categoryHarvest, "#c65a37", "#fff1eb", "#f7e4d8", "#f2d4c8");
+  if (inBranch("root-korenova")) return make(ICONS.categoryUseful, "#d58b32", "#fff4ea", "#f6e7d2", "#ecd2b0");
+  if (inBranch("root-listova")) return make(ICONS.categoryWildPlants, "#73a84e", "#f3f8eb", "#e3efda", "#d3e5c2");
+  if (inBranch("root-bylinky")) return make(ICONS.categoryTea, "#4b8f6a", "#eef7f1", "#dff0e6", "#cde3d5");
+  if (inBranch("root-strukoviny")) return make(ICONS.categoryUseful, "#7ea052", "#f4f8ee", "#e8efd8", "#d8e3be");
+  if (inBranch("root-hluzova")) return make(ICONS.categoryGarden, "#a77a53", "#f8f2ea", "#eee6db", "#e1d4c7", "Hľúbová zelenina");
+  if (inBranch("sub-uzitkove-ostatne")) return make(ICONS.categoryUseful, "#9aa25b", "#f8f5e9", "#eef0db", "#dfe2bf");
+  if (inBranch("cat-uzitkove", "root-zahrada")) return make(ICONS.categoryUseful, category?.color || "#769a4a", "#f8f4e8", "#edf4dd", "#d9e7bf");
+  if (inBranch("root-okrasne")) return make(ICONS.categoryFlowers, "#b06aa0", "#fbf0f6", "#f4e3ee", "#e8d0e0");
+  if (inBranch("root-priroda")) return make(ICONS.categoryNature, category?.color || "#4f8a68", "#f2f6ef", "#dfefe5", "#d4e7db");
+  if (inBranch("root-uroda")) return make(ICONS.categoryHarvest, category?.color || "#b57a32", "#fbf1e3", "#f6ead7", "#ead8ba");
+  if (inBranch("root-ine")) return make(ICONS.categoryOther, "#7d8c97", "#f1f4f6", "#e4eaee", "#d8e0e6");
 
-  return make("🌿", category?.color || "#7e9f4b", "#f7f4ec", "#edf2e2", "#dce5c9");
+  return make(ICONS.categoryGarden, category?.color || "#7e9f4b", "#f7f4ec", "#edf2e2", "#dce5c9");
 }
 
 function categoryPlaceholderImage(category) {
@@ -11348,13 +14794,13 @@ function categoryPlaceholderImage(category) {
 
 function cardPlaceholderImage(cardTypeValue = "variety") {
   const presets = {
-    variety: { emoji: "🌱", accent: "#7ca64b", bg: "#edf6e4", glow: "#d7eabf", label: "Odroda" },
-    mushroom: { emoji: "🍄", accent: "#a16d56", bg: "#f6ece7", glow: "#ecd9cf", label: "Huba alebo hríb" },
-    "wild-plant": { emoji: "🌿", accent: "#5f8d52", bg: "#eaf4e5", glow: "#d8e8cf", label: "Divoká rastlina" },
-    bird: { emoji: "🐦", accent: "#7b6a58", bg: "#f5efe8", glow: "#e7ddd3", label: "Vtáky" },
-    insect: { emoji: "🦋", accent: "#8c72b8", bg: "#f1ebfb", glow: "#e1d5f6", label: "Hmyz" },
-    "pest-problem": { emoji: "🐭", accent: "#b26b45", bg: "#f8ede7", glow: "#efd8cb", label: "Karta problému" },
-    "processing-recipe": { emoji: "🍯", accent: "#c18d2f", bg: "#fbf1d8", glow: "#f0dfac", label: "Spracovanie" }
+    variety: { emoji: ICONS.cardVariety, accent: "#7ca64b", bg: "#edf6e4", glow: "#d7eabf", label: "Odroda" },
+    mushroom: { emoji: ICONS.cardMushroom, accent: "#a16d56", bg: "#f6ece7", glow: "#ecd9cf", label: "Huba alebo hríb" },
+    "wild-plant": { emoji: ICONS.cardWildPlant, accent: "#5f8d52", bg: "#eaf4e5", glow: "#d8e8cf", label: "Divoká rastlina" },
+    bird: { emoji: ICONS.cardBird, accent: "#7b6a58", bg: "#f5efe8", glow: "#e7ddd3", label: "Vtáky" },
+    insect: { emoji: ICONS.cardInsect, accent: "#8c72b8", bg: "#f1ebfb", glow: "#e1d5f6", label: "Hmyz" },
+    "pest-problem": { emoji: ICONS.cardPest, accent: "#b26b45", bg: "#f8ede7", glow: "#efd8cb", label: "Karta problému" },
+    "processing-recipe": { emoji: ICONS.cardRecipe, accent: "#c18d2f", bg: "#fbf1d8", glow: "#f0dfac", label: "Spracovanie" }
   };
   const preset = presets[cardTypeValue] || presets.variety;
   return `data:image/svg+xml,${encodeURIComponent(`
@@ -11767,6 +15213,10 @@ function updateUndoButton() {
 
 function updateMenuVisibility() {
   if (!menuPanelEl) return;
+  if (typeof document !== "undefined") {
+    document.body.classList.toggle("app-main-menu-mode", !isFocusedView);
+    document.body.classList.toggle("app-focused-mode", isFocusedView);
+  }
   menuPanelEl.classList.toggle("is-hidden", isFocusedView);
   if (workspaceMainEl) {
     workspaceMainEl.classList.toggle("is-hidden", !isFocusedView);
@@ -11781,10 +15231,15 @@ function updateMenuVisibility() {
     batchMenuQuickEl.hidden = !state.varieties.length;
   }
   updateCatalogHeader();
+  syncMobileToolbarScrollState();
 }
 
 function closeUtilityDrawers() {
-  return;
+  closeToolbarAddMenu();
+  const searchResults = document.getElementById("toolbar-search-results");
+  if (searchResults) {
+    searchResults.hidden = true;
+  }
 }
 
 function supportsFolderStorage() {
@@ -12146,13 +15601,20 @@ function normalizeSupabasePreferences(value = {}) {
   };
 }
 
+function loadSupabaseBootstrapPreferences() {
+  if (typeof window === "undefined") return normalizeSupabasePreferences();
+  const rawConfig = window.MOJA_ZAHRADA_SUPABASE;
+  if (!rawConfig || typeof rawConfig !== "object") return normalizeSupabasePreferences();
+  return normalizeSupabasePreferences(rawConfig);
+}
+
 function loadSupabasePreferences() {
   try {
     const raw = localStorage.getItem(SUPABASE_PREFERENCES_KEY);
-    if (!raw) return normalizeSupabasePreferences();
+    if (!raw) return loadSupabaseBootstrapPreferences();
     return normalizeSupabasePreferences(JSON.parse(raw));
   } catch (error) {
-    return normalizeSupabasePreferences();
+    return loadSupabaseBootstrapPreferences();
   }
 }
 
@@ -13218,10 +16680,8 @@ function removeAuthGate() {
   const root = authGateRoot();
   if (root) root.remove();
   document.body.classList.remove("app-auth-locked");
-  if (authGatePreviousOverflow !== null) {
-    document.body.style.overflow = authGatePreviousOverflow;
-    authGatePreviousOverflow = null;
-  }
+  unlockBodyScroll("auth");
+  authGatePreviousOverflow = null;
 }
 
 function ensureAuthGateRoot() {
@@ -13266,7 +16726,7 @@ function syncAuthGate(statusMessage = "", tone = "") {
   if (authGatePreviousOverflow === null) {
     authGatePreviousOverflow = document.body.style.overflow;
   }
-  document.body.style.overflow = "hidden";
+  lockBodyScroll("auth");
   document.body.classList.add("app-auth-locked");
   root.innerHTML = `
     <div class="auth-gate">
@@ -13403,19 +16863,26 @@ function weatherCodeLabel(code) {
     2: "polooblačno",
     3: "oblačno",
     45: "hmla",
-    48: "námraza",
+    48: "hmla s námrazou",
     51: "slabé mrholenie",
     53: "mrholenie",
     55: "silné mrholenie",
+    56: "mrznúce mrholenie",
+    57: "silné mrznúce mrholenie",
     61: "slabý dážď",
     63: "dážď",
     65: "silný dážď",
+    66: "mrznúci dážď",
+    67: "silný mrznúci dážď",
     71: "slabé sneženie",
     73: "sneženie",
     75: "silné sneženie",
+    77: "snehové zrná",
     80: "prehánky",
     81: "výrazné prehánky",
     82: "silné prehánky",
+    85: "snehové prehánky",
+    86: "silné snehové prehánky",
     95: "búrka",
     96: "búrka s krúpami",
     99: "silná búrka s krúpami"
@@ -13423,9 +16890,15 @@ function weatherCodeLabel(code) {
   return labels[Number(code)] || "bez popisu";
 }
 
-function currentWeatherConditionLabel(code, precipitation = 0) {
+function currentWeatherConditionLabel(code, precipitation = 0, rain = 0, showers = 0, snowfall = 0) {
   const normalizedCode = Number(code);
   const normalizedPrecipitation = Number(precipitation || 0);
+  const normalizedRain = Number(rain || 0);
+  const normalizedShowers = Number(showers || 0);
+  const normalizedSnowfall = Number(snowfall || 0);
+  if (Math.max(normalizedPrecipitation, normalizedRain, normalizedShowers) > 0.04 && normalizedSnowfall > 0.03) {
+    return "dážď so snehom";
+  }
   if (normalizedCode === 3 && normalizedPrecipitation <= 0.2) return "polooblačno";
   return weatherCodeLabel(normalizedCode);
 }
@@ -13459,14 +16932,6 @@ function weatherDayPeriodFromHour(hour) {
   const normalizedHour = Number(hour);
   if (!Number.isFinite(normalizedHour)) return "day";
   return normalizedHour >= 20 || normalizedHour < 6 ? "night" : "day";
-}
-
-function weatherObservedHour(value) {
-  const date = new Date(value);
-  if (!Number.isNaN(date.getTime())) return date.getHours();
-  const match = String(value || "").match(/(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-  return Number(match[1]);
 }
 
 function weatherSnapshotDayPeriod(weather) {
@@ -13564,11 +17029,11 @@ function capitalizeLabel(value) {
 
 function weatherVisualByKey(key) {
   const visuals = {
-    sun: { key: "sun", icon: "☀️", label: "skôr slnečný", weekLabel: "slnečnejší týždeň", tone: "sun" },
-    partly: { key: "partly", icon: "⛅", label: "premenlivý", weekLabel: "premenlivý týždeň", tone: "soft" },
-    cloud: { key: "cloud", icon: "☁️", label: "zamračený", weekLabel: "oblačnejší týždeň", tone: "soft" },
-    rain: { key: "rain", icon: "🌧️", label: "daždivý", weekLabel: "daždivejší týždeň", tone: "rain" },
-    snow: { key: "snow", icon: "🌨️", label: "so snehom", weekLabel: "zimnejší týždeň", tone: "frost" }
+    sun: { key: "sun", icon: ICONS.weatherSun, label: "skôr slnečný", weekLabel: "slnečnejší týždeň", tone: "sun" },
+    partly: { key: "partly", icon: ICONS.weatherPartly, label: "premenlivý", weekLabel: "premenlivý týždeň", tone: "soft" },
+    cloud: { key: "cloud", icon: ICONS.weatherCloud, label: "zamračený", weekLabel: "oblačnejší týždeň", tone: "soft" },
+    rain: { key: "rain", icon: ICONS.weatherRain, label: "daždivý", weekLabel: "daždivejší týždeň", tone: "rain" },
+    snow: { key: "snow", icon: ICONS.weatherSnow, label: "so snehom", weekLabel: "zimnejší týždeň", tone: "frost" }
   };
   return visuals[key] || visuals.partly;
 }
@@ -13659,24 +17124,24 @@ function weatherAlertVisual(alert = {}) {
   const text = `${String(alert?.title || "")} ${String(alert?.body || "")}`.toLowerCase();
 
   if (tone === "storm" || /búr|blesk|krúp/.test(text)) {
-    return { icon: "⚡", label: "Búrka", tone: "storm" };
+    return { icon: ICONS.weatherStorm, label: "Búrka", tone: "storm" };
   }
   if (/sneh|snežen/.test(text)) {
-    return { icon: "❄️", label: "Sneženie", tone: "frost" };
+    return { icon: ICONS.weatherSnow, label: "Sneženie", tone: "frost" };
   }
   if (tone === "frost" || /mráz|chlad|ľad|prízemný/.test(text)) {
-    return { icon: "🧊", label: "Mráz", tone: "frost" };
+    return { icon: ICONS.frost, label: "Mráz", tone: "frost" };
   }
   if (tone === "rain" || /dáž|zráž|preliat|blato/.test(text)) {
-    return { icon: "🌧️", label: "Dážď", tone: "rain" };
+    return { icon: ICONS.weatherRain, label: "Dážď", tone: "rain" };
   }
   if (tone === "wind" || /vietor|náraz/.test(text)) {
-    return { icon: "💨", label: "Vietor", tone: "wind" };
+    return { icon: ICONS.weatherWind, label: "Vietor", tone: "wind" };
   }
   if (tone === "heat" || /teplo|horúč|prehriat/.test(text)) {
-    return { icon: "☀️", label: "Teplo", tone: "heat" };
+    return { icon: ICONS.heat, label: "Teplo", tone: "heat" };
   }
-  return { icon: "⛅", label: "Počasie", tone: "soft" };
+  return { icon: ICONS.weatherPartly, label: "Počasie", tone: "soft" };
 }
 
 function renderWeatherAlertCard(alert) {
@@ -13686,7 +17151,7 @@ function renderWeatherAlertCard(alert) {
       <div class="weather-alert__content">
         <div class="weather-alert__topline">
           <span class="weather-alert__phenomenon weather-alert__phenomenon--${escapeAttribute(visual.tone || "soft")}" aria-hidden="true">
-            <span class="weather-alert__phenomenon-icon">${escapeHtml(visual.icon || "⛅")}</span>
+            <span class="weather-alert__phenomenon-icon">${escapeHtml(visual.icon || ICONS.weatherPartly)}</span>
             <span class="weather-alert__phenomenon-label">${escapeHtml(visual.label || "Počasie")}</span>
           </span>
           <p class="weather-alert__eyebrow">${escapeHtml(alert.eyebrow || "Predpoveď")}</p>
@@ -13724,7 +17189,7 @@ function weatherTemperatureTone(value) {
 
 function renderWeatherDayTemperature(label, value, period = "day") {
   const tone = weatherTemperatureTone(value);
-  const icon = period === "night" ? "☾" : "☀";
+  const icon = period === "night" ? ICONS.weatherMoon : ICONS.weatherSun;
   const temperature = Number.isFinite(value) ? `${Math.round(value)} °C` : "—";
   return `
     <span class="weather-day-card__temp weather-day-card__temp--${escapeAttribute(period)} weather-day-card__temp--${escapeAttribute(tone)}">
@@ -13919,7 +17384,7 @@ function renderWeatherWeekCard(week) {
                 </div>
                 <div class="weather-day-card__head-meta">
                   ${day.isToday ? '<span class="weather-day-card__today">Dnes</span>' : ""}
-                  <span class="weather-day-card__icon" aria-hidden="true">${escapeHtml(day.icon || "⛅")}</span>
+                  <span class="weather-day-card__icon" aria-hidden="true">${escapeHtml(day.icon || ICONS.weatherPartly)}</span>
                 </div>
               </div>
               <div class="weather-day-card__temps">
@@ -14074,8 +17539,8 @@ function renderWeatherOverviewHero(snapshot, overview) {
   const heroData = weatherOverviewHeroData(snapshot, selectedDay, selectedPeriod);
   const periodControls = `
     <div class="weather-hero__period-switch" role="tablist" aria-label="Denný alebo nočný pohľad">
-      <button class="weather-hero__period-button ${selectedPeriod === "day" ? "is-active" : ""}" type="button" data-weather-hero-period="day" aria-pressed="${selectedPeriod === "day" ? "true" : "false"}">Deň</button>
-      <button class="weather-hero__period-button ${selectedPeriod === "night" ? "is-active" : ""}" type="button" data-weather-hero-period="night" aria-pressed="${selectedPeriod === "night" ? "true" : "false"}">Noc</button>
+      <button class="weather-hero__period-button ${selectedPeriod === "day" ? "is-active" : ""}" type="button" data-weather-hero-period="day" aria-pressed="${selectedPeriod === "day" ? "true" : "false"}">${ICONS.weatherSun} Deň</button>
+      <button class="weather-hero__period-button ${selectedPeriod === "night" ? "is-active" : ""}" type="button" data-weather-hero-period="night" aria-pressed="${selectedPeriod === "night" ? "true" : "false"}">${ICONS.weatherMoon} Noc</button>
     </div>
   `;
 
@@ -14106,7 +17571,7 @@ function renderWeatherOverviewHero(snapshot, overview) {
               </span>
             </span>
             <span class="weather-overview__hero-day-main">
-              <span class="weather-overview__hero-day-icon" aria-hidden="true">${escapeHtml(item.icon || "⛅")}</span>
+              <span class="weather-overview__hero-day-icon" aria-hidden="true">${escapeHtml(item.icon || ICONS.weatherPartly)}</span>
               <strong>${escapeHtml(Number.isFinite(item.maxTempC) ? `${Math.round(item.maxTempC)} °C` : "—")}</strong>
             </span>
             <span class="weather-overview__hero-day-meta">
@@ -14154,7 +17619,7 @@ function renderWeatherOverviewContent(snapshot, overview) {
               target="_blank"
               rel="noreferrer noopener"
             >
-              <span class="weather-overview__external-link-icon" aria-hidden="true">🌧️</span>
+              <span class="weather-overview__external-link-icon" aria-hidden="true">${ICONS.weatherRain}</span>
               Otvoriť radar zrážok
             </a>
             <a
@@ -14163,7 +17628,7 @@ function renderWeatherOverviewContent(snapshot, overview) {
               target="_blank"
               rel="noreferrer noopener"
             >
-              <span class="weather-overview__external-link-icon" aria-hidden="true">⚡</span>
+              <span class="weather-overview__external-link-icon" aria-hidden="true">${ICONS.lightning}</span>
               Otvoriť mapu bleskov
             </a>
           </div>
@@ -14278,16 +17743,17 @@ async function fetchWeatherForDate(source, date) {
     const currentParams = new URLSearchParams({
       latitude: String(source.latitude),
       longitude: String(source.longitude),
-      current: "temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
-      daily: "sunshine_duration",
+      current: "temperature_2m,apparent_temperature,relative_humidity_2m,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,pressure_msl,surface_pressure",
+      daily: "sunrise,sunset,daylight_duration,sunshine_duration,precipitation_probability_max,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,wind_speed_10m_max,wind_gusts_10m_max",
       timezone: "auto"
     });
     const currentResponse = await fetch(`https://api.open-meteo.com/v1/forecast?${currentParams.toString()}`);
     if (!currentResponse.ok) throw new Error("Aktuálne počasie sa nepodarilo načítať z internetu.");
     const currentData = await currentResponse.json();
     const current = currentData?.current;
+    const currentDaily = currentData?.daily || null;
     if (!current?.time) throw new Error("Aktuálne počasie nie je dostupné.");
-    const condition = currentWeatherConditionLabel(current.weather_code, current.precipitation);
+    const condition = currentWeatherConditionLabel(current.weather_code, current.precipitation, current.rain, current.showers, current.snowfall);
     return normalizeWeatherSnapshot({
       condition,
       temperature: Number.isFinite(current.temperature_2m) ? `${Math.round(current.temperature_2m)} °C` : "",
@@ -14297,8 +17763,33 @@ async function fetchWeatherForDate(source, date) {
       observedAt: formatObservedTime(current.time),
       icon: weatherIconSymbol({ condition }),
       placeLabel: source.placeLabel || "Počasie dňa",
-      dayPeriod: weatherDayPeriodFromHour(weatherObservedHour(current.time)),
-      sunshineHours: Number(currentData?.daily?.sunshine_duration?.[0] || 0) / 3600,
+      dayPeriod: Number(current.is_day) === 0 ? "night" : weatherDayPeriodFromHour(weatherObservedHour(current.time)),
+      sunshineHours: toFiniteWeatherNumber(currentDaily?.sunshine_duration?.[0]) !== null
+        ? Number(currentDaily.sunshine_duration[0]) / 3600
+        : null,
+      moonPhase: moonPhaseFromDateValue(current.time),
+      isDay: toFiniteWeatherNumber(current.is_day),
+      temperatureC: toFiniteWeatherNumber(current.temperature_2m),
+      apparentTemperatureC: toFiniteWeatherNumber(current.apparent_temperature),
+      humidityPct: toFiniteWeatherNumber(current.relative_humidity_2m),
+      precipitationMm: toFiniteWeatherNumber(current.precipitation),
+      rainMm: toFiniteWeatherNumber(current.rain),
+      showersMm: toFiniteWeatherNumber(current.showers),
+      snowfallCm: toFiniteWeatherNumber(current.snowfall),
+      cloudCoverPct: toFiniteWeatherNumber(current.cloud_cover),
+      cloudCoverLowPct: toFiniteWeatherNumber(current.cloud_cover_low),
+      cloudCoverMidPct: toFiniteWeatherNumber(current.cloud_cover_mid),
+      cloudCoverHighPct: toFiniteWeatherNumber(current.cloud_cover_high),
+      windSpeedKmh: toFiniteWeatherNumber(current.wind_speed_10m),
+      windGustsKmh: toFiniteWeatherNumber(current.wind_gusts_10m),
+      windDirectionDeg: toFiniteWeatherNumber(current.wind_direction_10m),
+      visibilityM: toFiniteWeatherNumber(current.visibility),
+      pressureMslHpa: toFiniteWeatherNumber(current.pressure_msl),
+      surfacePressureHpa: toFiniteWeatherNumber(current.surface_pressure),
+      sunriseAt: String(currentDaily?.sunrise?.[0] || "").trim(),
+      sunsetAt: String(currentDaily?.sunset?.[0] || "").trim(),
+      daylightSeconds: toFiniteWeatherNumber(currentDaily?.daylight_duration?.[0]),
+      precipitationProbabilityPct: toFiniteWeatherNumber(currentDaily?.precipitation_probability_max?.[0]),
       fetchedAt: new Date().toISOString(),
       latitude: String(source.latitude),
       longitude: String(source.longitude)
@@ -14312,7 +17803,7 @@ async function fetchWeatherForDate(source, date) {
     longitude: String(source.longitude),
     start_date: targetDate,
     end_date: targetDate,
-    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunshine_duration",
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,rain_sum,showers_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,sunrise,sunset,daylight_duration,sunshine_duration",
     timezone: "auto"
   });
   const response = await fetch(`${baseUrl}?${params.toString()}`);
@@ -14329,7 +17820,23 @@ async function fetchWeatherForDate(source, date) {
     icon: weatherIconSymbol({ condition }),
     placeLabel: source.placeLabel || "Počasie dňa",
     dayPeriod: "day",
-    sunshineHours: Number(daily.sunshine_duration?.[0] || 0) / 3600,
+    sunshineHours: toFiniteWeatherNumber(daily.sunshine_duration?.[0]) !== null
+      ? Number(daily.sunshine_duration[0]) / 3600
+      : null,
+    moonPhase: moonPhaseFromDateValue(targetDate),
+    temperatureC: averageWeatherNumbers(daily.temperature_2m_max?.[0], daily.temperature_2m_min?.[0]),
+    apparentTemperatureC: averageWeatherNumbers(daily.apparent_temperature_max?.[0], daily.apparent_temperature_min?.[0]),
+    precipitationMm: toFiniteWeatherNumber(daily.precipitation_sum?.[0]),
+    rainMm: toFiniteWeatherNumber(daily.rain_sum?.[0]),
+    showersMm: toFiniteWeatherNumber(daily.showers_sum?.[0]),
+    snowfallCm: toFiniteWeatherNumber(daily.snowfall_sum?.[0]),
+    windSpeedKmh: toFiniteWeatherNumber(daily.wind_speed_10m_max?.[0]),
+    windGustsKmh: toFiniteWeatherNumber(daily.wind_gusts_10m_max?.[0]),
+    windDirectionDeg: toFiniteWeatherNumber(daily.wind_direction_10m_dominant?.[0]),
+    sunriseAt: String(daily.sunrise?.[0] || "").trim(),
+    sunsetAt: String(daily.sunset?.[0] || "").trim(),
+    daylightSeconds: toFiniteWeatherNumber(daily.daylight_duration?.[0]),
+    precipitationProbabilityPct: toFiniteWeatherNumber(daily.precipitation_probability_max?.[0]),
     fetchedAt: new Date().toISOString(),
     latitude: String(source.latitude),
     longitude: String(source.longitude)
@@ -14416,6 +17923,7 @@ async function loadHomeWeatherSnapshot(forceReload = false) {
       })
       .then((snapshot) => {
         homeWeatherSnapshot = snapshot;
+        applyMobileWeatherTheme(snapshot);
         return snapshot;
       })
       .catch(() => null)
@@ -14655,13 +18163,17 @@ function bindWeatherOverviewTriggers(root = document) {
 async function refreshMainMenuWeatherMini() {
   const [snapshot, trend] = await Promise.all([loadHomeWeatherSnapshot(), loadHomeWeatherTrend()]);
   if (!snapshot) return;
+  applyMobileWeatherTheme(snapshot);
   document.querySelectorAll("#main-menu-weather-mini, #hero-weather-mini").forEach((mountEl) => {
-    const showTrend = mountEl.id === "hero-weather-mini" || mountEl.classList.contains("main-menu-weather-mini--hero");
+    const isHeroMount = mountEl.id === "hero-weather-mini" || mountEl.classList.contains("main-menu-weather-mini--hero");
+    const heroCompact = Boolean(document.body?.classList.contains("app-mobile-shell") && isHeroMount);
+    const showTrend = !isHeroMount;
     mountEl.innerHTML = renderMainMenuWeatherMini(snapshot, {
       showTrend,
       compactTrend: showTrend,
       trendDays: trend || homeWeatherTrend || [],
-      interactive: true
+      interactive: true,
+      heroCompact
     });
   });
   bindWeatherOverviewTriggers(document);
@@ -14683,6 +18195,7 @@ async function refreshHomeWeatherCard() {
   if (!card) return;
   const [snapshot, trend] = await Promise.all([loadHomeWeatherSnapshot(), loadHomeWeatherTrend()]);
   if (!snapshot) return;
+  applyMobileWeatherTheme(snapshot);
   const bodyEl = card.querySelector("[data-home-weather-body]");
   if (bodyEl) bodyEl.innerHTML = renderHomeWeatherCardMarkup(snapshot, trend || homeWeatherTrend || []);
   bindWeatherOverviewTriggers(card);
@@ -14753,4 +18266,5 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
 

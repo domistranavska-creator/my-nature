@@ -1,0 +1,254 @@
+body.app-mobile-shell .page-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: transparent !important;
+  z-index: 1;
+}
+
+body.app-mobile-shell .weather-bg-engine {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: transparent;
+}
+
+body.app-mobile-shell .weather-bg-engine__shader-canvas,
+body.app-mobile-shell .weather-bg-engine__layer,
+body.app-mobile-shell .weather-bg-engine__celestial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body.app-mobile-shell .weather-bg-engine__shader-canvas,
+body.app-mobile-shell .weather-bg-engine__layer {
+  display: block;
+}
+
+body.app-mobile-shell .weather-bg-engine__shader-canvas {
+  z-index: 1;
+}
+
+body.app-mobile-shell .weather-bg-engine__tree-canvas {
+  z-index: 3;
+  display: none;
+  opacity: 0;
+}
+
+body.app-mobile-shell .weather-bg-engine__celestial {
+  z-index: 4;
+  overflow: hidden;
+}
+
+body.app-mobile-shell .weather-bg-engine__stars-canvas {
+  z-index: 4;
+}
+
+body.app-mobile-shell .weather-bg-engine__precip-canvas {
+  z-index: 5;
+}
+
+body.app-mobile-shell .weather-bg-engine__fx-canvas {
+  z-index: 6;
+}
+
+body.app-mobile-shell .weather-bg-engine__debug-badge {
+  display: none;
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 8;
+  max-width: calc(100% - 12px);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(14, 20, 29, 0.72);
+  color: #eef5fb;
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.app-mobile-shell .weather-bg-engine__sun-wrap,
+body.app-mobile-shell .weather-bg-engine__moon-wrap {
+  position: absolute;
+  width: 132px;
+  height: 132px;
+  top: 22px;
+  left: 16px;
+  transition: opacity 900ms ease, transform 1200ms ease, filter 900ms ease, left 1200ms ease, top 1200ms ease;
+  opacity: 0;
+}
+
+body.app-mobile-shell .weather-bg-engine__moon-wrap {
+  left: 16px;
+  right: auto;
+  top: 22px;
+}
+
+body.app-mobile-shell .weather-bg-engine__sun-halo,
+body.app-mobile-shell .weather-bg-engine__sun-disc,
+body.app-mobile-shell .weather-bg-engine__moon-glow,
+body.app-mobile-shell .weather-bg-engine__moon-disc,
+body.app-mobile-shell .weather-bg-engine__moon-shade {
+  position: absolute;
+  border-radius: 50%;
+}
+
+body.app-mobile-shell .weather-bg-engine__sun-halo--far {
+  inset: -44px;
+  background:
+    radial-gradient(circle, rgba(255,228,155,.14) 0 18%, rgba(255,217,130,.07) 32%, rgba(255,210,120,.02) 54%, transparent 72%);
+  filter: blur(18px);
+}
+
+body.app-mobile-shell .weather-bg-engine__sun-halo--mid {
+  inset: -20px;
+  background:
+    radial-gradient(circle, rgba(255,244,210,.42) 0 16%, rgba(255,230,168,.14) 30%, rgba(255,223,150,.04) 48%, transparent 66%);
+  filter: blur(10px);
+}
+
+body.app-mobile-shell .weather-bg-engine__sun-halo--near {
+  inset: -6px;
+  background:
+    radial-gradient(circle, rgba(255,250,230,.26) 0 12%, rgba(255,235,175,.10) 32%, transparent 58%);
+  filter: blur(4px);
+}
+
+body.app-mobile-shell .weather-bg-engine__sun-disc {
+  inset: 26px;
+  background:
+    radial-gradient(circle at 40% 36%, rgba(255,252,240,.99) 0 9%, rgba(255,247,220,.99) 24%, rgba(255,238,186,.98) 50%, rgba(255,224,150,.96) 76%, rgba(238,174,83,.88) 100%);
+  box-shadow:
+    inset -12px -12px 20px rgba(220,145,52,.14),
+    inset 10px 10px 18px rgba(255,255,255,.12),
+    0 0 12px rgba(255,226,172,.14);
+}
+
+body.app-mobile-shell[data-mobile-weather-phase="dawn"] .weather-bg-engine__sun-halo--far {
+  background:
+    radial-gradient(circle, rgba(255,222,132,.22) 0 18%, rgba(255,184,96,.12) 34%, rgba(255,164,82,.05) 58%, transparent 76%);
+}
+
+body.app-mobile-shell[data-mobile-weather-phase="dawn"] .weather-bg-engine__sun-halo--mid {
+  background:
+    radial-gradient(circle, rgba(255,245,212,.44) 0 16%, rgba(255,220,146,.18) 30%, rgba(255,198,114,.06) 48%, transparent 66%);
+}
+
+body.app-mobile-shell[data-mobile-weather-phase="dawn"] .weather-bg-engine__sun-halo--near {
+  background:
+    radial-gradient(circle, rgba(255,249,230,.28) 0 12%, rgba(255,226,148,.14) 32%, transparent 58%);
+}
+
+body.app-mobile-shell[data-mobile-weather-phase="dawn"] .weather-bg-engine__sun-disc {
+  background:
+    radial-gradient(circle at 40% 34%, rgba(255,253,242,.99) 0 8%, rgba(255,246,204,.99) 18%, rgba(255,222,110,.99) 42%, rgba(255,174,72,.97) 72%, rgba(219,118,34,.82) 100%);
+  box-shadow:
+    inset -12px -12px 22px rgba(210,118,28,.20),
+    inset 10px 10px 18px rgba(255,255,255,.14),
+    0 0 18px rgba(255,202,104,.20);
+}
+
+body.app-mobile-shell[data-mobile-weather-phase="sunset"] .weather-bg-engine__sun-halo--far {
+  background:
+    radial-gradient(circle, rgba(255,164,120,.22) 0 18%, rgba(236,98,164,.12) 34%, rgba(176,78,154,.06) 58%, transparent 76%);
+}
+
+body.app-mobile-shell[data-mobile-weather-phase="sunset"] .weather-bg-engine__sun-halo--mid {
+  background:
+    radial-gradient(circle, rgba(255,229,194,.42) 0 16%, rgba(255,168,114,.18) 30%, rgba(220,102,170,.08) 48%, transparent 66%);
+}
+
+body.app-mobile-shell[data-mobile-weather-phase="sunset"] .weather-bg-engine__sun-halo--near {
+  background:
+    radial-gradient(circle, rgba(255,240,214,.24) 0 12%, rgba(255,166,118,.14) 30%, rgba(222,92,170,.06) 46%, transparent 60%);
+}
+
+body.app-mobile-shell[data-mobile-weather-phase="sunset"] .weather-bg-engine__sun-disc {
+  background:
+    radial-gradient(circle at 40% 34%, rgba(255,247,228,.99) 0 8%, rgba(255,214,146,.99) 18%, rgba(255,154,96,.98) 42%, rgba(238,92,130,.95) 68%, rgba(168,56,140,.80) 100%);
+  box-shadow:
+    inset -12px -12px 22px rgba(160,58,118,.22),
+    inset 10px 10px 18px rgba(255,248,236,.12),
+    0 0 20px rgba(236,108,156,.20);
+}
+
+body.app-mobile-shell .weather-bg-engine__moon-glow {
+  inset: -12px;
+  background:
+    radial-gradient(circle, rgba(202,220,255,.10) 0 12%, rgba(176,198,248,.05) 26%, rgba(140,168,230,.02) 44%, transparent 62%);
+  filter: blur(9px);
+}
+
+body.app-mobile-shell[data-mobile-weather-period="night"][data-mobile-weather-cloud="cloudy"] .weather-bg-engine__moon-glow {
+  inset: -10px;
+  opacity: .28;
+  filter: blur(7px);
+}
+
+body.app-mobile-shell[data-mobile-weather-period="night"][data-mobile-weather-cloud="overcast"] .weather-bg-engine__moon-glow {
+  inset: -8px;
+  opacity: .16;
+  filter: blur(6px);
+}
+
+body.app-mobile-shell .weather-bg-engine__moon-disc {
+  inset: 28px;
+}
+
+body.app-mobile-shell .weather-bg-engine__moon-disc {
+  background:
+    radial-gradient(circle at 34% 30%, rgba(255,255,255,.98) 0 10%, rgba(246,248,252,.98) 22%, rgba(224,230,239,.97) 46%, rgba(188,198,211,.95) 72%, rgba(136,149,166,.92) 100%),
+    radial-gradient(circle at 62% 66%, rgba(154,166,182,.18) 0 10%, rgba(154,166,182,0) 18%),
+    radial-gradient(circle at 48% 46%, rgba(122,134,151,.10) 0 18%, rgba(122,134,151,0) 30%);
+  box-shadow:
+    inset -14px -14px 22px rgba(56,68,84,.26),
+    inset 8px 10px 12px rgba(255,255,255,.18),
+    inset 0 0 10px rgba(250,252,255,.16),
+    0 0 16px rgba(210,225,255,.10);
+  overflow: hidden;
+}
+
+body.app-mobile-shell .weather-bg-engine__moon-disc::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(145,156,170,.15) 0 6px, transparent 7px),
+    radial-gradient(circle at 58% 26%, rgba(140,151,166,.14) 0 7px, transparent 8px),
+    radial-gradient(circle at 40% 56%, rgba(132,144,160,.12) 0 10px, transparent 11px),
+    radial-gradient(circle at 67% 62%, rgba(132,144,160,.10) 0 8px, transparent 9px),
+    radial-gradient(circle at 46% 74%, rgba(126,138,154,.09) 0 5px, transparent 6px),
+    radial-gradient(circle at 26% 69%, rgba(126,138,154,.08) 0 5px, transparent 6px),
+    radial-gradient(circle at 72% 40%, rgba(120,132,148,.08) 0 10px, transparent 12px),
+    radial-gradient(circle at 54% 52%, rgba(134,146,162,.08) 0 12px, transparent 14px);
+  mix-blend-mode: multiply;
+}
+
+body.app-mobile-shell .weather-bg-engine__moon-disc::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255,255,255,.18) 0 14%, rgba(255,255,255,0) 28%),
+    radial-gradient(circle at 60% 64%, rgba(86,98,116,.12) 0 14%, rgba(86,98,116,0) 28%),
+    radial-gradient(circle at 54% 40%, rgba(100,112,130,.10) 0 22%, rgba(100,112,130,0) 34%);
+  mix-blend-mode: soft-light;
+  opacity: .9;
+}
+
+body.app-mobile-shell .weather-bg-engine__moon-shade {
+  inset: -4px;
+  background: radial-gradient(circle at 42% 50%, rgba(6,12,22,.99) 0 64%, rgba(6,12,22,.96) 80%, rgba(6,12,22,.74) 90%, rgba(6,12,22,0) 100%);
+  transition: background 900ms ease, transform 900ms ease, opacity 900ms ease;
+  will-change: transform, opacity;
+}
