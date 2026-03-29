@@ -29,6 +29,7 @@ const MOBILE_WEATHER_THEME_DEBUG_TEMP_KEY = "moja-zahrada-mobile-weather-temp-de
 const MOBILE_WEATHER_THEME_DEBUG_PHASE_KEY = "moja-zahrada-mobile-weather-phase-debug-v1";
 const MOBILE_WEATHER_THEME_DEBUG_MOON_KEY = "moja-zahrada-mobile-weather-moon-debug-v1";
 const MOBILE_WEATHER_THEME_SEASON_KEY = "moja-zahrada-mobile-weather-season-debug-v1";
+const MOBILE_WEATHER_DEBUG_PARAM = "weather-debug";
 const MOBILE_WEATHER_SCENE_ONLY_KEY = "moja-zahrada-mobile-weather-scene-only-v1";
 const MOBILE_WEATHER_SOUND_KEY = "moja-zahrada-mobile-weather-sound-v1";
 const MOBILE_WEATHER_SOUND_VOLUME_KEY = "moja-zahrada-mobile-weather-sound-volume-v1";
@@ -884,6 +885,16 @@ function isEmbeddedMobilePreviewMode() {
   return Boolean(embeddedMobilePreviewDeviceId);
 }
 
+function shouldShowWeatherDebugUi() {
+  if (typeof window === "undefined") return false;
+  try {
+    const url = new URL(window.location.href);
+    return url.searchParams.get(MOBILE_WEATHER_DEBUG_PARAM) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
 function getActiveMobilePreviewDeviceProfile() {
   return MOBILE_PREVIEW_DEVICES[embeddedMobilePreviewDeviceId || MOBILE_PREVIEW_DEFAULT_DEVICE_ID]
     || MOBILE_PREVIEW_DEVICES[MOBILE_PREVIEW_DEFAULT_DEVICE_ID];
@@ -1569,6 +1580,12 @@ function renderDesktopMobilePreviewHostToolsMarkup(stage) {
 function syncDesktopMobilePreviewHostTools(stage) {
   const tools = stage?.querySelector("[data-mobile-preview-tools]");
   if (!tools) return;
+  const shouldShow = shouldShowWeatherDebugUi();
+  tools.hidden = !shouldShow;
+  if (!shouldShow) {
+    tools.innerHTML = "";
+    return;
+  }
   tools.innerHTML = renderDesktopMobilePreviewHostToolsMarkup(stage);
 }
 
@@ -4643,7 +4660,7 @@ function renderMainMenu() {
   const roots = grouped.map(({ root }) => root);
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
   const isEmbeddedMobilePreview = typeof document !== "undefined" && document.body.classList.contains("app-mobile-preview-embedded");
-  const showMobileWeatherDebugPanel = isMobileShell && !isEmbeddedMobilePreview;
+  const showMobileWeatherDebugPanel = isMobileShell && !isEmbeddedMobilePreview && shouldShowWeatherDebugUi();
   const activeWeatherThemeDebug = loadMobileWeatherThemeDebugOverride();
   const activeWeatherThemeDebugId = activeWeatherThemeDebug?.id || "auto";
   const activeWeatherThemeCloudOverride = loadMobileWeatherThemeCloudOverride();
