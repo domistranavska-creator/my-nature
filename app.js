@@ -1027,6 +1027,19 @@ function reconcileBodyScrollState() {
   unlockBodyScroll();
 }
 
+function syncMainMenuTouchScrollState() {
+  if (typeof document === "undefined") return;
+  const body = document.body;
+  const isMainMenuMode = body.classList.contains("app-main-menu-mode");
+  const hasBlockingOverlay = Boolean(
+    detailModal?.open
+    || journalOverlayRoot()
+    || imageLightboxEl?.open
+    || authGateRoot()
+  );
+  body.classList.toggle("app-main-menu-scroll-safe", isMainMenuMode && !hasBlockingOverlay);
+}
+
 function scheduleWalkMapResize(map) {
   if (!map) return;
   requestAnimationFrame(() => map.invalidateSize());
@@ -3531,6 +3544,7 @@ function render() {
   safeStep("mapy prechádzok", () => hydrateWalkMaps(document));
   syncAuthGate();
   reconcileBodyScrollState();
+  syncMainMenuTouchScrollState();
 }
 
 function renderMainMenu() {
@@ -4050,6 +4064,7 @@ function syncMobileOverlayBottomNavPlacement() {
     detailModal?.querySelector("#detail-mobile-bottom-nav")?.remove();
     imageLightboxEl?.querySelector("#lightbox-mobile-bottom-nav")?.remove();
     journalOverlayRoot()?.querySelector("#journal-mobile-bottom-nav")?.remove();
+    syncMainMenuTouchScrollState();
     return;
   }
 
@@ -4079,6 +4094,8 @@ function syncMobileOverlayBottomNavPlacement() {
   } else {
     imageLightboxEl?.querySelector("#lightbox-mobile-bottom-nav")?.remove();
   }
+
+  syncMainMenuTouchScrollState();
 }
 
 function syncMobileBottomNavPlacement() {

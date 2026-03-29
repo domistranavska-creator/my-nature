@@ -33140,3 +33140,41 @@ body.app-mobile-shell.app-main-menu-mode .catalog-card--main-menu-card {
   transition: none !important;
   animation: none !important;
 }
+
+/* Mobile touch-scroll guard:
+   ak po overlayoch ostane stary lock, home screen musi znovu prijat prstovy scroll. */
+html:has(body.app-mobile-shell.app-main-menu-scroll-safe) {
+  overflow-y: auto !important;
+}
+
+body.app-mobile-shell.app-main-menu-scroll-safe {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: auto !important;
+  overflow-y: auto !important;
+  touch-action: pan-y pinch-zoom !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+body.app-mobile-shell.app-main-menu-scroll-safe .page-shell,
+body.app-mobile-shell.app-main-menu-scroll-safe .content,
+body.app-mobile-shell.app-main-menu-scroll-safe .panel--menu,
+body.app-mobile-shell.app-main-menu-scroll-safe .main-menu,
+body.app-mobile-shell.app-main-menu-scroll-safe .workspace-layout,
+body.app-mobile-shell.app-main-menu-scroll-safe .workspace-layout--menu,
+body.app-mobile-shell.app-main-menu-scroll-safe .workspace-side,
+body.app-mobile-shell.app-main-menu-scroll-safe .panel--sticky {
+  overflow-y: visible !important;
+  touch-action: pan-y pinch-zoom !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+body.app-mobile-shell.app-main-menu-scroll-safe .utility-bar,
+body.app-mobile-shell.app-main-menu-scroll-safe .utility-bar.is-collapsed {
+  position: static !important;
+  top: auto !important;
+}
