@@ -14,6 +14,12 @@ const SUPABASE_PREFERENCES_KEY = "moja-zahrada-supabase-preferences-v1";
 const SUPABASE_AUTH_MIRROR_KEY = "moja-zahrada-supabase-auth-mirror-v1";
 const SUPABASE_SYNC_META_KEY = "moja-zahrada-supabase-sync-meta-v1";
 const UI_MOBILE_PREVIEW_KEY = "moja-zahrada-mobile-preview-v1";
+const MOBILE_PREVIEW_EMBED_PARAM = "mobile-preview-embedded";
+const MOBILE_PREVIEW_DEVICE_PARAM = "mobile-preview-device";
+const MOBILE_PREVIEW_HOST_ID = "mobile-preview-system-chrome";
+const MOBILE_PREVIEW_DEFAULT_DEVICE_ID = "galaxy-a54-5g";
+const MOBILE_PREVIEW_MESSAGE_TYPE = "moja-zahrada-mobile-preview-metrics";
+const MOBILE_PREVIEW_COMMAND_TYPE = "moja-zahrada-mobile-preview-command";
 const MOBILE_WEATHER_THEME_DEBUG_KEY = "moja-zahrada-mobile-weather-theme-debug-v1";
 const MOBILE_WEATHER_THEME_CLOUD_KEY = "moja-zahrada-mobile-weather-cloud-debug-v1";
 const MOBILE_WEATHER_THEME_DEBUG_PERIOD_KEY = "moja-zahrada-mobile-weather-theme-period-debug-v1";
@@ -37,6 +43,33 @@ const RESET_BACKUP_KEY = "moja-zahrada-reset-backup-v1";
 const IMAGE_BACKGROUND_MIGRATION_KEY = "moja-zahrada-white-bg-v1";
 const FALLBACK_CATEGORY_ID = "cat-nezaradene";
 const ROOT_CATEGORY_IDS = ["root-zahrada", "root-priroda", "root-uroda", "root-ine"];
+const MOBILE_PREVIEW_DEVICES = Object.freeze({
+  "galaxy-a54-5g": Object.freeze({
+    id: "galaxy-a54-5g",
+    label: "Samsung Galaxy A54 5G",
+    screenWidth: 360,
+    screenHeight: 800,
+    statusBarHeight: 24,
+    topToolbarExpandedHeight: 56,
+    topToolbarCollapsedHeight: 56,
+    bottomToolbarExpandedHeight: 50,
+    bottomToolbarCollapsedHeight: 50,
+    frameRadius: 34
+  })
+});
+const embeddedMobilePreviewDeviceId = (() => {
+  if (typeof window === "undefined") return "";
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(MOBILE_PREVIEW_EMBED_PARAM) !== "1") return "";
+    const requestedId = String(url.searchParams.get(MOBILE_PREVIEW_DEVICE_PARAM) || "")
+      .trim()
+      .toLowerCase();
+    return MOBILE_PREVIEW_DEVICES[requestedId] ? requestedId : MOBILE_PREVIEW_DEFAULT_DEVICE_ID;
+  } catch (error) {
+    return "";
+  }
+})();
 const ICONS = {
   moodJoy: "\uD83D\uDE0A",
   moodCalm: "\uD83D\uDE0C",
@@ -815,11 +848,15 @@ let bodyScrollLockY = 0;
 let skipNextBodyScrollRestore = false;
 const bodyScrollLockOwners = new Set();
 let mobilePreviewEnabled = (() => {
+  if (embeddedMobilePreviewDeviceId) return false;
   try {
-    return localStorage.getItem(UI_MOBILE_PREVIEW_KEY) === "1";
+    const storedValue = localStorage.getItem(UI_MOBILE_PREVIEW_KEY);
+    if (storedValue === "1") return true;
+    if (storedValue === "0") return false;
   } catch (error) {
     return false;
   }
+  return typeof window !== "undefined" ? window.innerWidth > 760 : false;
 })();
 let mobileWeatherSoundEnabled = (() => {
   try {
@@ -838,8 +875,890 @@ let mobileWeatherSoundPanelOpen = false;
 let mainMenuWeatherAudioDebugTimer = 0;
 let mainMenuWeatherAudioDebugEventsBound = false;
 let mainMenuWeatherAudioControlsBound = false;
+let embeddedMobilePreviewMetricsRaf = 0;
 const walkMapInstances = new WeakMap();
+const desktopMobilePreviewState = new WeakMap();
 const MOBILE_APP_SHELL_MAX_WIDTH = 760;
+
+function isEmbeddedMobilePreviewMode() {
+  return Boolean(embeddedMobilePreviewDeviceId);
+}
+
+function getActiveMobilePreviewDeviceProfile() {
+  return MOBILE_PREVIEW_DEVICES[embeddedMobilePreviewDeviceId || MOBILE_PREVIEW_DEFAULT_DEVICE_ID]
+    || MOBILE_PREVIEW_DEVICES[MOBILE_PREVIEW_DEFAULT_DEVICE_ID];
+}
+
+function shouldUseDesktopMobilePreviewHost() {
+  if (typeof window === "undefined") return false;
+  return !isEmbeddedMobilePreviewMode()
+    && Boolean(mobilePreviewEnabled)
+    && window.innerWidth > MOBILE_APP_SHELL_MAX_WIDTH;
+}
+
+function shouldUseInlineMobilePreviewClass() {
+  if (isEmbeddedMobilePreviewMode()) return false;
+  if (!mobilePreviewEnabled) return false;
+  if (typeof window === "undefined") return true;
+  return window.innerWidth <= MOBILE_APP_SHELL_MAX_WIDTH;
+}
+
+function mobilePreviewViewportHeight(profile, collapsed = false) {
+  const topHeight = collapsed
+    ? profile.topToolbarCollapsedHeight
+    : profile.topToolbarExpandedHeight;
+  const bottomHeight = collapsed
+    ? profile.bottomToolbarCollapsedHeight
+    : profile.bottomToolbarExpandedHeight;
+  return Math.max(1, profile.screenHeight - profile.statusBarHeight - topHeight - bottomHeight);
+}
+
+function buildEmbeddedMobilePreviewUrl(deviceId = MOBILE_PREVIEW_DEFAULT_DEVICE_ID) {
+  if (typeof window === "undefined") return "";
+  const url = new URL(window.location.href);
+  url.searchParams.set(MOBILE_PREVIEW_EMBED_PARAM, "1");
+  url.searchParams.set(MOBILE_PREVIEW_DEVICE_PARAM, deviceId);
+  return url.toString();
+}
+
+function mobilePreviewAddressLabel() {
+  if (typeof window === "undefined") return "moja-zahrada";
+  try {
+    const url = new URL(window.location.href);
+    if (url.protocol !== "file:" && url.hostname) {
+      return url.hostname;
+    }
+    const segments = url.pathname.split(/[\\/]/).filter(Boolean);
+    const fileName = String(segments[segments.length - 1] || "").replace(/\.html?$/i, "");
+    if (fileName && fileName.toLowerCase() !== "index") return fileName;
+    const folderName = String(segments[segments.length - 2] || "").trim();
+    return folderName || fileName || "moja-zahrada";
+  } catch (error) {
+    return "moja-zahrada";
+  }
+}
+
+function syncDesktopMobilePreviewStageScale(stage, profile) {
+  if (!stage || !profile || typeof window === "undefined") return;
+  const shellWidth = profile.screenWidth + 24;
+  const shellHeight = profile.screenHeight + 84;
+  const availableWidth = Math.max(1, window.innerWidth - 72);
+  const availableHeight = Math.max(1, window.innerHeight - 88);
+  const scale = Math.min(
+    1,
+    availableWidth / Math.max(1, shellWidth),
+    availableHeight / Math.max(1, shellHeight)
+  );
+  stage.style.setProperty("--mobile-preview-scale", scale.toFixed(4));
+}
+
+function syncDesktopMobilePreviewStageMetrics(stage, { collapsed, viewportHeight } = {}) {
+  if (!stage) return;
+  const profile = getActiveMobilePreviewDeviceProfile();
+  const nextCollapsed = typeof collapsed === "boolean"
+    ? collapsed
+    : stage.dataset.toolbarState === "collapsed";
+  const topHeight = nextCollapsed
+    ? profile.topToolbarCollapsedHeight
+    : profile.topToolbarExpandedHeight;
+  const bottomHeight = nextCollapsed
+    ? profile.bottomToolbarCollapsedHeight
+    : profile.bottomToolbarExpandedHeight;
+  const nextViewportHeight = Number.isFinite(Number(viewportHeight))
+    ? Math.max(1, Math.round(Number(viewportHeight)))
+    : mobilePreviewViewportHeight(profile, nextCollapsed);
+
+  stage.dataset.toolbarState = nextCollapsed ? "collapsed" : "expanded";
+  stage.style.setProperty("--mobile-preview-device-width", `${profile.screenWidth}px`);
+  stage.style.setProperty("--mobile-preview-device-height", `${profile.screenHeight}px`);
+  stage.style.setProperty("--mobile-preview-device-radius", `${profile.frameRadius}px`);
+  stage.style.setProperty("--mobile-preview-status-height", `${profile.statusBarHeight}px`);
+  stage.style.setProperty("--mobile-preview-topbar-height", `${topHeight}px`);
+  stage.style.setProperty("--mobile-preview-bottombar-height", `${bottomHeight}px`);
+  stage.style.setProperty("--mobile-preview-viewport-height", `${nextViewportHeight}px`);
+
+  const viewportLabel = stage.querySelector("[data-mobile-preview-viewport]");
+  if (viewportLabel) {
+    viewportLabel.textContent = `${profile.screenWidth} × ${nextViewportHeight} px`;
+  }
+
+  const addressLabel = stage.querySelector("[data-mobile-preview-address]");
+  if (addressLabel) {
+    addressLabel.textContent = mobilePreviewAddressLabel();
+  }
+
+  const timeLabel = stage.querySelector("[data-mobile-preview-time]");
+  if (timeLabel) {
+    try {
+      timeLabel.textContent = new Intl.DateTimeFormat("sk-SK", {
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(new Date());
+    } catch (error) {
+      timeLabel.textContent = "09:41";
+    }
+  }
+
+  syncDesktopMobilePreviewStageScale(stage, profile);
+}
+
+function syncDesktopMobilePreviewHost() {
+  if (typeof document === "undefined" || isEmbeddedMobilePreviewMode()) return;
+
+  const active = shouldUseDesktopMobilePreviewHost();
+  let stage = document.getElementById(MOBILE_PREVIEW_HOST_ID);
+
+  if (!active) {
+    stage?.remove();
+    return;
+  }
+
+  const profile = getActiveMobilePreviewDeviceProfile();
+  if (!stage) {
+    stage = document.createElement("section");
+    stage.id = MOBILE_PREVIEW_HOST_ID;
+    stage.className = "mobile-preview-stage";
+    stage.innerHTML = `
+      <div class="mobile-preview-stage__scrim" data-mobile-preview-close></div>
+      <div class="mobile-preview-stage__layout">
+        <div class="mobile-preview-stage__meta">
+          <div class="mobile-preview-stage__meta-copy">
+            <strong>${escapeHtml(profile.label)}</strong>
+            <span data-mobile-preview-viewport>${profile.screenWidth} × ${mobilePreviewViewportHeight(profile, false)} px</span>
+          </div>
+          <button class="mobile-preview-stage__close" type="button" data-mobile-preview-close>Zavrieť náhľad</button>
+        </div>
+        <div class="mobile-preview-device" data-mobile-preview-device="${escapeAttribute(profile.id)}">
+          <div class="mobile-preview-device__frame">
+            <div class="mobile-preview-device__speaker" aria-hidden="true"></div>
+            <div class="mobile-preview-device__screen">
+              <div class="mobile-preview-device__status-bar" aria-hidden="true">
+                <span data-mobile-preview-time>09:41</span>
+                <div class="mobile-preview-device__status-icons">
+                  <span class="mobile-preview-device__signal"></span>
+                  <span class="mobile-preview-device__wifi"></span>
+                  <span class="mobile-preview-device__battery"></span>
+                </div>
+              </div>
+              <div class="mobile-preview-device__toolbar mobile-preview-device__toolbar--top" aria-hidden="true">
+                <div class="mobile-preview-device__browser-leading">
+                  <span class="mobile-preview-device__browser-home"></span>
+                  <span class="mobile-preview-device__browser-switch"></span>
+                </div>
+                <div class="mobile-preview-device__address-pill">
+                  <span class="mobile-preview-device__address-icon"></span>
+                  <span data-mobile-preview-address>moja-zahrada</span>
+                </div>
+                <div class="mobile-preview-device__toolbar-actions">
+                  <span class="mobile-preview-device__tabs-pill">36</span>
+                  <span class="mobile-preview-device__menu-dots"></span>
+                </div>
+              </div>
+              <div class="mobile-preview-device__viewport">
+                <iframe
+                  class="mobile-preview-device__iframe"
+                  title="Galaxy A54 5G mobilný preview"
+                  loading="eager"
+                  allow="clipboard-read; clipboard-write"
+                ></iframe>
+              </div>
+              <div class="mobile-preview-device__toolbar mobile-preview-device__toolbar--bottom" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <aside class="mobile-preview-stage__tools" data-mobile-preview-tools></aside>
+      </div>
+    `;
+    document.body.appendChild(stage);
+  }
+
+  if (stage.dataset.bound !== "true") {
+    stage.dataset.bound = "true";
+    stage.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest("[data-mobile-preview-close]")) return;
+      event.preventDefault();
+      setMobilePreviewEnabled(false);
+    });
+    stage.addEventListener("click", handleDesktopMobilePreviewHostClick);
+    stage.addEventListener("input", handleDesktopMobilePreviewHostInput);
+    stage.addEventListener("change", handleDesktopMobilePreviewHostChange);
+  }
+
+  const frame = stage.querySelector(".mobile-preview-device__iframe");
+  const nextSrc = buildEmbeddedMobilePreviewUrl(profile.id);
+  if (frame && stage.dataset.frameBound !== "true") {
+    stage.dataset.frameBound = "true";
+    frame.addEventListener("load", () => {
+      syncDesktopMobilePreviewStageMetrics(stage);
+      syncDesktopMobilePreviewHostTools(stage);
+    });
+  }
+  if (frame && frame.getAttribute("src") !== nextSrc) {
+    frame.setAttribute("src", nextSrc);
+  }
+
+  syncDesktopMobilePreviewStageMetrics(stage);
+  syncDesktopMobilePreviewHostTools(stage);
+}
+
+function handleDesktopMobilePreviewMessage(event) {
+  const data = event?.data;
+  if (!data || data.type !== MOBILE_PREVIEW_MESSAGE_TYPE) return;
+
+  const stage = document.getElementById(MOBILE_PREVIEW_HOST_ID);
+  if (!stage) return;
+
+  const frame = stage.querySelector(".mobile-preview-device__iframe");
+  if (frame?.contentWindow && frame.contentWindow !== event.source) return;
+
+  if (data.previewState && typeof data.previewState === "object") {
+    setDesktopMobilePreviewState(stage, data.previewState);
+  }
+
+  syncDesktopMobilePreviewStageMetrics(stage, {
+    collapsed: false,
+    viewportHeight: Number(data.innerHeight || 0) || undefined
+  });
+  syncDesktopMobilePreviewHostTools(stage);
+}
+
+function scheduleEmbeddedMobilePreviewMetricsPush() {
+  if (!isEmbeddedMobilePreviewMode() || typeof window === "undefined" || window.parent === window) return;
+  if (embeddedMobilePreviewMetricsRaf) return;
+
+  embeddedMobilePreviewMetricsRaf = window.requestAnimationFrame(() => {
+    embeddedMobilePreviewMetricsRaf = 0;
+    const scrollTop = Math.max(
+      Number(window.scrollY) || 0,
+      Number(document.documentElement?.scrollTop) || 0,
+      Number(document.scrollingElement?.scrollTop) || 0
+    );
+    const weatherBackgroundDebugState = window.weatherBackgroundEngine?.getDebugState
+      ? window.weatherBackgroundEngine.getDebugState()
+      : null;
+    const weatherBackgroundDebugText = formatWeatherBackgroundDebugText(weatherBackgroundDebugState);
+    const soundscapeConfig = window.weatherAudioConfig?.soundscapeConfig || {};
+    const audioState = window.weatherAudioEngine?.getState
+      ? window.weatherAudioEngine.getState()
+      : null;
+    const audioDebugState = collectWeatherAudioDebugState(audioState, soundscapeConfig);
+    window.parent.postMessage({
+      type: MOBILE_PREVIEW_MESSAGE_TYPE,
+      deviceId: embeddedMobilePreviewDeviceId,
+      scrollTop,
+      innerWidth: Math.max(1, Math.round(window.innerWidth || document.documentElement?.clientWidth || 1)),
+      innerHeight: Math.max(1, Math.round(window.innerHeight || document.documentElement?.clientHeight || 1)),
+      previewState: {
+        ready: true,
+        weatherBackgroundDebugText,
+        audioDebugState
+      }
+    }, "*");
+  });
+}
+
+function handleEmbeddedMobilePreviewCommand(event) {
+  if (!isEmbeddedMobilePreviewMode()) return;
+  const data = event?.data;
+  if (!data || data.type !== MOBILE_PREVIEW_COMMAND_TYPE) return;
+
+  const command = String(data.command || "").trim();
+  const payload = data.payload && typeof data.payload === "object" ? data.payload : {};
+
+  if (command === "sync-weather") {
+    applyMobileWeatherTheme();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "sync-weather-and-scene") {
+    applyMobileWeatherTheme();
+    applyMobileWeatherSceneMode();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "set-weather-precip") {
+    saveMobileWeatherThemePrecipOverride(payload.value);
+    applyMobileWeatherTheme();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "set-weather-wind") {
+    saveMobileWeatherThemeWindOverride(payload.value);
+    applyMobileWeatherTheme();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "set-weather-temp") {
+    saveMobileWeatherThemeTemperatureOverride(payload.value);
+    applyMobileWeatherTheme();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "set-audio-enabled") {
+    window.weatherAudioEngine?.handleUserActivation?.();
+    setMobileWeatherSoundEnabled(Boolean(payload.enabled));
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "set-audio-volume") {
+    window.weatherAudioEngine?.handleUserActivation?.();
+    setMobileWeatherSoundVolume(payload.value);
+    scheduleEmbeddedMobilePreviewMetricsPush();
+  }
+}
+
+function readStoredMobileWeatherSoundState() {
+  let enabled = mobileWeatherSoundEnabled;
+  let volume = mobileWeatherSoundVolume;
+  try {
+    enabled = localStorage.getItem(MOBILE_WEATHER_SOUND_KEY) !== "0";
+  } catch (error) {
+    enabled = mobileWeatherSoundEnabled;
+  }
+  try {
+    const raw = Number(localStorage.getItem(MOBILE_WEATHER_SOUND_VOLUME_KEY));
+    if (Number.isFinite(raw)) {
+      volume = Math.max(0, Math.min(1, raw));
+    }
+  } catch (error) {
+    volume = mobileWeatherSoundVolume;
+  }
+  return { enabled, volume };
+}
+
+function getDesktopMobilePreviewState(stage = null) {
+  if (!stage) return null;
+  return desktopMobilePreviewState.get(stage) || null;
+}
+
+function setDesktopMobilePreviewState(stage = null, nextState = null) {
+  if (!stage || !nextState || typeof nextState !== "object") return getDesktopMobilePreviewState(stage);
+  const previous = getDesktopMobilePreviewState(stage) || {};
+  const merged = { ...previous, ...nextState };
+  desktopMobilePreviewState.set(stage, merged);
+  return merged;
+}
+
+function getDesktopMobilePreviewFrame(stage = null) {
+  if (typeof document === "undefined") return null;
+  const resolvedStage = stage || document.getElementById(MOBILE_PREVIEW_HOST_ID);
+  return resolvedStage?.querySelector(".mobile-preview-device__iframe") || null;
+}
+
+function getDesktopMobilePreviewFrameWindow(stage = null) {
+  const frame = getDesktopMobilePreviewFrame(stage);
+  if (!frame?.contentWindow) return null;
+  try {
+    void frame.contentWindow.location?.href;
+    return frame.contentWindow;
+  } catch (error) {
+    return null;
+  }
+}
+
+function scheduleDesktopMobilePreviewToolsRefresh(stage) {
+  if (!stage || typeof window === "undefined") return;
+  window.setTimeout(() => {
+    if (!stage.isConnected) return;
+    syncDesktopMobilePreviewHostTools(stage);
+  }, 72);
+}
+
+function postDesktopMobilePreviewCommand(stage = null, command = "", payload = {}) {
+  const frame = getDesktopMobilePreviewFrame(stage);
+  if (!frame?.contentWindow) return false;
+  try {
+    frame.contentWindow.postMessage({
+      type: MOBILE_PREVIEW_COMMAND_TYPE,
+      command: String(command || "").trim(),
+      payload: payload && typeof payload === "object" ? payload : {}
+    }, "*");
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function syncDesktopMobilePreviewEmbeddedWeather(stage, { syncScene = false } = {}) {
+  const previewWindow = getDesktopMobilePreviewFrameWindow(stage);
+  if (previewWindow) {
+    previewWindow.applyMobileWeatherTheme?.();
+    if (syncScene) {
+      previewWindow.applyMobileWeatherSceneMode?.();
+    }
+    previewWindow.scheduleEmbeddedMobilePreviewMetricsPush?.();
+    return true;
+  }
+  return postDesktopMobilePreviewCommand(stage, syncScene ? "sync-weather-and-scene" : "sync-weather");
+}
+
+function renderDesktopMobilePreviewHostToolsMarkup(stage) {
+  const previewState = getDesktopMobilePreviewState(stage);
+  const previewReady = Boolean(previewState?.ready);
+  const activeWeatherThemeDebug = loadMobileWeatherThemeDebugOverride();
+  const activeWeatherThemeDebugId = activeWeatherThemeDebug?.id || "auto";
+  const activeWeatherThemeCloudOverride = loadMobileWeatherThemeCloudOverride();
+  const activeWeatherThemePhase = loadMobileWeatherThemePhaseOverride();
+  const activeWeatherThemeSeason = loadMobileWeatherThemeSeasonOverride();
+  const activeWeatherThemeWindOverride = loadMobileWeatherThemeWindOverride();
+  const activeWeatherThemePrecipOverride = loadMobileWeatherThemePrecipOverride();
+  const activeWeatherThemeTemperatureOverride = loadMobileWeatherThemeTemperatureOverride();
+  const weatherSceneOnlyActive = loadMobileWeatherSceneOnlyPreference();
+  const effectiveWeatherWindSpeed = activeWeatherThemeWindOverride === null
+    ? (homeWeatherSnapshot
+      ? weatherWindSpeedKmh(homeWeatherSnapshot)
+      : weatherWindSpeedFallbackForCategory(activeWeatherThemeDebug?.wind || "calm"))
+    : activeWeatherThemeWindOverride;
+  const effectiveWeatherPrecipitationAmount = activeWeatherThemePrecipOverride === null
+    ? (homeWeatherSnapshot ? weatherPrecipitationMm(homeWeatherSnapshot) : 0)
+    : activeWeatherThemePrecipOverride;
+  const effectiveWeatherTemperature = activeWeatherThemeTemperatureOverride === null
+    ? (homeWeatherSnapshot ? (weatherTemperatureC(homeWeatherSnapshot) ?? 16) : 16)
+    : activeWeatherThemeTemperatureOverride;
+  const weatherWindDebugLabel = activeWeatherThemeWindOverride === null
+    ? `Auto · ${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`
+    : `${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`;
+  const weatherPrecipitationDebugLabel = activeWeatherThemePrecipOverride === null
+    ? `Auto · ${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`
+    : `${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`;
+  const weatherTemperatureDebugLabel = activeWeatherThemeTemperatureOverride === null
+    ? `Auto · ${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`
+    : `${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`;
+  const weatherBackgroundDebugText = previewState?.weatherBackgroundDebugText || "náhľad sa ešte načítava";
+  const { enabled: storedSoundEnabled, volume: storedSoundVolume } = readStoredMobileWeatherSoundState();
+  const audioDebugState = previewState?.audioDebugState || collectWeatherAudioDebugState({
+    enabled: storedSoundEnabled,
+    currentState: { masterVolume: storedSoundVolume }
+  }, {});
+  const audioVolume = Number.isFinite(Number(audioDebugState.currentState?.masterVolume))
+    ? Math.max(0, Math.min(1, Number(audioDebugState.currentState.masterVolume)))
+    : storedSoundVolume;
+  const audioEnabled = audioDebugState.enabled && storedSoundEnabled;
+  const audioStatus = !previewReady
+    ? "Náhľad sa ešte načítava."
+    : audioDebugState.supported === false
+      ? "Zvuk nie je podporovaný."
+      : !audioEnabled
+        ? "Zvuk je vypnutý."
+        : audioDebugState.running
+          ? "Zvuk hrá podľa aktuálneho počasia."
+          : audioDebugState.activated
+            ? "Zvuk je pripravený."
+            : "Ťukni na zapnutie zvuku.";
+  const weatherPanelOpen = activeWeatherThemeDebugId !== "auto"
+    || activeWeatherThemeCloudOverride !== ""
+    || activeWeatherThemePhase !== ""
+    || activeWeatherThemeSeason !== ""
+    || activeWeatherThemeWindOverride !== null
+    || activeWeatherThemePrecipOverride !== null
+    || activeWeatherThemeTemperatureOverride !== null
+    || weatherSceneOnlyActive;
+  const audioPanelOpen = audioEnabled || audioVolume < 0.999 || Boolean(audioDebugState.activated);
+
+  return `
+    <div class="mobile-preview-tools">
+      <details class="mobile-preview-tools__card"${weatherPanelOpen ? " open" : ""}>
+        <summary class="mobile-preview-tools__summary">Test počasia</summary>
+        <div class="mobile-preview-tools__body">
+          <button
+            class="mobile-preview-tools__toggle ${weatherSceneOnlyActive ? "is-active" : ""}"
+            type="button"
+            data-mobile-weather-scene-toggle="1"
+            aria-pressed="${weatherSceneOnlyActive ? "true" : "false"}"
+          >${weatherSceneOnlyActive ? "Čisté pozadie je zapnuté" : "Čisté pozadie"}</button>
+          <p class="mobile-preview-tools__note">${weatherSceneOnlyActive ? "Karty v náhľade sú skryté, aby bolo vidno celé pozadie." : "Skryje obsah v náhľade a nechá iba čisté pozadie."}</p>
+
+          <div class="mobile-preview-tools__label">Fáza dňa</div>
+          <div class="mobile-preview-tools__chips">
+            ${MOBILE_WEATHER_PHASE_DEBUG_OPTIONS.map((item) => `
+              <button
+                class="mobile-preview-tools__chip ${item.id === activeWeatherThemePhase ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-phase="${escapeAttribute(item.id)}"
+              >${escapeHtml(item.label)}</button>
+            `).join("")}
+          </div>
+
+          <div class="mobile-preview-tools__label">Sezóna</div>
+          <div class="mobile-preview-tools__chips">
+            ${MOBILE_WEATHER_SEASON_DEBUG_OPTIONS.map((item) => `
+              <button
+                class="mobile-preview-tools__chip ${item.id === activeWeatherThemeSeason ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-season="${escapeAttribute(item.id)}"
+              >${escapeHtml(item.label)}</button>
+            `).join("")}
+          </div>
+
+          <div class="mobile-preview-tools__label">Oblačnosť</div>
+          <div class="mobile-preview-tools__chips">
+            ${MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.map((item) => `
+              <button
+                class="mobile-preview-tools__chip ${item.id === activeWeatherThemeCloudOverride ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-cloud="${escapeAttribute(item.id)}"
+              >${escapeHtml(item.label)}</button>
+            `).join("")}
+          </div>
+
+          <div class="mobile-preview-tools__label">Javy</div>
+          <div class="mobile-preview-tools__chips">
+            ${MOBILE_WEATHER_THEME_DEBUG_OPTIONS.map((item) => `
+              <button
+                class="mobile-preview-tools__chip ${item.id === activeWeatherThemeDebugId ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-debug="${escapeAttribute(item.id)}"
+              >${escapeHtml(item.label)}</button>
+            `).join("")}
+          </div>
+
+          <div class="mobile-preview-tools__range-block">
+            <div class="mobile-preview-tools__range-head">
+              <span>Zrážky</span>
+              <span data-mobile-preview-precip-label>${escapeHtml(weatherPrecipitationDebugLabel)}</span>
+            </div>
+            <div class="mobile-preview-tools__range-actions">
+              <button
+                class="mobile-preview-tools__chip ${activeWeatherThemePrecipOverride === null ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-precip-auto="1"
+              >Auto</button>
+              <input
+                class="mobile-preview-tools__range"
+                type="range"
+                min="0"
+                max="12"
+                step="0.2"
+                value="${escapeAttribute(effectiveWeatherPrecipitationAmount.toFixed(1))}"
+                data-mobile-weather-precip-range
+                aria-label="Intenzita zrážok v milimetroch"
+              >
+            </div>
+          </div>
+
+          <div class="mobile-preview-tools__range-block">
+            <div class="mobile-preview-tools__range-head">
+              <span>Vietor</span>
+              <span data-mobile-preview-wind-label>${escapeHtml(weatherWindDebugLabel)}</span>
+            </div>
+            <div class="mobile-preview-tools__range-actions">
+              <button
+                class="mobile-preview-tools__chip ${activeWeatherThemeWindOverride === null ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-wind-auto="1"
+              >Auto</button>
+              <input
+                class="mobile-preview-tools__range"
+                type="range"
+                min="0"
+                max="70"
+                step="2"
+                value="${escapeAttribute(String(Math.round(effectiveWeatherWindSpeed)))}"
+                data-mobile-weather-wind-range
+                aria-label="Sila vetra v kilometroch za hodinu"
+              >
+            </div>
+          </div>
+
+          <div class="mobile-preview-tools__range-block">
+            <div class="mobile-preview-tools__range-head">
+              <span>Teplota</span>
+              <span data-mobile-preview-temp-label>${escapeHtml(weatherTemperatureDebugLabel)}</span>
+            </div>
+            <div class="mobile-preview-tools__range-actions">
+              <button
+                class="mobile-preview-tools__chip ${activeWeatherThemeTemperatureOverride === null ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-temp-auto="1"
+              >Auto</button>
+              <input
+                class="mobile-preview-tools__range"
+                type="range"
+                min="-15"
+                max="38"
+                step="1"
+                value="${escapeAttribute(String(Math.round(effectiveWeatherTemperature)))}"
+                data-mobile-weather-temp-range
+                aria-label="Teplota v stupňoch Celzia"
+              >
+            </div>
+          </div>
+
+          <p class="mobile-preview-tools__status">Debug: ${escapeHtml(weatherBackgroundDebugText)}</p>
+        </div>
+      </details>
+
+      <details class="mobile-preview-tools__card"${audioPanelOpen ? " open" : ""}>
+        <summary class="mobile-preview-tools__summary">Zvuky počasia</summary>
+        <div class="mobile-preview-tools__body">
+          <button
+            class="mobile-preview-tools__toggle ${audioEnabled ? "is-active" : ""}"
+            type="button"
+            data-mobile-preview-audio-toggle="1"
+            aria-pressed="${audioEnabled ? "true" : "false"}"
+          >${audioEnabled ? "Zvuk je zapnutý" : "Zapnúť zvuk"}</button>
+          <p class="mobile-preview-tools__note">${escapeHtml(audioStatus)}</p>
+          <div class="mobile-preview-tools__range-block">
+            <div class="mobile-preview-tools__range-head">
+              <span>Hlasitosť</span>
+              <span data-mobile-preview-audio-label>${escapeHtml(`${Math.round(audioVolume * 100)} %`)}</span>
+            </div>
+            <input
+              class="mobile-preview-tools__range"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value="${escapeAttribute(String(Math.round(audioVolume * 100)))}"
+              data-mobile-preview-audio-volume-range
+              aria-label="Hlasitosť zvukov počasia"
+            >
+          </div>
+          <div class="mobile-preview-tools__sound-block ${audioDebugState.timeLayerKeys.length ? "is-live" : ""}">
+            <div class="mobile-preview-tools__label">Loop času</div>
+            <div class="mobile-preview-tools__sound-chips">${renderWeatherAudioDebugChipList(audioDebugState.timeLayerKeys, "nič", {
+              activeItems: audioDebugState.timeLayerKeys
+            })}</div>
+          </div>
+          <div class="mobile-preview-tools__sound-block ${audioDebugState.weatherLayerKeys.length ? "is-live" : ""}">
+            <div class="mobile-preview-tools__label">Počasie</div>
+            <div class="mobile-preview-tools__sound-chips">${renderWeatherAudioDebugChipList(audioDebugState.weatherLayerKeys, "nič", {
+              activeItems: audioDebugState.weatherLayerKeys
+            })}</div>
+          </div>
+          <div class="mobile-preview-tools__sound-block ${audioDebugState.textureLayerKeys.length ? "is-live" : ""}">
+            <div class="mobile-preview-tools__label">Textúry</div>
+            <div class="mobile-preview-tools__sound-chips">${renderWeatherAudioDebugChipList(audioDebugState.textureLayerKeys, "nič", {
+              activeItems: audioDebugState.textureLayerKeys
+            })}</div>
+          </div>
+          <div class="mobile-preview-tools__sound-block ${audioDebugState.playingDetailKeys.length ? "is-live" : audioDebugState.allowedDetailKeys.length ? "is-ready" : ""}">
+            <div class="mobile-preview-tools__label">Všetky detaily</div>
+            <div class="mobile-preview-tools__sound-chips">${renderWeatherAudioDebugChipList(audioDebugState.allDetailKeys, "nič", {
+              activeItems: audioDebugState.allowedDetailKeys,
+              mutedItems: audioDebugState.blockedDetailKeys,
+              playingItems: audioDebugState.playingDetailKeys
+            })}</div>
+          </div>
+          <div class="mobile-preview-tools__sound-block ${audioDebugState.playingDetailKeys.length ? "is-live" : ""}">
+            <div class="mobile-preview-tools__label">Práve hrá</div>
+            <div class="mobile-preview-tools__sound-chips">${renderWeatherAudioDebugChipList(audioDebugState.playingDetailKeys, "zatiaľ nič", {
+              playingItems: audioDebugState.playingDetailKeys,
+              playing: true
+            })}</div>
+          </div>
+          ${audioDebugState.mutedReasons.length ? `<p class="mobile-preview-tools__status">${escapeHtml(audioDebugState.mutedReasons.join(" "))}</p>` : ""}
+        </div>
+      </details>
+    </div>
+  `;
+}
+
+function syncDesktopMobilePreviewHostTools(stage) {
+  const tools = stage?.querySelector("[data-mobile-preview-tools]");
+  if (!tools) return;
+  tools.innerHTML = renderDesktopMobilePreviewHostToolsMarkup(stage);
+}
+
+function handleDesktopMobilePreviewHostClick(event) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const stage = target.closest(".mobile-preview-stage");
+  const toolsRoot = target.closest("[data-mobile-preview-tools]");
+  if (!stage || !toolsRoot) return;
+
+  const button = target.closest("button");
+  if (!(button instanceof HTMLButtonElement)) return;
+
+  if (button.matches("[data-mobile-weather-debug]")) {
+    event.preventDefault();
+    saveMobileWeatherThemeDebugOverride(String(button.getAttribute("data-mobile-weather-debug") || "auto").trim() || "auto");
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+    return;
+  }
+
+  if (button.matches("[data-mobile-weather-cloud]")) {
+    event.preventDefault();
+    saveMobileWeatherThemeCloudOverride(String(button.getAttribute("data-mobile-weather-cloud") || "").trim());
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+    return;
+  }
+
+  if (button.matches("[data-mobile-weather-phase]")) {
+    event.preventDefault();
+    saveMobileWeatherThemePhaseOverride(String(button.getAttribute("data-mobile-weather-phase") || "").trim());
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+    return;
+  }
+
+  if (button.matches("[data-mobile-weather-season]")) {
+    event.preventDefault();
+    saveMobileWeatherThemeSeasonOverride(String(button.getAttribute("data-mobile-weather-season") || "").trim());
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+    return;
+  }
+
+  if (button.matches("[data-mobile-weather-precip-auto]")) {
+    event.preventDefault();
+    saveMobileWeatherThemePrecipOverride(null);
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+    return;
+  }
+
+  if (button.matches("[data-mobile-weather-wind-auto]")) {
+    event.preventDefault();
+    saveMobileWeatherThemeWindOverride(null);
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+    return;
+  }
+
+  if (button.matches("[data-mobile-weather-temp-auto]")) {
+    event.preventDefault();
+    saveMobileWeatherThemeTemperatureOverride(null);
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+    return;
+  }
+
+  if (button.matches("[data-mobile-weather-scene-toggle]")) {
+    event.preventDefault();
+    saveMobileWeatherSceneOnlyPreference(!loadMobileWeatherSceneOnlyPreference());
+    syncDesktopMobilePreviewEmbeddedWeather(stage, { syncScene: true });
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+    return;
+  }
+
+  if (button.matches("[data-mobile-preview-audio-toggle]")) {
+    event.preventDefault();
+    const previewWindow = getDesktopMobilePreviewFrameWindow(stage);
+    const { enabled } = readStoredMobileWeatherSoundState();
+    if (previewWindow?.weatherAudioEngine?.handleUserActivation) {
+      previewWindow.weatherAudioEngine.handleUserActivation();
+    }
+    if (typeof previewWindow?.setMobileWeatherSoundEnabled === "function") {
+      previewWindow.setMobileWeatherSoundEnabled(!enabled);
+    } else {
+      try {
+        localStorage.setItem(MOBILE_WEATHER_SOUND_KEY, !enabled ? "1" : "0");
+      } catch (error) {
+        // Keď je iframe ešte v nábehu, host si aspoň zapamätá posledné želanie.
+      }
+      postDesktopMobilePreviewCommand(stage, "set-audio-enabled", { enabled: !enabled });
+    }
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+  }
+}
+
+function handleDesktopMobilePreviewHostInput(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  const stage = target.closest(".mobile-preview-stage");
+  const toolsRoot = target.closest("[data-mobile-preview-tools]");
+  if (!stage || !toolsRoot) return;
+
+  if (target.matches("[data-mobile-weather-precip-range]")) {
+    const nextAmount = Math.max(0, Math.min(12, Math.round((Number(target.value) || 0) * 10) / 10));
+    saveMobileWeatherThemePrecipOverride(nextAmount);
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    postDesktopMobilePreviewCommand(stage, "set-weather-precip", { value: nextAmount });
+    const label = toolsRoot.querySelector("[data-mobile-preview-precip-label]");
+    if (label) {
+      label.textContent = `${nextAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(nextAmount)}`;
+    }
+    return;
+  }
+
+  if (target.matches("[data-mobile-weather-wind-range]")) {
+    const nextSpeed = Math.max(0, Math.min(70, Math.round(Number(target.value) || 0)));
+    saveMobileWeatherThemeWindOverride(nextSpeed);
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    postDesktopMobilePreviewCommand(stage, "set-weather-wind", { value: nextSpeed });
+    const label = toolsRoot.querySelector("[data-mobile-preview-wind-label]");
+    if (label) {
+      label.textContent = `${nextSpeed} km/h · ${mobileWeatherWindLabel(nextSpeed)}`;
+    }
+    return;
+  }
+
+  if (target.matches("[data-mobile-weather-temp-range]")) {
+    const nextTemp = Math.max(-15, Math.min(38, Math.round(Number(target.value) || 0)));
+    saveMobileWeatherThemeTemperatureOverride(nextTemp);
+    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    postDesktopMobilePreviewCommand(stage, "set-weather-temp", { value: nextTemp });
+    const label = toolsRoot.querySelector("[data-mobile-preview-temp-label]");
+    if (label) {
+      label.textContent = `${nextTemp} °C · ${mobileWeatherTemperatureBandLabel(nextTemp)}`;
+    }
+    return;
+  }
+
+  if (target.matches("[data-mobile-preview-audio-volume-range]")) {
+    const nextPercent = Math.max(0, Math.min(100, Math.round(Number(target.value) || 0)));
+    const previewWindow = getDesktopMobilePreviewFrameWindow(stage);
+    if (previewWindow?.weatherAudioEngine?.handleUserActivation) {
+      previewWindow.weatherAudioEngine.handleUserActivation();
+    }
+    if (typeof previewWindow?.setMobileWeatherSoundVolume === "function") {
+      previewWindow.setMobileWeatherSoundVolume(nextPercent / 100);
+    } else {
+      try {
+        localStorage.setItem(MOBILE_WEATHER_SOUND_VOLUME_KEY, String(nextPercent / 100));
+      } catch (error) {
+        // Host si odloží hlasitosť aj keď iframe ešte nie je pripravený.
+      }
+      postDesktopMobilePreviewCommand(stage, "set-audio-volume", { value: nextPercent / 100 });
+    }
+    const label = toolsRoot.querySelector("[data-mobile-preview-audio-label]");
+    if (label) {
+      label.textContent = `${nextPercent} %`;
+    }
+  }
+}
+
+function handleDesktopMobilePreviewHostChange(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  const stage = target.closest(".mobile-preview-stage");
+  const toolsRoot = target.closest("[data-mobile-preview-tools]");
+  if (!stage || !toolsRoot) return;
+  if (
+    target.matches("[data-mobile-weather-precip-range]")
+    || target.matches("[data-mobile-weather-wind-range]")
+    || target.matches("[data-mobile-weather-temp-range]")
+    || target.matches("[data-mobile-preview-audio-volume-range]")
+  ) {
+    syncDesktopMobilePreviewHostTools(stage);
+    scheduleDesktopMobilePreviewToolsRefresh(stage);
+  }
+}
+
 function normalizeMobileWeatherCloudDebugId(value = "") {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "partly-cloudy") return "cloudy";
@@ -892,19 +1811,24 @@ const MOBILE_WEATHER_SEASON_DEBUG_OPTIONS = [
 ];
 
 function isCompactAppShellViewport() {
-  if (typeof window === "undefined") return Boolean(mobilePreviewEnabled);
-  return Boolean(mobilePreviewEnabled) || window.innerWidth <= MOBILE_APP_SHELL_MAX_WIDTH;
+  if (typeof window === "undefined") return Boolean(mobilePreviewEnabled) || isEmbeddedMobilePreviewMode();
+  return isEmbeddedMobilePreviewMode() || window.innerWidth <= MOBILE_APP_SHELL_MAX_WIDTH;
 }
 
 function syncResponsiveAppShellClass() {
   if (typeof document === "undefined") return;
   document.body.classList.toggle("app-mobile-shell", isCompactAppShellViewport());
+  document.body.classList.toggle("app-mobile-preview-embedded", isEmbeddedMobilePreviewMode());
+  document.documentElement.classList.toggle("app-mobile-preview-embedded-root", isEmbeddedMobilePreviewMode());
+  syncToolbarAddMenuOverlayState();
   syncResponsiveToolbarButtonPlacement();
   syncMobileBottomNavPlacement();
   syncMobileWeatherMiniPlacement();
   applyMobileWeatherTheme();
   applyMobileWeatherSceneMode();
   syncMobileToolbarScrollState();
+  syncDesktopMobilePreviewHost();
+  scheduleEmbeddedMobilePreviewMetricsPush();
 }
 
 function syncMobileToolbarScrollState() {
@@ -919,9 +1843,9 @@ function syncMobileToolbarScrollState() {
 
 function syncMobilePreviewClass() {
   if (typeof document === "undefined") return;
-  document.body.classList.toggle("app-mobile-preview", Boolean(mobilePreviewEnabled));
+  document.body.classList.toggle("app-mobile-preview", shouldUseInlineMobilePreviewClass());
+  document.body.classList.toggle("app-mobile-preview-host", shouldUseDesktopMobilePreviewHost());
   syncResponsiveAppShellClass();
-  document.getElementById("mobile-preview-system-chrome")?.remove();
   const button = document.getElementById("toggle-mobile-preview");
   if (button) {
     const nextLabel = mobilePreviewEnabled ? "Desktop náhľad" : "Mobilný náhľad";
@@ -930,6 +1854,7 @@ function syncMobilePreviewClass() {
     button.setAttribute("aria-label", nextLabel);
     button.setAttribute("title", nextLabel);
     button.dataset.previewTarget = mobilePreviewEnabled ? "desktop" : "mobile";
+    button.hidden = isEmbeddedMobilePreviewMode();
   }
   syncMobileWeatherSoundButton();
 }
@@ -1031,6 +1956,7 @@ function syncMainMenuTouchScrollState() {
   if (typeof document === "undefined") return;
   const body = document.body;
   const isMainMenuMode = body.classList.contains("app-main-menu-mode");
+  const isFocusedMode = body.classList.contains("app-focused-mode");
   const hasBlockingOverlay = Boolean(
     detailModal?.open
     || journalOverlayRoot()
@@ -1038,6 +1964,7 @@ function syncMainMenuTouchScrollState() {
     || authGateRoot()
   );
   body.classList.toggle("app-main-menu-scroll-safe", isMainMenuMode && !hasBlockingOverlay);
+  body.classList.toggle("app-focused-scroll-safe", isFocusedMode && !hasBlockingOverlay);
 }
 
 function scheduleWalkMapResize(map) {
@@ -1335,6 +2262,7 @@ const undoDeleteEl = document.getElementById("undo-delete");
 const restoreResetEl = document.getElementById("restore-reset");
 const mainMenuQuickEl = document.getElementById("open-main-menu");
 const toolbarAddMenuEl = document.getElementById("toolbar-add-menu");
+const toolbarAddMenuPanelEl = toolbarAddMenuEl?.querySelector(".toolbar-add-menu__panel") || null;
 const addEntryQuickEl = document.getElementById("open-add-entry");
 const addCategoryQuickEl = document.getElementById("open-add-category");
 const worklogPanelToggleEl = document.getElementById("toggle-worklog-panel");
@@ -1354,6 +2282,7 @@ const utilityBarEl = document.querySelector(".utility-bar");
 const pageShellEl = document.querySelector(".page-shell");
 const heroWeatherWrapEl = document.querySelector(".hero__weather");
 const heroWeatherOriginalParentEl = heroWeatherWrapEl?.parentElement || null;
+const toolbarAddMenuPanelOriginalParentEl = toolbarAddMenuPanelEl?.parentElement || null;
 const mainMenuQuickOriginalParentEl = mainMenuQuickEl?.parentElement || null;
 const worklogQuickOriginalParentEl = worklogPanelToggleEl?.parentElement || null;
 const journalQuickOriginalParentEl = journalPanelToggleEl?.parentElement || null;
@@ -1361,12 +2290,20 @@ let lastDeleted = loadUndoState();
 const imageLightboxState = { images: [], index: 0, label: "Fotka" };
 let toolbarSearchQuery = "";
 let toolbarSearchLastResults = [];
+let toolbarAddMenuOverlayHostEl = null;
 
 wireStaticEvents();
 render();
 syncResponsiveAppShellClass();
-window.addEventListener("resize", syncResponsiveAppShellClass, { passive: true });
-window.addEventListener("scroll", syncMobileToolbarScrollState, { passive: true });
+window.addEventListener("resize", () => {
+  syncResponsiveAppShellClass();
+  positionToolbarAddMenuOverlay();
+}, { passive: true });
+window.addEventListener("scroll", () => {
+  syncMobileToolbarScrollState();
+  scheduleEmbeddedMobilePreviewMetricsPush();
+  positionToolbarAddMenuOverlay();
+}, { passive: true });
 scheduleImageBackgroundCleanup();
 hydrateStateFromFolderStorage().catch((error) => {
   console.warn("Dočasné diskové úložisko sa nepodarilo načítať.", error);
@@ -1379,6 +2316,57 @@ function closeToolbarAddMenu() {
   if (toolbarAddMenuEl?.open) {
     toolbarAddMenuEl.open = false;
   }
+  restoreToolbarAddMenuOverlay();
+}
+
+function ensureToolbarAddMenuOverlayHost() {
+  if (typeof document === "undefined") return null;
+  if (toolbarAddMenuOverlayHostEl?.isConnected) return toolbarAddMenuOverlayHostEl;
+  const host = document.createElement("div");
+  host.id = "toolbar-add-menu-overlay-host";
+  document.body.appendChild(host);
+  toolbarAddMenuOverlayHostEl = host;
+  return host;
+}
+
+function isMobileToolbarAddOverlayMode() {
+  return Boolean(document.body?.classList.contains("app-mobile-shell"));
+}
+
+function positionToolbarAddMenuOverlay() {
+  if (!toolbarAddMenuEl?.open || !toolbarAddMenuPanelEl || !isMobileToolbarAddOverlayMode()) return;
+  const host = ensureToolbarAddMenuOverlayHost();
+  if (!host) return;
+  const rect = toolbarAddMenuEl.getBoundingClientRect();
+  const top = Math.max(56, Math.round(rect.bottom + 8));
+  host.style.setProperty("--toolbar-add-overlay-top", `${top}px`);
+}
+
+function mountToolbarAddMenuOverlay() {
+  if (!toolbarAddMenuPanelEl || !toolbarAddMenuPanelOriginalParentEl || !isMobileToolbarAddOverlayMode()) return;
+  const host = ensureToolbarAddMenuOverlayHost();
+  if (!host) return;
+  positionToolbarAddMenuOverlay();
+  if (toolbarAddMenuPanelEl.parentElement !== host) {
+    host.appendChild(toolbarAddMenuPanelEl);
+  }
+  document.body.classList.add("app-toolbar-add-overlay-open");
+}
+
+function restoreToolbarAddMenuOverlay() {
+  if (!toolbarAddMenuPanelEl || !toolbarAddMenuPanelOriginalParentEl) return;
+  if (toolbarAddMenuPanelEl.parentElement !== toolbarAddMenuPanelOriginalParentEl) {
+    toolbarAddMenuPanelOriginalParentEl.appendChild(toolbarAddMenuPanelEl);
+  }
+  document.body?.classList.remove("app-toolbar-add-overlay-open");
+}
+
+function syncToolbarAddMenuOverlayState() {
+  if (!toolbarAddMenuEl?.open || !isMobileToolbarAddOverlayMode()) {
+    restoreToolbarAddMenuOverlay();
+    return;
+  }
+  mountToolbarAddMenuOverlay();
 }
 
 function openMainMenuView() {
@@ -2001,6 +2989,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
   const relationDisclosure = formEl?.querySelector("[data-relation-disclosure]") || null;
   const relationSummary = relationDisclosure?.querySelector("[data-relation-summary]") || null;
   let currentWeatherSnapshot = editingEntry?.weather || null;
+  let lastSyncedEntryType = initialEntryType;
   let walkGpsPoints = normalizeWalkGpsPoints(editingEntry?.walk?.gpsPoints);
   let walkStartedAt = String(editingEntry?.walk?.startedAt || walkGpsPoints[0]?.recordedAt || "").trim();
   let walkEndedAt = String(editingEntry?.walk?.endedAt || "").trim();
@@ -2018,6 +3007,31 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
   let walkGpsLiveEndMarker = null;
 
   const waitForNextPaint = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+  const autoJournalTitleForType = (entryTypeValue, weatherSnapshot = currentWeatherSnapshot || editingEntry?.weather || null) => journalAutoTitle(entryTypeValue, {
+    tags: formEl?.elements.tags?.value || editingEntry?.tags || "",
+    weatherCondition: weatherSnapshot?.condition || ""
+  });
+
+  const syncTitleAutoDerivedState = () => {
+    if (!titleInput) return;
+    const selectedType = String(formEl?.querySelector('input[name="entryType"]:checked')?.value || lastSyncedEntryType || initialEntryType || "note").trim() || "note";
+    const currentValue = String(titleInput.value || "").trim();
+    titleInput.dataset.autoDerived = String(!currentValue || currentValue === autoJournalTitleForType(selectedType));
+  };
+
+  const maybeSyncAutoDerivedTitle = (nextType, previousType = lastSyncedEntryType) => {
+    if (!titleInput) return;
+    const currentValue = String(titleInput.value || "").trim();
+    const previousAutoTitle = autoJournalTitleForType(previousType);
+    const nextAutoTitle = autoJournalTitleForType(nextType);
+    const isAutoDerived = titleInput.dataset.autoDerived === "true"
+      || !currentValue
+      || currentValue === previousAutoTitle;
+    if (!isAutoDerived) return;
+    titleInput.value = nextAutoTitle;
+    titleInput.dataset.autoDerived = "true";
+  };
 
   const stopWalkGpsTracking = ({ silent = false } = {}) => {
     if (walkGpsWatchId !== null && typeof navigator !== "undefined" && navigator.geolocation) {
@@ -2592,6 +3606,8 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
   const syncEntryTypeUi = () => {
     if (!formEl) return;
     const selectedType = String(formEl.querySelector('input[name="entryType"]:checked')?.value || editingEntry?.entryType || "note").trim() || "note";
+    maybeSyncAutoDerivedTitle(selectedType, lastSyncedEntryType);
+    lastSyncedEntryType = selectedType;
     const ui = journalEntryTypeUi(selectedType);
     const entryTypeTitleMap = {
       note: editingEntry ? "Upraviť zápis" : "Zápis",
@@ -2766,7 +3782,17 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
     });
   }
 
+  titleInput?.addEventListener("input", () => {
+    syncTitleAutoDerivedState();
+  });
+
   setEntryMode(defaultEntryMode);
+  if (titleInput) {
+    titleInput.dataset.autoDerived = String(
+      !String(titleInput.value || "").trim()
+      || String(titleInput.value || "").trim() === autoJournalTitleForType(initialEntryType, editingEntry?.weather || null)
+    );
+  }
   syncMoodPicker(editingEntry?.mood || "");
   syncEntryTypeUi();
   renderPreview();
@@ -2977,6 +4003,36 @@ function toolbarSearchElements() {
   };
 }
 
+function syncToolbarSearchOverlayPosition() {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const { wrap, results } = toolbarSearchElements();
+  if (!wrap || !results) return;
+  if (!document.body?.classList.contains("app-mobile-shell")) {
+    results.style.removeProperty("--toolbar-search-overlay-top");
+    results.style.removeProperty("--toolbar-search-overlay-left");
+    results.style.removeProperty("--toolbar-search-overlay-width");
+    return;
+  }
+
+  const rect = wrap.getBoundingClientRect();
+  const viewportWidth = Math.max(
+    Number(document.documentElement?.clientWidth) || 0,
+    Number(window.innerWidth) || 0,
+    320
+  );
+  const horizontalInset = 12;
+  const maxWidth = Math.max(180, viewportWidth - (horizontalInset * 2));
+  const nextWidth = Math.min(Math.max(Math.round(rect.width), 180), maxWidth);
+  const nextLeft = Math.min(
+    Math.max(horizontalInset, Math.round(rect.left)),
+    Math.max(horizontalInset, viewportWidth - horizontalInset - nextWidth)
+  );
+
+  results.style.setProperty("--toolbar-search-overlay-top", `${Math.round(rect.bottom + 8)}px`);
+  results.style.setProperty("--toolbar-search-overlay-left", `${nextLeft}px`);
+  results.style.setProperty("--toolbar-search-overlay-width", `${nextWidth}px`);
+}
+
 function clearToolbarSearch({ keepFocus = false } = {}) {
   const { wrap, input, results } = toolbarSearchElements();
   const clearButton = document.getElementById("toolbar-search-clear");
@@ -2987,6 +4043,9 @@ function clearToolbarSearch({ keepFocus = false } = {}) {
   if (results) {
     results.hidden = true;
     results.innerHTML = "";
+    results.style.removeProperty("--toolbar-search-overlay-top");
+    results.style.removeProperty("--toolbar-search-overlay-left");
+    results.style.removeProperty("--toolbar-search-overlay-width");
   }
   wrap?.classList.remove("is-open");
   if (!keepFocus) input?.blur();
@@ -3058,6 +4117,7 @@ function renderToolbarSearchResults() {
     results.hidden = false;
     results.innerHTML = `<div class="toolbar-search__empty">Nič som nenašla pre „${escapeHtml(query)}“.</div>`;
     wrap?.classList.add("is-open");
+    syncToolbarSearchOverlayPosition();
     return;
   }
 
@@ -3072,6 +4132,7 @@ function renderToolbarSearchResults() {
     </button>
   `).join("");
   wrap?.classList.add("is-open");
+  syncToolbarSearchOverlayPosition();
 
   results.querySelectorAll("[data-toolbar-search-id]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3173,6 +4234,19 @@ function ensureToolbarSearch() {
 
   if (input) input.value = toolbarSearchQuery;
   if (clearButton) clearButton.hidden = !toolbarSearchQuery.trim();
+  if (document.body?.dataset.toolbarSearchOverlayBound !== "true") {
+    document.body.dataset.toolbarSearchOverlayBound = "true";
+    window.addEventListener("resize", () => {
+      const { results } = toolbarSearchElements();
+      if (!results || results.hidden) return;
+      syncToolbarSearchOverlayPosition();
+    });
+    window.addEventListener("scroll", () => {
+      const { results } = toolbarSearchElements();
+      if (!results || results.hidden) return;
+      syncToolbarSearchOverlayPosition();
+    }, { passive: true });
+  }
   if (group && group.dataset.mobileSearchTapBound !== "true") {
     group.dataset.mobileSearchTapBound = "true";
     group.addEventListener("click", (event) => {
@@ -3205,6 +4279,13 @@ function wireStaticEvents() {
   const settingsPanelToggleEl = ensureSettingsToolbarButton();
   const mobilePreviewToggleEl = ensureMobilePreviewButton();
   const mobileWeatherSoundToggleEl = ensureMobileWeatherSoundButton();
+
+  if (document.body?.dataset.mobilePreviewHostBound !== "true") {
+    document.body.dataset.mobilePreviewHostBound = "true";
+    window.addEventListener("message", handleDesktopMobilePreviewMessage);
+    window.addEventListener("message", handleEmbeddedMobilePreviewCommand);
+    window.addEventListener("weatheraudio:statechange", scheduleEmbeddedMobilePreviewMetricsPush);
+  }
 
   document.querySelectorAll(".filter").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3243,6 +4324,14 @@ function wireStaticEvents() {
 
   if (mainMenuQuickEl) {
     mainMenuQuickEl.addEventListener("click", openMainMenuView);
+  }
+
+  if (toolbarAddMenuEl && toolbarAddMenuEl.dataset.overlayBound !== "true") {
+    toolbarAddMenuEl.dataset.overlayBound = "true";
+    toolbarAddMenuEl.addEventListener("toggle", () => {
+      syncToolbarAddMenuOverlayState();
+      positionToolbarAddMenuOverlay();
+    });
   }
 
   if (addEntryQuickEl) {
@@ -3309,6 +4398,7 @@ function wireStaticEvents() {
   document.addEventListener("click", (event) => {
     if (!toolbarAddMenuEl?.open) return;
     if (event.target.closest("#toolbar-add-menu")) return;
+    if (event.target.closest("#toolbar-add-menu-overlay-host")) return;
     closeToolbarAddMenu();
   });
 
@@ -3545,20 +4635,189 @@ function render() {
   syncAuthGate();
   reconcileBodyScrollState();
   syncMainMenuTouchScrollState();
+  scheduleEmbeddedMobilePreviewMetricsPush();
 }
 
 function renderMainMenu() {
   const grouped = groupedCategories();
   const roots = grouped.map(({ root }) => root);
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const isEmbeddedMobilePreview = typeof document !== "undefined" && document.body.classList.contains("app-mobile-preview-embedded");
+  const showMobileWeatherDebugPanel = isMobileShell && !isEmbeddedMobilePreview;
+  const activeWeatherThemeDebug = loadMobileWeatherThemeDebugOverride();
+  const activeWeatherThemeDebugId = activeWeatherThemeDebug?.id || "auto";
+  const activeWeatherThemeCloudOverride = loadMobileWeatherThemeCloudOverride();
+  const activeWeatherThemePhase = loadMobileWeatherThemePhaseOverride();
+  const activeWeatherThemeSeason = loadMobileWeatherThemeSeasonOverride();
+  const activeWeatherThemeWindOverride = loadMobileWeatherThemeWindOverride();
+  const activeWeatherThemePrecipOverride = loadMobileWeatherThemePrecipOverride();
+  const activeWeatherThemeTemperatureOverride = loadMobileWeatherThemeTemperatureOverride();
+  let weatherSceneOnlyActive = loadMobileWeatherSceneOnlyPreference();
+  const effectiveWeatherWindSpeed = activeWeatherThemeWindOverride === null
+    ? (homeWeatherSnapshot
+      ? weatherWindSpeedKmh(homeWeatherSnapshot)
+      : weatherWindSpeedFallbackForCategory(activeWeatherThemeDebug?.wind || "calm"))
+    : activeWeatherThemeWindOverride;
+  const effectiveWeatherPrecipitationAmount = activeWeatherThemePrecipOverride === null
+    ? (homeWeatherSnapshot ? weatherPrecipitationMm(homeWeatherSnapshot) : 0)
+    : activeWeatherThemePrecipOverride;
+  const effectiveWeatherTemperature = activeWeatherThemeTemperatureOverride === null
+    ? (homeWeatherSnapshot ? (weatherTemperatureC(homeWeatherSnapshot) ?? 16) : 16)
+    : activeWeatherThemeTemperatureOverride;
+  const weatherWindDebugLabel = activeWeatherThemeWindOverride === null
+    ? `Auto · ${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`
+    : `${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`;
+  const weatherPrecipitationDebugLabel = activeWeatherThemePrecipOverride === null
+    ? `Auto · ${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`
+    : `${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`;
+  const weatherTemperatureDebugLabel = activeWeatherThemeTemperatureOverride === null
+    ? `Auto · ${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`
+    : `${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`;
+  const weatherBackgroundDebugState = typeof window !== "undefined" && window.weatherBackgroundEngine?.getDebugState
+    ? window.weatherBackgroundEngine.getDebugState()
+    : null;
+  const weatherBackgroundDebugText = formatWeatherBackgroundDebugText(weatherBackgroundDebugState);
+  const weatherAudioDebugMarkup = showMobileWeatherDebugPanel
+    ? renderWeatherAudioDebugMarkup(typeof window !== "undefined" && window.weatherAudioEngine?.getState
+      ? window.weatherAudioEngine.getState()
+      : null)
+    : "";
   if (typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell") && loadMobileWeatherSceneOnlyPreference()) {
     saveMobileWeatherSceneOnlyPreference(false);
   }
+  weatherSceneOnlyActive = loadMobileWeatherSceneOnlyPreference();
   applyMobileWeatherSceneMode();
   mainMenuEl.innerHTML = `
     <section class="menu-group">
       <div class="home-section__header">
       <div></div>
       </div>
+      ${showMobileWeatherDebugPanel ? `
+        <details class="weather-theme-debug"${activeWeatherThemeDebugId !== "auto" || activeWeatherThemeCloudOverride !== "" || activeWeatherThemePhase !== "" || activeWeatherThemeSeason !== "" || activeWeatherThemeWindOverride !== null || activeWeatherThemePrecipOverride !== null || activeWeatherThemeTemperatureOverride !== null || weatherSceneOnlyActive ? " open" : ""}>
+          <summary class="weather-theme-debug__summary">Test počasia</summary>
+          <div class="weather-theme-debug__scene">
+            <button
+              class="weather-theme-debug__scene-button ${weatherSceneOnlyActive ? "is-active" : ""}"
+              type="button"
+              data-mobile-weather-scene-toggle="1"
+              aria-pressed="${weatherSceneOnlyActive ? "true" : "false"}"
+            >${weatherSceneOnlyActive ? "Čisté pozadie je zapnuté" : "Čisté pozadie"}</button>
+            <p class="weather-theme-debug__scene-note" data-mobile-weather-scene-note>${weatherSceneOnlyActive ? "Karty a ďalší obsah sú skryté, aby bolo vidno celé pozadie." : "Dočasne skryje karty a obsah, aby si vedela odfotiť celé pozadie."}</p>
+          </div>
+          <div class="weather-theme-debug__period">
+            ${MOBILE_WEATHER_PHASE_DEBUG_OPTIONS.map((item) => `
+              <button class="weather-theme-debug__mode ${item.id === activeWeatherThemePhase ? "is-active" : ""}" type="button" data-mobile-weather-phase="${escapeAttribute(item.id)}">${escapeHtml(item.label)}</button>
+            `).join("")}
+          </div>
+          <div class="weather-theme-debug__section-label">Sezóna</div>
+          <div class="weather-theme-debug__chips">
+            ${MOBILE_WEATHER_SEASON_DEBUG_OPTIONS.map((item) => `
+              <button
+                class="weather-theme-debug__chip ${item.id === activeWeatherThemeSeason ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-season="${escapeAttribute(item.id)}"
+              >${escapeHtml(item.label)}</button>
+            `).join("")}
+          </div>
+          <div class="weather-theme-debug__section-label">Oblačnosť</div>
+          <div class="weather-theme-debug__chips">
+            ${MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.map((item) => `
+              <button
+                class="weather-theme-debug__chip ${item.id === activeWeatherThemeCloudOverride ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-cloud="${escapeAttribute(item.id)}"
+              >${escapeHtml(item.label)}</button>
+            `).join("")}
+          </div>
+          <div class="weather-theme-debug__section-label">Javy</div>
+          <div class="weather-theme-debug__chips">
+            ${MOBILE_WEATHER_THEME_DEBUG_OPTIONS.map((item) => `
+              <button
+                class="weather-theme-debug__chip ${item.id === activeWeatherThemeDebugId ? "is-active" : ""}"
+                type="button"
+                data-mobile-weather-debug="${escapeAttribute(item.id)}"
+              >${escapeHtml(item.label)}</button>
+            `).join("")}
+          </div>
+          <div class="weather-theme-debug__wind weather-theme-debug__wind--precip">
+            <div class="weather-theme-debug__wind-head">
+              <span class="weather-theme-debug__wind-caption">Zrážky</span>
+              <span class="weather-theme-debug__wind-value" data-mobile-weather-precip-label>${escapeHtml(weatherPrecipitationDebugLabel)}</span>
+            </div>
+            <div class="weather-theme-debug__wind-controls">
+              <button class="weather-theme-debug__mode ${activeWeatherThemePrecipOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-precip-auto="1">Auto</button>
+              <input
+                class="weather-theme-debug__range weather-theme-debug__range--precip"
+                type="range"
+                min="0"
+                max="12"
+                step="0.2"
+                value="${escapeAttribute(effectiveWeatherPrecipitationAmount.toFixed(1))}"
+                data-mobile-weather-precip-range
+                aria-label="Intenzita zrážok v milimetroch"
+              >
+            </div>
+            <div class="weather-theme-debug__scale" aria-hidden="true">
+              <span>0</span>
+              <span>2</span>
+              <span>6</span>
+              <span>12 mm</span>
+            </div>
+          </div>
+          <div class="weather-theme-debug__wind">
+            <div class="weather-theme-debug__wind-head">
+              <span class="weather-theme-debug__wind-caption">Vietor</span>
+              <span class="weather-theme-debug__wind-value" data-mobile-weather-wind-label>${escapeHtml(weatherWindDebugLabel)}</span>
+            </div>
+            <div class="weather-theme-debug__wind-controls">
+              <button class="weather-theme-debug__mode ${activeWeatherThemeWindOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-wind-auto="1">Auto</button>
+              <input
+                class="weather-theme-debug__range"
+                type="range"
+                min="0"
+                max="70"
+                step="2"
+                value="${escapeAttribute(Math.round(effectiveWeatherWindSpeed))}"
+                data-mobile-weather-wind-range
+                aria-label="Sila vetra v kilometroch za hodinu"
+              >
+            </div>
+            <div class="weather-theme-debug__scale" aria-hidden="true">
+              <span>0</span>
+              <span>20</span>
+              <span>40</span>
+              <span>70 km/h</span>
+            </div>
+          </div>
+          <div class="weather-theme-debug__wind weather-theme-debug__wind--temp">
+            <div class="weather-theme-debug__wind-head">
+              <span class="weather-theme-debug__wind-caption">Teplota</span>
+              <span class="weather-theme-debug__wind-value" data-mobile-weather-temp-label>${escapeHtml(weatherTemperatureDebugLabel)}</span>
+            </div>
+            <div class="weather-theme-debug__wind-controls">
+              <button class="weather-theme-debug__mode ${activeWeatherThemeTemperatureOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-temp-auto="1">Auto</button>
+              <input
+                class="weather-theme-debug__range"
+                type="range"
+                min="-15"
+                max="38"
+                step="1"
+                value="${escapeAttribute(String(Math.round(effectiveWeatherTemperature)))}"
+                data-mobile-weather-temp-range
+                aria-label="Teplota v stupňoch Celzia"
+              >
+            </div>
+            <div class="weather-theme-debug__scale" aria-hidden="true">
+              <span>-15</span>
+              <span>0</span>
+              <span>20</span>
+              <span>38 °C</span>
+            </div>
+          </div>
+          <p class="weather-theme-debug__inline-state" data-mobile-weather-inline-state style="margin:10px 0 0; padding:8px 10px; border-radius:14px; background:rgba(16,22,30,.08); color:#314233; font-size:12px; line-height:1.35; word-break:break-word;">Debug: ${escapeHtml(weatherBackgroundDebugText)}</p>
+        </details>
+        ${weatherAudioDebugMarkup}
+      ` : ""}
       <div class="catalog-grid catalog-grid--main-menu">
         ${roots.map(renderMainMenuCategoryCard).join("")}
       </div>
@@ -3831,6 +5090,10 @@ function ensureSettingsToolbarButton() {
 }
 
 function ensureMobilePreviewButton() {
+  if (isEmbeddedMobilePreviewMode()) {
+    document.getElementById("toggle-mobile-preview")?.remove();
+    return null;
+  }
   const toolbarSlot = document.getElementById("menu-toolbar-settings-slot") || document.querySelector(".utility-bar__settings");
   if (!toolbarSlot) return null;
   const mobilePrimaryGroup = document.querySelector(".menu-toolbar__group--primary");
@@ -3937,6 +5200,7 @@ function setMobileWeatherSoundEnabled(enabled, { persist = true } = {}) {
   syncMobileWeatherSoundButton();
   updateMainMenuWeatherAudioDebugPanel();
   syncMainMenuWeatherAudioControls();
+  scheduleEmbeddedMobilePreviewMetricsPush();
 }
 
 function setMobileWeatherSoundVolume(value, { persist = true } = {}) {
@@ -3951,6 +5215,7 @@ function setMobileWeatherSoundVolume(value, { persist = true } = {}) {
   window.weatherAudioEngine?.setMasterVolume?.(mobileWeatherSoundVolume);
   updateMainMenuWeatherAudioDebugPanel();
   syncMainMenuWeatherAudioControls();
+  scheduleEmbeddedMobilePreviewMetricsPush();
 }
 
 function syncResponsiveToolbarButtonPlacement() {
@@ -3969,6 +5234,10 @@ function mobileBottomNavMarkup() {
     <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="tasks">
       <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--tasks" aria-hidden="true"></span>
       <span class="mobile-bottom-nav__label">Úlohy</span>
+    </button>
+    <button class="mobile-bottom-nav__button mobile-bottom-nav__button--camera" type="button" data-mobile-bottom-nav="camera">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--camera" aria-hidden="true"></span>
+      <span class="mobile-bottom-nav__label">Foťák</span>
     </button>
     <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="journal">
       <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--journal" aria-hidden="true"></span>
@@ -4012,6 +5281,10 @@ function runMobileBottomNavAction(action = "") {
       openTaskManager();
       return;
     }
+    if (normalizedAction === "camera") {
+      openMobileCameraPicker();
+      return;
+    }
     if (normalizedAction === "journal") {
       forceOpenJournalManager();
     }
@@ -4034,14 +5307,19 @@ function bindMobileBottomNav(slot) {
 function ensureMobileBottomNavHostSlot(host, { id, className = "" } = {}) {
   if (!host) return null;
   let slot = id ? host.querySelector(`#${id}`) : host.querySelector(".mobile-bottom-nav");
+  const nextMarkup = mobileBottomNavMarkup();
   if (!slot) {
     slot = document.createElement("nav");
     slot.className = `mobile-bottom-nav ${className}`.trim();
     if (id) slot.id = id;
     slot.setAttribute("aria-label", "Spodná mobilná navigácia");
-    slot.innerHTML = mobileBottomNavMarkup();
+    slot.innerHTML = nextMarkup;
   } else if (className) {
     slot.className = `mobile-bottom-nav ${className}`.trim();
+  }
+
+  if (slot.innerHTML.trim() !== nextMarkup.trim()) {
+    slot.innerHTML = nextMarkup;
   }
 
   if (slot.parentElement !== host) {
@@ -4111,7 +5389,9 @@ function syncMobileBottomNavPlacement() {
     if (journalPanelToggleEl && journalQuickOriginalParentEl && journalPanelToggleEl.parentElement !== journalQuickOriginalParentEl) {
       journalQuickOriginalParentEl.appendChild(journalPanelToggleEl);
     }
+    document.getElementById("mobile-camera-fab-shell")?.remove();
     ensureMobileBottomNavSlot();
+    ensureMobileCameraPicker();
     syncMobileOverlayBottomNavPlacement();
     return;
   }
@@ -4133,7 +5413,192 @@ function syncMobileBottomNavPlacement() {
     }
   }
   document.getElementById("mobile-bottom-nav")?.remove();
+  document.getElementById("mobile-camera-fab-shell")?.remove();
+  document.getElementById("mobile-camera-picker-host")?.remove();
   syncMobileOverlayBottomNavPlacement();
+}
+
+function lastSuggestedJournalPlace() {
+  const latestPlaceEntry = normalizedJournalList().find((entry) => String(entry?.place || "").trim());
+  if (latestPlaceEntry?.place) {
+    return String(latestPlaceEntry.place || "").trim();
+  }
+  const weatherPreferences = loadWeatherPreferences();
+  const shortWeatherPlace = String(weatherPreferences?.placeLabel || "").split(",")[0].trim();
+  return shortWeatherPlace || "";
+}
+
+function ensureMobileCameraPicker() {
+  if (typeof document === "undefined") return null;
+  let host = document.getElementById("mobile-camera-picker-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "mobile-camera-picker-host";
+    host.hidden = true;
+    host.setAttribute("aria-hidden", "true");
+    host.innerHTML = `
+      <input id="mobile-camera-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" capture="environment" hidden>
+    `;
+    document.body.appendChild(host);
+  }
+
+  if (host.parentElement !== document.body) {
+    document.body.appendChild(host);
+  }
+
+  if (host.dataset.bound !== "true") {
+    host.dataset.bound = "true";
+    const input = host.querySelector("#mobile-camera-input");
+    input?.addEventListener("change", () => {
+      const file = Array.from(input.files || []).find((item) => item instanceof File && item.size) || null;
+      input.value = "";
+      if (!file) return;
+      openQuickPhotoEntryFlow(file);
+    });
+  }
+
+  return host.querySelector("#mobile-camera-input");
+}
+
+function openMobileCameraPicker() {
+  const input = ensureMobileCameraPicker();
+  input?.click();
+}
+
+function openQuickPhotoEntryFlow(photoFile) {
+  if (!(photoFile instanceof File) || !photoFile.size) return;
+
+  const previewUrl = URL.createObjectURL(photoFile);
+  const suggestedPlace = lastSuggestedJournalPlace();
+  const defaultEntryType = "note";
+  let currentWeatherSnapshot = homeWeatherSnapshot || null;
+
+  resetDetailModalClasses();
+  detailModal.classList.add("detail-modal--editor", "detail-modal--photo-quick");
+  detailContent.innerHTML = `
+    <div class="detail-layout detail-layout--compact detail-layout--photo-quick-layout">
+      <div class="detail-copy detail-copy--wide detail-copy--editor photo-quick-sheet">
+        <div class="detail-copy__headline photo-quick-sheet__headline">
+          <div class="photo-quick-sheet__headline-copy">
+            <p class="eyebrow">Rýchly fotozápis</p>
+            <h3>Pridať moment</h3>
+            <p>Fotka je pripravená. Doplň len krátku poznámku, typ a miesto.</p>
+          </div>
+          <div class="detail-copy__actions">
+            <button class="button" type="submit" form="quick-photo-entry-form">Uložiť</button>
+          </div>
+        </div>
+        <form id="quick-photo-entry-form" class="detail-form detail-form--editor photo-quick-sheet__form">
+          <div class="photo-quick-sheet__media">
+            <img src="${escapeAttribute(previewUrl)}" alt="Nová fotka do denníka">
+          </div>
+          <div class="photo-quick-sheet__weather" id="quick-photo-weather" hidden></div>
+          <div class="photo-quick-sheet__core">
+            <div class="journal-entry-type-field photo-quick-sheet__type">
+              <p class="journal-entry-type-field__label">Typ zápisu</p>
+              <div class="choice-group choice-group--compact-meta choice-group--journal-entry-type">
+                ${singleChoiceChipOptions("entryType", JOURNAL_ENTRY_TYPE_OPTIONS, defaultEntryType)}
+              </div>
+            </div>
+            <label class="field-block field-block--full photo-quick-sheet__field">
+              <span>Poznámka</span>
+              <textarea name="text" rows="3" placeholder="Krátko, čo sa stalo alebo čo si si všimla..."></textarea>
+            </label>
+            <label class="field-block field-block--full photo-quick-sheet__field">
+              <span>Miesto</span>
+              <input name="place" type="text" placeholder="Miesto zápisu" value="${escapeAttribute(suggestedPlace)}">
+              <div class="journal-tag-picker" data-journal-place-picker hidden></div>
+            </label>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const formEl = document.getElementById("quick-photo-entry-form");
+  const placeInput = formEl?.elements.place;
+  const weatherMountEl = document.getElementById("quick-photo-weather");
+  const textInput = formEl?.elements.text;
+
+  const cleanupQuickPhotoFlow = () => {
+    URL.revokeObjectURL(previewUrl);
+  };
+
+  detailModal.addEventListener("close", cleanupQuickPhotoFlow, { once: true });
+
+  const renderWeatherSummary = (snapshot) => {
+    if (!weatherMountEl) return;
+    if (!snapshot) {
+      weatherMountEl.hidden = true;
+      weatherMountEl.innerHTML = "";
+      return;
+    }
+    weatherMountEl.hidden = false;
+    const shortPlace = String(snapshot.placeLabel || "").split(",")[0].trim() || snapshot.placeLabel || "Počasie";
+    const observed = String(snapshot.observedAt || "").trim();
+    weatherMountEl.innerHTML = `
+      <div class="photo-quick-sheet__weather-card">
+        <span class="photo-quick-sheet__weather-icon" aria-hidden="true">${escapeHtml(weatherIconSymbol(snapshot))}</span>
+        <div class="photo-quick-sheet__weather-copy">
+          <strong>${escapeHtml([snapshot.temperature, snapshot.condition].filter(Boolean).join(" • ") || "Počasie sa doplnilo automaticky")}</strong>
+          <span>${escapeHtml([shortPlace, observed].filter(Boolean).join(" • "))}</span>
+        </div>
+      </div>
+    `;
+  };
+
+  const fillWeatherSnapshot = async () => {
+    currentWeatherSnapshot = homeWeatherSnapshot || await loadHomeWeatherSnapshot().catch(() => null);
+    renderWeatherSummary(currentWeatherSnapshot);
+  };
+
+  setupJournalPlaceInput(formEl);
+
+  if (textInput) {
+    textInput.focus();
+  }
+
+  fillWeatherSnapshot().catch(() => {});
+
+  formEl?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(formEl);
+    const selectedEntryType = String(form.get("entryType") || defaultEntryType).trim() || defaultEntryType;
+    const optimizedImage = await fileToOptimizedDataUrl(photoFile, 720, 0.72);
+    const linkedCategoryIds = activeCategoryId ? normalizeIdList([activeCategoryId]) : [];
+    const linkedCategoryId = linkedCategoryIds[0] || "";
+    const weatherSnapshot = currentWeatherSnapshot || homeWeatherSnapshot || await loadHomeWeatherSnapshot().catch(() => null);
+    const entry = normalizeJournalEntry({
+      id: makeId("journal"),
+      title: journalAutoTitle(selectedEntryType, {
+        weatherCondition: weatherSnapshot?.condition || ""
+      }),
+      date: stampJournalDate(todayISO(), currentTimeValue()),
+      text: String(form.get("text") || "").trim(),
+      images: [optimizedImage],
+      image: optimizedImage,
+      entryType: selectedEntryType,
+      tags: [],
+      linkedCategoryIds,
+      linkedCategoryId,
+      linkedVarietyId: "",
+      mood: "",
+      place: String(form.get("place") || "").trim(),
+      weather: weatherSnapshot
+    }, state.varieties);
+
+    state.journal.unshift(entry);
+    if (!persist()) {
+      state.journal = state.journal.filter((item) => item.id !== entry.id);
+      return;
+    }
+    render();
+    if (detailModal?.open && typeof detailModal.close === "function") {
+      detailModal.close();
+    }
+  });
+
+  openDetailModalDialog();
 }
 
 function ensureMobileWeatherToolbarSlot() {
@@ -5132,7 +6597,8 @@ function renderWeatherAudioDebugChipList(items = [], emptyLabel = "nič", option
   }).join("");
 }
 
-function renderWeatherAudioDebugMarkup(audioState = null) {
+function collectWeatherAudioDebugState(audioState = null, soundscapeConfig = null) {
+  const normalizedConfig = soundscapeConfig || {};
   const supported = audioState?.supported !== false;
   const enabled = audioState?.enabled !== false;
   const activated = Boolean(audioState?.activated);
@@ -5140,12 +6606,11 @@ function renderWeatherAudioDebugMarkup(audioState = null) {
   const evaluation = audioState?.evaluation || null;
   const activeMix = audioState?.activeMix || null;
   const currentState = audioState?.currentState || {};
-  const soundscapeConfig = typeof window !== "undefined" ? window.weatherAudioConfig?.soundscapeConfig || {} : {};
   const activeLayerKeys = Object.keys(activeMix?.activeLayers || {});
-  const timeLayerKeys = activeLayerKeys.filter((key) => Boolean(soundscapeConfig.timeLayers?.[key]));
-  const weatherLayerKeys = activeLayerKeys.filter((key) => Boolean(soundscapeConfig.weatherLayers?.[key]));
-  const textureLayerKeys = activeLayerKeys.filter((key) => Boolean(soundscapeConfig.textureLayers?.[key]));
-  const allDetailKeys = Object.entries(soundscapeConfig.detailEvents || {})
+  const timeLayerKeys = activeLayerKeys.filter((key) => Boolean(normalizedConfig.timeLayers?.[key]));
+  const weatherLayerKeys = activeLayerKeys.filter((key) => Boolean(normalizedConfig.weatherLayers?.[key]));
+  const textureLayerKeys = activeLayerKeys.filter((key) => Boolean(normalizedConfig.textureLayers?.[key]));
+  const allDetailKeys = Object.entries(normalizedConfig.detailEvents || {})
     .filter(([, detail]) => (detail?.chance ?? 1) > 0)
     .map(([detailKey]) => detailKey);
   const playingDetailKeys = Array.isArray(audioState?.playingDetails) ? audioState.playingDetails.filter(Boolean) : [];
@@ -5174,6 +6639,48 @@ function renderWeatherAudioDebugMarkup(audioState = null) {
   if (currentState.timeOfDay) metaParts.push(mobileWeatherAudioLabel(currentState.timeOfDay));
   if (currentState.weather) metaParts.push(mobileWeatherAudioLabel(currentState.weather));
   if (currentState.temperatureBand) metaParts.push(mobileWeatherAudioLabel(currentState.temperatureBand));
+
+  return {
+    supported,
+    enabled,
+    activated,
+    running,
+    evaluation,
+    activeMix,
+    currentState,
+    activeLayerKeys,
+    timeLayerKeys,
+    weatherLayerKeys,
+    textureLayerKeys,
+    allDetailKeys,
+    playingDetailKeys,
+    allowedDetailKeys,
+    blockedDetailKeys,
+    mutedReasons,
+    statusLabel,
+    statusClass,
+    masterVolume,
+    masterVolumePercent,
+    metaParts
+  };
+}
+
+function renderWeatherAudioDebugMarkup(audioState = null) {
+  const soundscapeConfig = typeof window !== "undefined" ? window.weatherAudioConfig?.soundscapeConfig || {} : {};
+  const {
+    timeLayerKeys,
+    weatherLayerKeys,
+    textureLayerKeys,
+    allDetailKeys,
+    playingDetailKeys,
+    allowedDetailKeys,
+    blockedDetailKeys,
+    mutedReasons,
+    statusLabel,
+    statusClass,
+    masterVolumePercent,
+    metaParts
+  } = collectWeatherAudioDebugState(audioState, soundscapeConfig);
   return `
     <section class="weather-audio-debug" data-mobile-weather-audio-panel>
       <div class="weather-audio-debug__header">
@@ -6339,6 +7846,7 @@ function applyMobileWeatherTheme(snapshot = null) {
     window.weatherBackgroundEngine?.clear?.();
     window.weatherAudioEngine?.clear?.();
     syncMobileWeatherSoundButton();
+    scheduleEmbeddedMobilePreviewMetricsPush();
     return;
   }
 
@@ -6475,6 +7983,7 @@ function applyMobileWeatherTheme(snapshot = null) {
   }
   syncMobileWeatherSoundButton();
   syncMainMenuWeatherAudioControls();
+  scheduleEmbeddedMobilePreviewMetricsPush();
 }
 
 function weatherIllustrationMarkup(weather) {
@@ -8187,6 +9696,7 @@ function latestJournalImages() {
 function renderMemories() {
   if (!memoryStripEl) return;
   const memoryItems = latestJournalImages();
+  const totalJournalEntries = Array.isArray(state.journal) ? state.journal.length : 0;
 
   if (memoryCarouselIndex >= memoryItems.length) {
     memoryCarouselIndex = 0;
@@ -8243,6 +9753,9 @@ function renderMemories() {
 
   const openAllJournalButton = document.getElementById("open-all-journal-from-memories");
   if (openAllJournalButton) {
+    openAllJournalButton.textContent = totalJournalEntries
+      ? `Zobraziť všetky zápisy (${totalJournalEntries})`
+      : "Otvoriť denník";
     openAllJournalButton.onclick = () => {
       forceOpenJournalManager();
       return false;

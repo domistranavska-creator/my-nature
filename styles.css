@@ -15344,6 +15344,659 @@ body.app-detail-locked {
   cursor: pointer;
 }
 
+body.app-mobile-preview-host {
+  overflow: hidden !important;
+}
+
+html:has(body.app-mobile-preview-host) {
+  overflow: hidden !important;
+}
+
+html.app-mobile-preview-embedded-root,
+html:has(body.app-mobile-preview-embedded) {
+  overflow-x: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  scrollbar-gutter: auto !important;
+}
+
+html.app-mobile-preview-embedded-root::-webkit-scrollbar,
+html:has(body.app-mobile-preview-embedded)::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+body.app-mobile-preview-embedded,
+body.app-mobile-preview-embedded * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+body.app-mobile-preview-embedded {
+  overflow-x: hidden !important;
+  scrollbar-gutter: auto !important;
+}
+
+body.app-mobile-preview-embedded::-webkit-scrollbar,
+body.app-mobile-preview-embedded *::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+body.app-mobile-preview-embedded .page-shell {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+.mobile-preview-stage {
+  --mobile-preview-scale: 1;
+  --mobile-preview-device-width: 360px;
+  --mobile-preview-device-height: 800px;
+  --mobile-preview-device-radius: 34px;
+  --mobile-preview-status-height: 24px;
+  --mobile-preview-topbar-height: 56px;
+  --mobile-preview-bottombar-height: 50px;
+  --mobile-preview-viewport-height: 670px;
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  isolation: isolate;
+}
+
+.mobile-preview-stage__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top, rgba(232, 241, 225, 0.34), transparent 34%),
+    linear-gradient(180deg, rgba(25, 31, 23, 0.34), rgba(25, 31, 23, 0.58));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.mobile-preview-stage__layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(420px, 720px);
+  grid-template-areas:
+    "meta meta"
+    "device tools";
+  align-items: start;
+  justify-items: center;
+  gap: 16px 20px;
+  width: min(100%, 1120px);
+  max-height: calc(100vh - 48px);
+}
+
+.mobile-preview-stage__meta {
+  grid-area: meta;
+  width: min(100%, 1120px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  background: rgba(252, 248, 240, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  box-shadow:
+    0 18px 42px rgba(20, 27, 19, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.mobile-preview-stage__meta-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mobile-preview-stage__meta-copy strong,
+.mobile-preview-stage__meta-copy span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-preview-stage__meta-copy strong {
+  font-size: 0.96rem;
+  color: #24301f;
+}
+
+.mobile-preview-stage__meta-copy span {
+  font-size: 0.82rem;
+  color: rgba(61, 73, 55, 0.78);
+}
+
+.mobile-preview-stage__close {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(108, 123, 89, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 238, 228, 0.94));
+  color: #334225;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mobile-preview-device {
+  grid-area: device;
+  transform: scale(var(--mobile-preview-scale));
+  transform-origin: center top;
+  will-change: transform;
+}
+
+.mobile-preview-stage__tools {
+  grid-area: tools;
+  align-self: start;
+  width: min(720px, calc(100vw - 96px));
+  max-height: calc(100vh - 160px);
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.mobile-preview-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.mobile-preview-tools__card {
+  border-radius: 24px;
+  background: rgba(252, 248, 240, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow:
+    0 18px 42px rgba(20, 27, 19, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  overflow: hidden;
+}
+
+.mobile-preview-tools__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #2e3a29;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 241, 232, 0.88));
+}
+
+.mobile-preview-tools__summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobile-preview-tools__body {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+
+.mobile-preview-tools__label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(69, 84, 54, 0.76);
+}
+
+.mobile-preview-tools__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mobile-preview-tools__chip,
+.mobile-preview-tools__toggle {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(123, 145, 91, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 249, 235, 0.92));
+  color: #334225;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mobile-preview-tools__chip.is-active,
+.mobile-preview-tools__toggle.is-active {
+  border-color: rgba(114, 150, 61, 0.34);
+  background: linear-gradient(180deg, rgba(241, 249, 223, 0.98), rgba(221, 236, 191, 0.94));
+  color: #27411e;
+}
+
+.mobile-preview-tools__toggle {
+  justify-self: start;
+}
+
+.mobile-preview-tools__note,
+.mobile-preview-tools__status {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(51, 65, 39, 0.84);
+}
+
+.mobile-preview-tools__status {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(27, 39, 28, 0.06);
+}
+
+.mobile-preview-tools__range-block {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-preview-tools__range-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: rgba(42, 55, 35, 0.86);
+}
+
+.mobile-preview-tools__range-head span:first-child {
+  font-weight: 800;
+}
+
+.mobile-preview-tools__range-head span:last-child {
+  text-align: right;
+}
+
+.mobile-preview-tools__range-actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-preview-tools__range {
+  width: 100%;
+  accent-color: #7b9d4e;
+}
+
+.mobile-preview-tools__sound-block {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.mobile-preview-tools__sound-block.is-ready {
+  background: rgba(241, 247, 229, 0.72);
+}
+
+.mobile-preview-tools__sound-block.is-live {
+  background: rgba(231, 242, 213, 0.9);
+}
+
+.mobile-preview-tools__sound-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mobile-preview-tools .weather-audio-debug__chip,
+.mobile-preview-tools .weather-audio-debug__empty {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(216, 228, 196, 0.68);
+  color: rgba(49, 64, 34, 0.88);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.mobile-preview-tools .weather-audio-debug__chip--active {
+  background: rgba(197, 223, 151, 0.82);
+  color: #27411e;
+}
+
+.mobile-preview-tools .weather-audio-debug__chip--playing {
+  background: rgba(61, 79, 44, 0.9);
+  color: #f5f8ef;
+}
+
+.mobile-preview-tools .weather-audio-debug__chip--muted {
+  background: rgba(205, 208, 198, 0.7);
+  color: rgba(86, 94, 79, 0.9);
+}
+
+.mobile-preview-tools .weather-audio-debug__empty {
+  background: rgba(27, 39, 28, 0.06);
+  color: rgba(69, 79, 61, 0.82);
+}
+
+.mobile-preview-stage__tools::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mobile-preview-stage__tools::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(86, 102, 70, 0.28);
+}
+
+@media (max-width: 1180px) {
+  .mobile-preview-stage__layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "meta"
+      "device"
+      "tools";
+    width: min(100%, 430px);
+  }
+
+  .mobile-preview-stage__meta,
+  .mobile-preview-stage__tools {
+    width: min(100%, 430px);
+  }
+
+  .mobile-preview-tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mobile-preview-stage__tools {
+    max-height: 240px;
+    padding-right: 0;
+  }
+}
+
+.mobile-preview-device__frame {
+  position: relative;
+  width: calc(var(--mobile-preview-device-width) + 24px);
+  padding: 12px;
+  border-radius: calc(var(--mobile-preview-device-radius) + 16px);
+  background:
+    linear-gradient(160deg, #22261f, #11140f 52%, #2f352c 100%);
+  box-shadow:
+    0 28px 70px rgba(7, 10, 8, 0.42),
+    0 8px 24px rgba(7, 10, 8, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.mobile-preview-device__speaker {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 72px;
+  height: 4px;
+  margin-left: -36px;
+  border-radius: 999px;
+  background: rgba(76, 82, 74, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.mobile-preview-device__screen {
+  position: relative;
+  width: var(--mobile-preview-device-width);
+  height: var(--mobile-preview-device-height);
+  display: grid;
+  grid-template-rows:
+    var(--mobile-preview-status-height)
+    var(--mobile-preview-topbar-height)
+    minmax(0, var(--mobile-preview-viewport-height))
+    var(--mobile-preview-bottombar-height);
+  overflow: hidden;
+  border-radius: var(--mobile-preview-device-radius);
+  background: #faf6ef;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.mobile-preview-device__status-bar,
+.mobile-preview-device__toolbar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding-inline: 14px;
+  color: #20261c;
+}
+
+.mobile-preview-device__status-bar {
+  justify-content: space-between;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: linear-gradient(180deg, rgba(245, 240, 232, 0.98), rgba(243, 237, 228, 0.94));
+}
+
+.mobile-preview-device__status-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mobile-preview-device__signal,
+.mobile-preview-device__wifi,
+.mobile-preview-device__battery {
+  display: inline-block;
+  border-radius: 999px;
+  background: #2c3624;
+  opacity: 0.84;
+}
+
+.mobile-preview-device__signal {
+  width: 12px;
+  height: 8px;
+  clip-path: polygon(0 100%, 0 68%, 22% 68%, 22% 52%, 44% 52%, 44% 36%, 66% 36%, 66% 18%, 88% 18%, 88% 0, 100% 0, 100% 100%);
+}
+
+.mobile-preview-device__wifi {
+  width: 12px;
+  height: 8px;
+  clip-path: polygon(0 100%, 14% 100%, 30% 76%, 50% 60%, 70% 76%, 86% 100%, 100% 100%, 100% 86%, 78% 54%, 50% 32%, 22% 54%, 0 86%);
+}
+
+.mobile-preview-device__battery {
+  position: relative;
+  width: 18px;
+  height: 8px;
+}
+
+.mobile-preview-device__battery::before,
+.mobile-preview-device__battery::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+}
+
+.mobile-preview-device__battery::before {
+  border: 1.6px solid #2c3624;
+  background: transparent;
+}
+
+.mobile-preview-device__battery::after {
+  inset: 1.6px 4px 1.6px 1.6px;
+  background: #2c3624;
+}
+
+.mobile-preview-device__toolbar {
+  justify-content: space-between;
+  background: linear-gradient(180deg, rgba(252, 249, 244, 0.99), rgba(247, 242, 235, 0.96));
+  border-bottom: 1px solid rgba(134, 124, 108, 0.12);
+  transition: height 180ms ease, opacity 180ms ease, border-color 180ms ease;
+}
+
+.mobile-preview-device__toolbar--top {
+  gap: 10px;
+  padding-inline: 12px 10px;
+}
+
+.mobile-preview-device__toolbar--bottom {
+  justify-content: center;
+  gap: 42px;
+  border-top: 1px solid rgba(134, 124, 108, 0.12);
+  border-bottom: 0;
+  background: linear-gradient(180deg, rgba(248, 245, 239, 0.99), rgba(243, 238, 230, 0.97));
+}
+
+.mobile-preview-device__browser-leading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.mobile-preview-device__browser-home,
+.mobile-preview-device__browser-switch {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.86;
+}
+
+.mobile-preview-device__browser-home {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23222b1d' d='M4.6 10.8 12 4.7l7.4 6.1v7a1.2 1.2 0 0 1-1.2 1.2h-4.1v-5h-4.2v5H5.8a1.2 1.2 0 0 1-1.2-1.2v-7Z'/%3E%3C/svg%3E");
+}
+
+.mobile-preview-device__browser-switch {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23222b1d' stroke-linecap='round' stroke-width='2'%3E%3Cpath d='M5 7h14'/%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='M5 17h14'/%3E%3Ccircle fill='%23222b1d' stroke='none' cx='9' cy='7' r='2'/%3E%3Ccircle fill='%23222b1d' stroke='none' cx='15' cy='12' r='2'/%3E%3Ccircle fill='%23222b1d' stroke='none' cx='11' cy='17' r='2'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.mobile-preview-device__address-pill {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  height: 36px;
+  margin: 10px 0;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(162, 152, 136, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  overflow: hidden;
+}
+
+.mobile-preview-device__address-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #7ca64b, #5f8535);
+  box-shadow: 0 0 0 3px rgba(124, 166, 75, 0.12);
+  flex: 0 0 auto;
+}
+
+.mobile-preview-device__address-pill span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  color: rgba(46, 58, 39, 0.76);
+}
+
+.mobile-preview-device__toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.mobile-preview-device__tabs-pill,
+.mobile-preview-device__menu-dots,
+.mobile-preview-device__toolbar--bottom span {
+  display: inline-block;
+}
+
+.mobile-preview-device__tabs-pill {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 7px;
+  border: 1.5px solid rgba(42, 51, 36, 0.75);
+  background: rgba(255, 255, 255, 0.82);
+  color: #1f2718;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.mobile-preview-device__menu-dots {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(48, 59, 42, 0.76);
+  box-shadow:
+    0 -6px 0 rgba(48, 59, 42, 0.76),
+    0 6px 0 rgba(48, 59, 42, 0.76);
+}
+
+.mobile-preview-device__toolbar--bottom span:nth-child(1) {
+  width: 12px;
+  height: 12px;
+  background: transparent;
+  border-left: 1.8px solid rgba(48, 59, 42, 0.72);
+  border-bottom: 1.8px solid rgba(48, 59, 42, 0.72);
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+.mobile-preview-device__toolbar--bottom span:nth-child(2) {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.8px solid rgba(48, 59, 42, 0.7);
+  background: transparent;
+}
+
+.mobile-preview-device__toolbar--bottom span:nth-child(3) {
+  width: 16px;
+  height: 14px;
+  border-radius: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(48, 59, 42, 0.72) 0 1.8px,
+      transparent 1.8px 5.6px,
+      rgba(48, 59, 42, 0.72) 5.6px 7.4px,
+      transparent 7.4px 11.2px,
+      rgba(48, 59, 42, 0.72) 11.2px 13px,
+      transparent 13px 100%
+    );
+}
+
+.mobile-preview-device__viewport {
+  min-height: 0;
+  overflow: hidden;
+  background: #f6f1e7;
+}
+
+.mobile-preview-device__iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  overflow: hidden;
+  background: #f6f1e7;
+}
+
+.mobile-preview-stage[data-toolbar-state="collapsed"] .mobile-preview-device__address-pill {
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
 body.app-mobile-preview {
   background: linear-gradient(180deg, #dbe6d7, #e9efe3);
   scrollbar-gutter: stable;
@@ -17540,12 +18193,12 @@ body.app-mobile-shell .category-action-panel--inline {
 
 body.app-mobile-shell .utility-bar.is-collapsed {
   gap: 0 !important;
-  padding-top: 6px !important;
-  margin-bottom: 10px !important;
+  padding-top: 0 !important;
+  margin-bottom: 8px !important;
 }
 
 body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar {
-  padding: 8px !important;
+  padding: 6px 8px !important;
 }
 
 body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar__center,
@@ -18531,11 +19184,9 @@ body.app-mobile-shell .workspace-layout--menu .season-card,
 body.app-mobile-shell .workspace-layout--menu .season-card--memories,
 body.app-mobile-shell .workspace-layout--menu .progress-overview,
 body.app-mobile-shell .workspace-layout--menu .season-grid--sidebar,
-body.app-mobile-shell .workspace-layout--menu .progress-card,
 body.app-mobile-shell .workspace-layout--menu .insight-strip,
 body.app-mobile-shell .workspace-layout--menu .insight-strip__ticker,
-body.app-mobile-shell .workspace-layout--menu .insight-strip__slide,
-body.app-mobile-shell .home-section {
+body.app-mobile-shell .workspace-layout--menu .insight-strip__slide {
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -18543,9 +19194,7 @@ body.app-mobile-shell .home-section {
 }
 
 body.app-mobile-shell .workspace-layout--menu .season-card,
-body.app-mobile-shell .workspace-layout--menu .progress-card,
-body.app-mobile-shell .workspace-layout--menu .insight-strip__slide,
-body.app-mobile-shell .home-section {
+body.app-mobile-shell .workspace-layout--menu .insight-strip__slide {
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
@@ -18564,8 +19213,7 @@ body.app-mobile-shell .home-section__header {
   padding: 0 2px !important;
 }
 
-body.app-mobile-shell .workspace-layout--menu .season-card .button,
-body.app-mobile-shell .home-section .button {
+body.app-mobile-shell .workspace-layout--menu .season-card .button {
   background: rgba(255, 251, 243, 0.34) !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -18872,17 +19520,24 @@ body.app-mobile-shell .weather-overview__external-link {
 
 body.app-mobile-shell .weather-week-card {
   padding: 14px 12px !important;
-  border-radius: 18px !important;
-  border: 0 !important;
-  box-shadow: none !important;
+  border-radius: 22px !important;
+  border: 1px solid rgba(126, 112, 88, 0.14) !important;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.94), rgba(244, 238, 227, 0.92)) !important;
+  box-shadow:
+    0 10px 22px rgba(56, 47, 30, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
   gap: 12px !important;
+  overflow: hidden !important;
 }
 
 body.app-mobile-shell .weather-overview__summary-chip {
   min-height: 30px !important;
   padding: 6px 10px !important;
-  border: 0 !important;
-  box-shadow: none !important;
+  border: 1px solid rgba(126, 112, 88, 0.12) !important;
+  background: rgba(255, 252, 246, 0.78) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 14px rgba(62, 50, 31, 0.04) !important;
 }
 
 body.app-mobile-shell .weather-day-grid {
@@ -18902,9 +19557,13 @@ body.app-mobile-shell .weather-day-grid::-webkit-scrollbar {
 body.app-mobile-shell .weather-day-card {
   min-width: 132px !important;
   padding: 10px !important;
-  border-radius: 16px !important;
-  border: 0 !important;
-  box-shadow: none !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(126, 112, 88, 0.14) !important;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.95), rgba(244, 238, 227, 0.92)) !important;
+  box-shadow:
+    0 10px 22px rgba(56, 47, 30, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  overflow: hidden !important;
 }
 
 body.app-mobile-shell .weather-day-card__temps {
@@ -18915,15 +19574,19 @@ body.app-mobile-shell .weather-day-card__temp {
   min-height: 42px !important;
   padding: 6px 7px !important;
   border-radius: 14px !important;
-  border: 0 !important;
-  box-shadow: none !important;
+  border: 1px solid rgba(126, 112, 88, 0.12) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 4px 10px rgba(62, 50, 31, 0.03) !important;
 }
 
 body.app-mobile-shell .weather-day-card__metric,
 body.app-mobile-shell .weather-day-card__badge,
 body.app-mobile-shell .weather-day-card__today {
-  border: 0 !important;
-  box-shadow: none !important;
+  border: 1px solid rgba(126, 112, 88, 0.12) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 4px 10px rgba(62, 50, 31, 0.03) !important;
 }
 
 body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed {
@@ -25700,7 +26363,7 @@ body.app-mobile-shell .mobile-bottom-nav {
   bottom: 0 !important;
   z-index: 140 !important;
   display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   width: 100% !important;
   min-height: 0 !important;
   height: auto !important;
@@ -25771,9 +26434,27 @@ body.app-mobile-shell .mobile-bottom-nav__icon--tasks {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 7h10M9 12h10M9 17h10' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M4.5 7.5 6 9l2-3' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4.5 17.5 6 19l2-3' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
 }
 
+body.app-mobile-shell .mobile-bottom-nav__icon--camera {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 4.5 7.8 6H5.5A2.5 2.5 0 0 0 3 8.5v8A2.5 2.5 0 0 0 5.5 19h13a2.5 2.5 0 0 0 2.5-2.5v-8A2.5 2.5 0 0 0 18.5 6h-2.3L15 4.5H9Zm3 3a4.75 4.75 0 1 1 0 9.5 4.75 4.75 0 0 1 0-9.5Zm0 2a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5Z'/%3E%3C/svg%3E") !important;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 4.5 7.8 6H5.5A2.5 2.5 0 0 0 3 8.5v8A2.5 2.5 0 0 0 5.5 19h13a2.5 2.5 0 0 0 2.5-2.5v-8A2.5 2.5 0 0 0 18.5 6h-2.3L15 4.5H9Zm3 3a4.75 4.75 0 1 1 0 9.5 4.75 4.75 0 0 1 0-9.5Zm0 2a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5Z'/%3E%3C/svg%3E") !important;
+}
+
 body.app-mobile-shell .mobile-bottom-nav__icon--journal {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='4' width='12' height='16' rx='2' ry='2' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M10 4v16M13 8h3M13 12h3M13 16h3' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") !important;
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='4' width='12' height='16' rx='2' ry='2' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M10 4v16M13 8h3M13 12h3M13 16h3' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+}
+
+body.app-mobile-shell .mobile-bottom-nav__button--camera {
+  color: #4f6f2f !important;
+}
+
+body.app-mobile-shell .mobile-bottom-nav__button--camera .mobile-bottom-nav__icon {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+body.app-mobile-shell .mobile-bottom-nav__button--camera .mobile-bottom-nav__label {
+  font-weight: 800 !important;
 }
 
 body.app-mobile-shell .mobile-bottom-nav__label {
@@ -26090,58 +26771,6 @@ body.app-mobile-preview.app-mobile-shell .detail-modal__content {
   height: 100dvh !important;
   max-height: 100dvh !important;
   border-radius: 0 !important;
-}
-
-/* Mobile centered manager headers:
-   simple sheet headings and add buttons should sit naturally in the middle. */
-body.app-mobile-shell .journal-overlay-frame__head {
-  grid-template-columns: 1fr !important;
-  justify-items: center !important;
-  align-items: center !important;
-  gap: 10px !important;
-  padding-right: 0 !important;
-  text-align: center !important;
-}
-
-body.app-mobile-shell .journal-overlay-frame__title-block,
-body.app-mobile-shell .journal-overlay-frame__title-block h3,
-body.app-mobile-shell .worklog-section__head h4 {
-  width: 100% !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  text-align: center !important;
-}
-
-body.app-mobile-shell .journal-overlay-frame__actions,
-body.app-mobile-shell .worklog-section__head {
-  justify-content: center !important;
-  align-items: center !important;
-  text-align: center !important;
-}
-
-body.app-mobile-shell .journal-overlay-frame__actions {
-  width: 100% !important;
-  margin: 0 !important;
-  padding-right: 0 !important;
-}
-
-body.app-mobile-shell .worklog-section__head {
-  gap: 10px !important;
-}
-
-body.app-mobile-shell .worklog-section__head .catalog-card__actions {
-  width: 100% !important;
-  margin: 0 !important;
-  display: flex !important;
-  justify-content: center !important;
-}
-
-body.app-mobile-shell .journal-overlay-frame__actions .button,
-body.app-mobile-shell .worklog-section__head .button {
-  width: auto !important;
-  min-width: min(240px, calc(100% - 24px)) !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
 }
 
 /* Mobile image framing:
@@ -26673,123 +27302,6 @@ body.app-mobile-shell .weather-overview.detail-copy--wide,
 body.app-mobile-shell .overview-manager.detail-copy--wide {
   padding-left: 10px !important;
   padding-right: 10px !important;
-}
-
-body.app-mobile-shell .detail-modal--editor .field-block--bird-name,
-body.app-mobile-shell .detail-modal--editor .field-block--bird-category,
-body.app-mobile-shell .detail-modal--editor .field-block--bird-observation,
-body.app-mobile-shell .detail-modal--editor .field-block--mushroom-meta,
-body.app-mobile-shell .detail-modal--editor .field-block--wild-plant-meta,
-body.app-mobile-shell .detail-modal--editor .category-manager__field,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--name,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--type,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--parent,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--recommended,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--order,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--color,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--image,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--preview,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--notes,
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter,
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter--source,
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter--date,
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter--category,
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter--target,
-body.app-mobile-shell .settings-panel__storage-meta,
-body.app-mobile-shell .settings-panel__status,
-body.app-mobile-shell .settings-panel__account-grid > * {
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-body.app-mobile-shell .detail-modal--editor .field-block--bird-name,
-body.app-mobile-shell .detail-modal--editor .field-block--bird-category,
-body.app-mobile-shell .detail-modal--editor .field-block--bird-observation,
-body.app-mobile-shell .detail-modal--editor .field-block--mushroom-meta,
-body.app-mobile-shell .detail-modal--editor .field-block--wild-plant-meta,
-body.app-mobile-shell .detail-modal--editor .category-manager__field,
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter,
-body.app-mobile-shell .settings-panel__storage-meta,
-body.app-mobile-shell .settings-panel__status {
-  gap: 8px !important;
-}
-
-/* Mobile flat wider surfaces:
-   extend the flatter app-like treatment to the remaining utility and manager sections. */
-body.app-mobile-shell .settings-hero,
-body.app-mobile-shell .settings-panel,
-body.app-mobile-shell .worklog-manager .worklog-section,
-body.app-mobile-shell .journal-quick-actions,
-body.app-mobile-shell .journal-tag-filter,
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__selection-card,
-body.app-mobile-shell .detail-modal--editor .detail-form--editor > .upload-field--compact,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--preview {
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-body.app-mobile-shell .settings-hero {
-  padding: 0 0 8px !important;
-  gap: 10px !important;
-}
-
-body.app-mobile-shell .settings-grid {
-  gap: 14px !important;
-}
-
-body.app-mobile-shell .settings-grid > .settings-panel {
-  padding: 0 0 14px !important;
-}
-
-body.app-mobile-shell .settings-grid > .settings-panel + .settings-panel {
-  padding-top: 14px !important;
-  border-top: 1px solid rgba(138, 121, 88, 0.12) !important;
-}
-
-body.app-mobile-shell .settings-panel__head,
-body.app-mobile-shell .settings-panel__head > div,
-body.app-mobile-shell .worklog-section__head-copy,
-body.app-mobile-shell .journal-quick-actions,
-body.app-mobile-shell .journal-tag-filter {
-  margin-bottom: 0 !important;
-}
-
-body.app-mobile-shell .worklog-manager .worklog-section {
-  padding: 0 0 8px !important;
-}
-
-body.app-mobile-shell .worklog-manager .worklog-section + .worklog-section {
-  padding-top: 12px !important;
-  border-top: 1px solid rgba(138, 121, 88, 0.12) !important;
-}
-
-body.app-mobile-shell .journal-quick-actions,
-body.app-mobile-shell .journal-tag-filter {
-  padding: 0 !important;
-}
-
-body.app-mobile-shell .journal-overlay-stack {
-  gap: 14px !important;
-}
-
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__selection-card,
-body.app-mobile-shell .detail-modal--editor .detail-form--editor > .upload-field--compact,
-body.app-mobile-shell .detail-modal--editor .category-manager__field--preview {
-  padding: 0 !important;
-}
-
-body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__selection-card {
-  gap: 10px !important;
-}
-
-body.app-mobile-shell .detail-modal--editor .batch-sowing__list {
-  padding-top: 4px !important;
 }
 
 /* Mobile journal quick add top bar:
@@ -29083,73 +29595,9 @@ body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot > .hero__wea
   margin: 0 !important;
 }
 
-body.app-mobile-shell.app-focused-mode .category-shell__nav,
-body.app-mobile-shell.app-focused-mode .category-shell__nav--compact,
-body.app-mobile-shell.app-focused-mode .breadcrumb--compact,
-body.app-mobile-shell.app-focused-mode .category-panel--summary {
-  margin-top: 0 !important;
-}
-
-body.app-mobile-shell.app-focused-mode .content {
-  margin-top: -8px !important;
-  padding-top: 0 !important;
-}
-
-body.app-mobile-shell.app-focused-mode .utility-bar,
-body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed {
+body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
   margin-top: 0 !important;
   margin-bottom: 6px !important;
-}
-
-body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
-  margin-top: -4px !important;
-  margin-bottom: 0 !important;
-}
-
-body.app-mobile-shell.app-focused-mode .category-shell__nav,
-body.app-mobile-shell.app-focused-mode .category-shell__nav--compact,
-body.app-mobile-shell.app-focused-mode .breadcrumb--compact {
-  display: none !important;
-}
-
-body.app-mobile-shell.app-focused-mode .category-shell {
-  display: flex !important;
-  flex-direction: column !important;
-  margin-top: 42px !important;
-}
-
-body.app-mobile-shell.app-focused-mode .category-shell > .subcatalog--overview {
-  order: 1 !important;
-  margin-top: 0 !important;
-}
-
-body.app-mobile-shell.app-focused-mode .category-shell + .subcatalog {
-  margin-top: 42px !important;
-}
-
-body.app-mobile-shell.app-focused-mode .category-panel--summary {
-  order: 2 !important;
-  margin-top: 8px !important;
-  padding-top: 12px !important;
-}
-
-body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero {
-  gap: 12px !important;
-  margin-bottom: 8px !important;
-}
-
-body.app-mobile-shell.app-focused-mode .category-panel--summary .category-action-disclosure--inline {
-  margin-top: 8px !important;
-}
-
-body.app-mobile-shell.app-focused-mode .content {
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-}
-
-body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
-  margin-top: 0 !important;
-  margin-bottom: 8px !important;
 }
 
 body.app-mobile-shell.app-focused-mode .category-shell {
@@ -29209,7 +29657,7 @@ body.app-mobile-shell.app-focused-mode .category-shell__nav--compact {
   width: 100% !important;
   min-width: 0 !important;
   padding: 0 2px !important;
-  margin: 60px 0 10px !important;
+  margin: 0 0 10px !important;
   overflow: hidden !important;
 }
 
@@ -30941,15 +31389,6 @@ body.app-mobile-shell .journal-overlay-frame__actions .button {
   padding-inline: 18px !important;
 }
 
-body.app-mobile-shell .journal-overlay-stack {
-  gap: 14px !important;
-  justify-items: center !important;
-}
-
-body.app-mobile-shell .journal-overlay-stack > * {
-  width: min(100%, 460px) !important;
-}
-
 body.app-mobile-shell .journal-tag-filter {
   gap: 10px !important;
   padding: 14px 14px !important;
@@ -30999,13 +31438,8 @@ body.app-mobile-shell .journal-tag-filter__section {
 }
 
 body.app-mobile-shell .journal-overlay-group {
-  width: min(100%, 460px) !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-top: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 body.app-mobile-shell .journal-overlay-group + .journal-overlay-group {
@@ -31141,8 +31575,9 @@ body.app-mobile-shell .journal-overlay-shell__topline {
   display: flex !important;
   align-items: center !important;
   gap: 10px !important;
-  width: min(100%, 460px) !important;
-  margin: 0 auto 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 10px !important;
   padding: calc(4px + env(safe-area-inset-top)) 0 0 !important;
 }
 
@@ -31150,7 +31585,6 @@ body.app-mobile-shell .journal-overlay-shell__topline-main {
   flex: 1 1 auto !important;
   min-width: 0 !important;
   display: flex !important;
-  justify-content: center !important;
 }
 
 body.app-mobile-shell .journal-overlay-shell__topline > .journal-overlay-shell__back {
@@ -31889,13 +32323,6 @@ body.app-mobile-shell .journal-quick-actions--topbar.detail-editor-mobile-switch
   display: none !important;
 }
 
-body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
-body.app-mobile-shell .detail-modal--editor .detail-copy__actions {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
 /* Mobile cleanup: final contrast, flatter headers and cleaner sheets. */
 body.app-mobile-shell .category-shell,
 body.app-mobile-shell .subcatalog,
@@ -32038,18 +32465,6 @@ body.app-mobile-shell .journal-overlay-shell .journal-quick-actions--topbar .jou
 body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button,
 body.app-mobile-shell .journal-overlay-shell .journal-quick-actions--topbar .journal-quick-actions__button {
   border-color: rgba(220, 214, 202, 0.48) !important;
-}
-
-body.app-mobile-shell .journal-overlay-frame__head {
-  width: min(100%, 430px) !important;
-  max-width: 430px !important;
-  margin: 0 auto 12px !important;
-  padding: 8px 0 4px !important;
-  gap: 10px !important;
-  background: transparent !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
 }
 
 body.app-mobile-shell .journal-overlay-mobile-actions,
@@ -32692,13 +33107,13 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry:focu
   border-color: rgba(255, 255, 255, 0.58) !important;
 }
 
-/* Mobile stability cleanup:
-   hide leftover weather debug panels, keep native vertical scroll,
-   and calm down the most broken stacked mobile layouts. */
-body.app-mobile-shell .weather-theme-debug-layout,
-body.app-mobile-shell .weather-theme-debug,
-body.app-mobile-shell .weather-audio-debug,
-body.app-mobile-shell [data-mobile-weather-inline-state] {
+/* PC preview cleanup:
+   in the embedded PC simulation keep the screenshot-clean mobile viewport
+   without extra weather debug panels or inline debug text. */
+body.app-mobile-preview-embedded .weather-theme-debug-layout,
+body.app-mobile-preview-embedded .weather-theme-debug,
+body.app-mobile-preview-embedded .weather-audio-debug,
+body.app-mobile-preview-embedded [data-mobile-weather-inline-state] {
   display: none !important;
 }
 
@@ -32847,7 +33262,8 @@ body.app-mobile-shell .season-card--memories {
 }
 
 /* Mobile flat pass:
-   zrusit zaoblenia len v mobile, aby sa rozlozenie citalo rovno a bez optickeho posunu. */
+   zrusit zaoblenia len na velkych mobilnych plochach a shellech,
+   nie na tlacidlach, kartach kategorii a drobnych ovladacoch. */
 body.app-mobile-shell .page-shell,
 body.app-mobile-shell .hero,
 body.app-mobile-shell .hero__text,
@@ -32855,35 +33271,18 @@ body.app-mobile-shell .content,
 body.app-mobile-shell .utility-bar,
 body.app-mobile-shell .menu-toolbar,
 body.app-mobile-shell .utility-bar__settings,
-body.app-mobile-shell .panel,
 body.app-mobile-shell .panel--menu,
 body.app-mobile-shell .panel--sticky,
-body.app-mobile-shell .catalog-card--main-menu-card,
-body.app-mobile-shell .catalog-card--main-menu-card::before,
-body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
-body.app-mobile-shell .catalog-card--child,
-body.app-mobile-shell .catalog-card--child .catalog-card__image,
+body.app-mobile-shell .main-menu,
+body.app-mobile-shell .menu-group,
 body.app-mobile-shell .category-panel--summary,
-body.app-mobile-shell .category-action-disclosure__summary,
 body.app-mobile-shell .category-action-panel,
 body.app-mobile-shell .category-action-panel--inline,
-body.app-mobile-shell .season-card,
-body.app-mobile-shell .home-card,
 body.app-mobile-shell .home-section,
-body.app-mobile-shell .sidebar-preview-card,
-body.app-mobile-shell .progress-card,
-body.app-mobile-shell .memory-strip__frame,
-body.app-mobile-shell .memory-strip__hero,
-body.app-mobile-shell .toolbar-add-menu__summary,
 body.app-mobile-shell .toolbar-add-menu__panel,
 body.app-mobile-shell .toolbar-add-submenu__panel,
-body.app-mobile-shell .button,
-body.app-mobile-shell .button--toolbar-home,
-body.app-mobile-shell .button--toolbar-add,
-body.app-mobile-shell .button--toolbar-utility,
 body.app-mobile-shell .detail-modal,
 body.app-mobile-shell .detail-modal__content,
-body.app-mobile-shell .detail-modal__back,
 body.app-mobile-shell .detail-copy__headline,
 body.app-mobile-shell .settings-sheet,
 body.app-mobile-shell .settings-hero,
@@ -32893,23 +33292,11 @@ body.app-mobile-shell .weather-overview__hero,
 body.app-mobile-shell .weather-overview__external,
 body.app-mobile-shell .weather-overview .overview-group,
 body.app-mobile-shell .weather-alert,
-body.app-mobile-shell .weather-week-card,
-body.app-mobile-shell .weather-day-card,
-body.app-mobile-shell .task-item,
-body.app-mobile-shell .journal-item,
 body.app-mobile-shell .journal-overlay-shell,
 body.app-mobile-shell .journal-overlay-frame__head,
-body.app-mobile-shell .journal-overlay-card,
-body.app-mobile-shell .journal-tag-filter,
-body.app-mobile-shell .mobile-bottom-nav,
-body.app-mobile-shell .mobile-bottom-nav__button,
-body.app-mobile-shell input:not([type="checkbox"]):not([type="radio"]),
-body.app-mobile-shell select,
-body.app-mobile-shell textarea,
-body.app-mobile-shell .tag,
-body.app-mobile-shell .choice-chip span,
-body.app-mobile-shell .filter,
-body.app-mobile-shell .breadcrumb__item {
+body.app-mobile-shell .workspace-layout--menu,
+body.app-mobile-shell .workspace-main,
+body.app-mobile-shell .workspace-side {
   border-radius: 0 !important;
 }
 
@@ -33147,7 +33534,23 @@ html:has(body.app-mobile-shell.app-main-menu-scroll-safe) {
   overflow-y: auto !important;
 }
 
+html:has(body.app-mobile-shell.app-focused-scroll-safe) {
+  overflow-y: auto !important;
+}
+
 body.app-mobile-shell.app-main-menu-scroll-safe {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: auto !important;
+  overflow-y: auto !important;
+  touch-action: pan-y pinch-zoom !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+body.app-mobile-shell.app-focused-scroll-safe {
   position: static !important;
   top: auto !important;
   left: auto !important;
@@ -33173,8 +33576,1385 @@ body.app-mobile-shell.app-main-menu-scroll-safe .panel--sticky {
   -webkit-overflow-scrolling: touch !important;
 }
 
+body.app-mobile-shell.app-focused-scroll-safe .page-shell,
+body.app-mobile-shell.app-focused-scroll-safe .content,
+body.app-mobile-shell.app-focused-scroll-safe .workspace-layout,
+body.app-mobile-shell.app-focused-scroll-safe .workspace-main,
+body.app-mobile-shell.app-focused-scroll-safe .workspace-main > .panel,
+body.app-mobile-shell.app-focused-scroll-safe #catalog,
+body.app-mobile-shell.app-focused-scroll-safe .category-shell,
+body.app-mobile-shell.app-focused-scroll-safe .subcatalog {
+  overflow-y: visible !important;
+  touch-action: pan-y pinch-zoom !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
 body.app-mobile-shell.app-main-menu-scroll-safe .utility-bar,
 body.app-mobile-shell.app-main-menu-scroll-safe .utility-bar.is-collapsed {
   position: static !important;
   top: auto !important;
+}
+
+/* Mobile top-fill pass:
+   keep the large top surfaces filled under the back/top bar,
+   but do not touch buttons, chips or category cards. */
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell.app-focused-mode .category-panel--summary,
+body.app-mobile-shell .category-shell__nav,
+body.app-mobile-shell .category-shell__nav--compact,
+body.app-mobile-shell .detail-modal__content,
+body.app-mobile-shell .journal-overlay-shell,
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .detail-modal--settings .settings-hero,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--weather .weather-overview__hero,
+body.app-mobile-shell .detail-modal--weather .weather-overview__external,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group,
+body.app-mobile-shell .detail-modal--weather .weather-alert,
+body.app-mobile-shell .journal-overlay-frame__head {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+/* Mobile add menu final safety:
+   keep quick-add rounded, above weather/cards, and fully tappable. */
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .menu-toolbar,
+body.app-mobile-shell .menu-toolbar__center,
+body.app-mobile-shell .menu-toolbar__group--primary {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .menu-toolbar,
+body.app-mobile-shell .menu-toolbar__group--primary {
+  z-index: 180 !important;
+  isolation: isolate !important;
+}
+
+body.app-mobile-shell .mobile-toolbar-weather-slot,
+body.app-mobile-shell.app-main-menu-mode .mobile-toolbar-weather-slot,
+body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
+  z-index: 40 !important;
+}
+
+body.app-mobile-shell .toolbar-add-menu,
+body.app-mobile-shell .toolbar-add-menu[open],
+body.app-mobile-shell .toolbar-add-submenu {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .toolbar-add-menu[open] {
+  z-index: 420 !important;
+}
+
+body.app-mobile-shell .toolbar-add-menu__panel {
+  position: absolute !important;
+  top: calc(100% + 8px) !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(284px, calc(100vw - 24px)) !important;
+  min-width: 220px !important;
+  margin-top: 0 !important;
+  padding: 8px !important;
+  display: grid !important;
+  gap: 8px !important;
+  border-radius: 22px !important;
+  border: 1px solid rgba(255, 255, 255, 0.42) !important;
+  background: linear-gradient(180deg, rgba(255, 251, 245, 0.98), rgba(246, 240, 230, 0.96)) !important;
+  box-shadow:
+    0 18px 36px rgba(38, 44, 31, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(14px) saturate(128%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(128%) !important;
+  overflow: hidden !important;
+  pointer-events: auto !important;
+  z-index: 430 !important;
+}
+
+body.app-mobile-shell .toolbar-add-submenu__panel {
+  display: grid !important;
+  gap: 8px !important;
+  margin-top: 6px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .toolbar-add-menu__action,
+body.app-mobile-shell .toolbar-add-submenu > summary {
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  min-height: 48px !important;
+  justify-content: center !important;
+  text-align: center !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(151, 134, 101, 0.12) !important;
+  background: rgba(255, 252, 246, 0.96) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 8px 18px rgba(61, 53, 38, 0.08) !important;
+  pointer-events: auto !important;
+}
+
+/* Mobile add menu open-state shield:
+   while quick-add is open, cards/weather must step back so taps land on menu actions. */
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .panel--menu,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .main-menu,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .menu-group,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .catalog-grid--main-menu,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .catalog-card--main-menu-card {
+  position: relative !important;
+  z-index: 0 !important;
+}
+
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .catalog-grid--main-menu,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .catalog-card--main-menu-card,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .mobile-toolbar-weather-slot,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .mobile-toolbar-weather-slot * {
+  pointer-events: none !important;
+}
+
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .mobile-toolbar-weather-slot,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .mobile-toolbar-weather-slot > .hero__weather {
+  opacity: 0 !important;
+}
+
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .utility-bar,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .menu-toolbar,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .menu-toolbar__center,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .menu-toolbar__group--primary,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-menu,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-menu__panel,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-menu__action,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-submenu,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-submenu > summary,
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-submenu__panel {
+  pointer-events: auto !important;
+}
+
+/* Mobile add menu overlay mode:
+   open the quick-add panel as a true top overlay above category cards. */
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-menu[open] {
+  z-index: 5200 !important;
+}
+
+body.app-mobile-shell:has(#toolbar-add-menu[open])::after {
+  content: "" !important;
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(244, 239, 231, 0.42) !important;
+  backdrop-filter: blur(3px) saturate(108%) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(108%) !important;
+  pointer-events: none !important;
+  z-index: 5250 !important;
+}
+
+body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-menu[open] .toolbar-add-menu__panel {
+  position: fixed !important;
+  top: calc(env(safe-area-inset-top) + 96px) !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  max-height: min(54dvh, calc(100dvh - 120px - env(safe-area-inset-bottom))) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 1), rgba(247, 241, 232, 0.995)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  z-index: 5300 !important;
+}
+
+/* Mobile add menu overlay host:
+   move the open quick-add panel into a dedicated body-level layer
+   so it always stays above category cards in mobile/preview. */
+body.app-mobile-shell #toolbar-add-menu-overlay-host {
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 6200 !important;
+}
+
+body.app-mobile-shell.app-toolbar-add-overlay-open::after {
+  z-index: 6180 !important;
+}
+
+body.app-mobile-shell.app-toolbar-add-overlay-open #toolbar-add-menu-overlay-host .toolbar-add-menu__panel {
+  position: absolute !important;
+  top: var(--toolbar-add-overlay-top, calc(env(safe-area-inset-top) + 96px)) !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  max-height: min(54dvh, calc(100dvh - 120px - env(safe-area-inset-bottom))) !important;
+  margin: 0 !important;
+  padding: 8px !important;
+  display: grid !important;
+  gap: 8px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  border-radius: 22px !important;
+  border: 1px solid rgba(255, 255, 255, 0.56) !important;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 1), rgba(247, 241, 232, 0.998)) !important;
+  box-shadow:
+    0 22px 42px rgba(33, 38, 26, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  isolation: isolate !important;
+  z-index: 6210 !important;
+}
+
+/* Mobile premium UI pass:
+   unify the most visible mobile managers and overlays into a softer,
+   more app-like shell without changing desktop behavior. */
+body.app-mobile-shell {
+  --mobile-premium-shell-bg: linear-gradient(180deg, rgba(248, 243, 234, 0.985), rgba(237, 230, 218, 0.985));
+  --mobile-premium-card-bg: linear-gradient(180deg, rgba(255, 252, 246, 0.985), rgba(245, 238, 227, 0.965));
+  --mobile-premium-card-bg-strong: linear-gradient(180deg, rgba(255, 253, 248, 0.995), rgba(248, 241, 231, 0.985));
+  --mobile-premium-border: rgba(123, 105, 77, 0.14);
+  --mobile-premium-border-strong: rgba(104, 133, 64, 0.22);
+  --mobile-premium-shadow: 0 18px 38px rgba(58, 47, 31, 0.12);
+  --mobile-premium-shadow-strong: 0 26px 56px rgba(38, 34, 25, 0.18);
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-modal__content::before,
+body.app-mobile-shell .detail-modal--batch .detail-modal__content::before,
+body.app-mobile-shell .detail-modal--worklog .detail-modal__content::before,
+body.app-mobile-shell .journal-overlay-shell::before {
+  background:
+    radial-gradient(circle at top left, rgba(255, 247, 221, 0.7), transparent 34%),
+    radial-gradient(circle at top right, rgba(140, 171, 100, 0.14), transparent 28%),
+    var(--mobile-premium-shell-bg) !important;
+  opacity: 1 !important;
+}
+
+body.app-mobile-shell .detail-modal__back,
+body.app-mobile-shell .journal-overlay-shell__back,
+body.app-mobile-shell .journal-overlay-shell__close {
+  border-radius: 18px !important;
+  border: 1px solid rgba(120, 106, 81, 0.14) !important;
+  background: rgba(255, 252, 246, 0.9) !important;
+  box-shadow:
+    0 12px 24px rgba(52, 44, 31, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(8px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(118%) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor,
+body.app-mobile-shell .detail-modal--editor .editor-gallery,
+body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__selection-card,
+body.app-mobile-shell .detail-modal--worklog .worklog-section,
+body.app-mobile-shell .detail-modal--worklog .worklog-task-editor,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .entry-advanced {
+  border-radius: 26px !important;
+  border: 1px solid var(--mobile-premium-border) !important;
+  background: var(--mobile-premium-card-bg) !important;
+  box-shadow:
+    var(--mobile-premium-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head,
+body.app-mobile-shell .journal-overlay-frame__head {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.95), rgba(248, 241, 231, 0.9)) !important;
+  border: 1px solid rgba(124, 111, 89, 0.12) !important;
+  border-radius: 24px !important;
+  box-shadow:
+    0 12px 28px rgba(53, 45, 32, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head {
+  padding: 16px 16px 14px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline h3,
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head h4,
+body.app-mobile-shell .journal-overlay-frame__head h3 {
+  color: #24301d !important;
+  letter-spacing: -0.03em !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-form--editor,
+body.app-mobile-shell .detail-modal--worklog .worklog-manager.detail-copy--wide,
+body.app-mobile-shell .journal-overlay-shell__body {
+  padding: 14px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .field-block,
+body.app-mobile-shell .detail-modal--worklog .task-form .relation-disclosure,
+body.app-mobile-shell .detail-modal--worklog .task-form > input:not([type="checkbox"]):not([type="radio"]),
+body.app-mobile-shell .detail-modal--worklog .task-form > textarea,
+body.app-mobile-shell .detail-modal--worklog .task-form > select,
+body.app-mobile-shell .journal-overlay-shell .upload-field--compact,
+body.app-mobile-shell .journal-overlay-shell .relation-disclosure,
+body.app-mobile-shell .journal-overlay-shell .journal-form__image,
+body.app-mobile-shell .detail-modal--editor .category-manager__preview-shell {
+  border-radius: 22px !important;
+  border: 1px solid rgba(130, 115, 89, 0.12) !important;
+  background: var(--mobile-premium-card-bg-strong) !important;
+  box-shadow:
+    0 10px 22px rgba(56, 47, 30, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .field-block input,
+body.app-mobile-shell .detail-modal--editor .field-block select,
+body.app-mobile-shell .detail-modal--editor .field-block textarea,
+body.app-mobile-shell .detail-modal--editor .status-date-row__field input,
+body.app-mobile-shell .detail-modal--editor .status-date-row__field select,
+body.app-mobile-shell .detail-modal--worklog .task-form input:not([type="checkbox"]):not([type="radio"]),
+body.app-mobile-shell .detail-modal--worklog .task-form select,
+body.app-mobile-shell .detail-modal--worklog .task-form textarea,
+body.app-mobile-shell .journal-overlay-shell input,
+body.app-mobile-shell .journal-overlay-shell select,
+body.app-mobile-shell .journal-overlay-shell textarea {
+  border-radius: 18px !important;
+  border: 1px solid rgba(126, 112, 88, 0.14) !important;
+  background: rgba(255, 253, 248, 0.96) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 14px rgba(62, 50, 31, 0.04) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .field-block > span,
+body.app-mobile-shell .detail-modal--editor .status-date-row__field span,
+body.app-mobile-shell .journal-overlay-shell .upload-field__label,
+body.app-mobile-shell .journal-overlay-shell .entry-advanced__summary,
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head-copy,
+body.app-mobile-shell .detail-modal--editor .field-block__heading,
+body.app-mobile-shell .detail-modal--editor .field-block__subfield-label {
+  color: rgba(84, 95, 71, 0.92) !important;
+  letter-spacing: 0.08em !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__actions .button,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__toolbar .button,
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head .button,
+body.app-mobile-shell .detail-modal--worklog .worklog-task-editor__actions .button,
+body.app-mobile-shell .journal-overlay-shell .journal-overlay-mobile-actions .button,
+body.app-mobile-shell .journal-overlay-shell .entry-mode-switch__button,
+body.app-mobile-shell .journal-overlay-shell .journal-quick-actions__button {
+  border-radius: 18px !important;
+  min-height: 46px !important;
+  border: 1px solid rgba(109, 134, 65, 0.16) !important;
+  box-shadow:
+    0 12px 24px rgba(54, 46, 31, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item {
+  position: relative !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(130, 115, 86, 0.12) !important;
+  background: var(--mobile-premium-card-bg-strong) !important;
+  box-shadow:
+    0 14px 28px rgba(58, 48, 31, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item::before,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 auto 0 0 !important;
+  width: 5px !important;
+  border-radius: 24px 0 0 24px !important;
+  background: linear-gradient(180deg, rgba(119, 156, 71, 0.95), rgba(74, 112, 53, 0.92)) !important;
+  opacity: 0.9 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--done {
+  background: linear-gradient(180deg, rgba(244, 248, 238, 0.98), rgba(235, 242, 228, 0.96)) !important;
+  border-color: rgba(108, 147, 64, 0.18) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__date-badge,
+body.app-mobile-shell .detail-modal--worklog .task-item__done-badge,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__summary,
+body.app-mobile-shell .overview-group__count,
+body.app-mobile-shell .journal-overlay-card .journal-item__date-badge,
+body.app-mobile-shell .journal-overlay-card .journal-weather__pill,
+body.app-mobile-shell .journal-overlay-card__place {
+  border-radius: 999px !important;
+  border: 1px solid rgba(136, 154, 94, 0.18) !important;
+  background: rgba(239, 247, 220, 0.92) !important;
+  color: #557135 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+}
+
+body.app-mobile-shell .journal-overlay-card {
+  border-radius: 28px !important;
+  padding: 16px !important;
+  background:
+    radial-gradient(circle at top right, rgba(255, 248, 223, 0.5), transparent 28%),
+    var(--mobile-premium-card-bg) !important;
+  box-shadow:
+    var(--mobile-premium-shadow-strong),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__title {
+  font-size: 1.18rem !important;
+  line-height: 1.2 !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__text,
+body.app-mobile-shell .detail-modal--worklog .task-item__meta,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__copy small {
+  color: rgba(88, 92, 80, 0.94) !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__gallery .journal-item__image,
+body.app-mobile-shell .journal-overlay-card__gallery--single .journal-item__image {
+  border-radius: 22px !important;
+  border: 1px solid rgba(255, 255, 255, 0.58) !important;
+  box-shadow: 0 12px 28px rgba(55, 46, 31, 0.14) !important;
+}
+
+body.app-mobile-shell .journal-overlay-card .journal-item__action,
+body.app-mobile-shell .detail-modal--worklog .task-item__actions .journal-item__action,
+body.app-mobile-shell .detail-modal--worklog .task-item__actions .button {
+  border-radius: 16px !important;
+  background: rgba(255, 252, 246, 0.9) !important;
+  border: 1px solid rgba(126, 111, 86, 0.13) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .category-manager__preview-shell {
+  padding: 14px !important;
+  min-height: 230px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .category-preview {
+  border-radius: 26px !important;
+  box-shadow:
+    0 18px 36px rgba(55, 46, 31, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .batch-sowing__list,
+body.app-mobile-shell .journal-overlay-shell__body,
+body.app-mobile-shell .journal-overlay-shell .journal-quick-actions__chips {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(113, 137, 72, 0.62) rgba(244, 239, 230, 0.72) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .batch-sowing__list::-webkit-scrollbar-thumb,
+body.app-mobile-shell .journal-overlay-shell__body::-webkit-scrollbar-thumb,
+body.app-mobile-shell .journal-overlay-shell .journal-quick-actions__chips::-webkit-scrollbar-thumb {
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, rgba(120, 150, 72, 0.92), rgba(92, 122, 56, 0.92)) !important;
+}
+
+/* Mobile camera quick-entry:
+   visible primary action above the bottom nav and a compact premium photo sheet. */
+body.app-mobile-shell .mobile-camera-fab-shell {
+  display: none !important;
+}
+
+body.app-mobile-preview.app-mobile-shell .mobile-camera-fab-shell {
+  display: none !important;
+}
+
+body.app-mobile-shell .mobile-camera-fab {
+  pointer-events: auto !important;
+  width: 78px !important;
+  height: 78px !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  border: 1px solid rgba(113, 137, 72, 0.22) !important;
+  border-radius: 999px !important;
+  background:
+    radial-gradient(circle at top left, rgba(255, 248, 223, 0.86), transparent 42%),
+    linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(241, 247, 226, 0.97)) !important;
+  box-shadow:
+    0 18px 34px rgba(46, 41, 30, 0.2),
+    0 8px 20px rgba(94, 122, 54, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94) !important;
+  color: #44612a !important;
+}
+
+body.app-mobile-shell .mobile-camera-fab__icon {
+  width: 24px !important;
+  height: 24px !important;
+  display: block !important;
+  background: currentColor !important;
+  -webkit-mask-repeat: no-repeat !important;
+  mask-repeat: no-repeat !important;
+  -webkit-mask-position: center !important;
+  mask-position: center !important;
+  -webkit-mask-size: contain !important;
+  mask-size: contain !important;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 4.5 7.8 6H5.5A2.5 2.5 0 0 0 3 8.5v8A2.5 2.5 0 0 0 5.5 19h13a2.5 2.5 0 0 0 2.5-2.5v-8A2.5 2.5 0 0 0 18.5 6h-2.3L15 4.5H9Zm3 3a4.75 4.75 0 1 1 0 9.5 4.75 4.75 0 0 1 0-9.5Zm0 2a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5Z'/%3E%3C/svg%3E") !important;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 4.5 7.8 6H5.5A2.5 2.5 0 0 0 3 8.5v8A2.5 2.5 0 0 0 5.5 19h13a2.5 2.5 0 0 0 2.5-2.5v-8A2.5 2.5 0 0 0 18.5 6h-2.3L15 4.5H9Zm3 3a4.75 4.75 0 1 1 0 9.5 4.75 4.75 0 0 1 0-9.5Zm0 2a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5Z'/%3E%3C/svg%3E") !important;
+}
+
+body.app-mobile-shell .mobile-camera-fab__label {
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.01em !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .detail-modal__content {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet {
+  display: grid !important;
+  gap: 14px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__headline-copy p {
+  margin: 6px 0 0 !important;
+  color: rgba(93, 99, 83, 0.92) !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__form {
+  display: grid !important;
+  gap: 14px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__media {
+  position: relative !important;
+  overflow: hidden !important;
+  min-height: 240px !important;
+  border-radius: 28px !important;
+  border: 1px solid rgba(255, 255, 255, 0.52) !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  box-shadow:
+    0 18px 34px rgba(49, 42, 30, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__media img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 240px !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__weather {
+  border-radius: 22px !important;
+  border: 1px solid rgba(129, 145, 93, 0.16) !important;
+  background: linear-gradient(180deg, rgba(243, 249, 228, 0.94), rgba(236, 244, 219, 0.92)) !important;
+  box-shadow:
+    0 10px 22px rgba(68, 82, 41, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  padding: 12px 14px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__weather-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__weather-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 252, 246, 0.9) !important;
+  font-size: 1.05rem !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__weather-copy {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__weather-copy strong {
+  color: #2d381f !important;
+  font-size: 0.96rem !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__weather-copy span {
+  color: rgba(85, 95, 69, 0.94) !important;
+  font-size: 0.78rem !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__core {
+  display: grid !important;
+  gap: 12px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__field textarea {
+  min-height: 118px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet .choice-group--journal-entry-type {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet .choice-group--journal-entry-type .choice-chip span {
+  border-radius: 18px !important;
+  min-height: 44px !important;
+  background: rgba(255, 252, 246, 0.92) !important;
+  border: 1px solid rgba(125, 139, 92, 0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 10px 20px rgba(56, 48, 31, 0.06) !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet .choice-group--journal-entry-type .choice-chip input:checked + span {
+  background: linear-gradient(180deg, rgba(234, 244, 207, 0.96), rgba(218, 235, 179, 0.94)) !important;
+  border-color: rgba(125, 156, 71, 0.24) !important;
+  color: #4b6b2d !important;
+}
+
+/* Mobile toolbar full-width final pass:
+   keep the top control strip stretched edge-to-edge in menu aj kategórii. */
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .utility-bar.is-collapsed,
+body.app-mobile-shell.app-main-menu-mode .utility-bar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed,
+body.app-mobile-shell.app-focused-mode .utility-bar,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed {
+  width: calc(100% + 24px) !important;
+  max-width: none !important;
+  margin: 0 -12px 8px !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .menu-toolbar,
+body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell.app-focused-mode .menu-toolbar,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .menu-toolbar {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .menu-toolbar__center,
+body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar__center,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar__center,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar__center,
+body.app-mobile-shell.app-focused-mode .menu-toolbar__center,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .menu-toolbar__center,
+body.app-mobile-shell .menu-toolbar__group--primary,
+body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar__group--primary,
+body.app-mobile-shell.app-focused-mode .menu-toolbar__group--primary,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .menu-toolbar__group--primary {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .toolbar-search,
+body.app-mobile-shell .utility-bar.is-collapsed .toolbar-search,
+body.app-mobile-shell.app-main-menu-mode .toolbar-search,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .toolbar-search,
+body.app-mobile-shell.app-focused-mode .toolbar-search,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .toolbar-search {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+/* Mobile main-menu bottom scroll fix:
+   keep enough real scroll space under the fixed bottom nav so the last memory/journal cards are reachable. */
+body.app-mobile-shell.app-main-menu-mode .content {
+  padding-bottom: calc(136px + env(safe-area-inset-bottom)) !important;
+}
+
+/* Mobile search overlay final pass:
+   results must float above category cards and weather chips in mobile/preview. */
+body.app-mobile-shell .utility-bar:has(.toolbar-search.is-open),
+body.app-mobile-shell .menu-toolbar:has(.toolbar-search.is-open),
+body.app-mobile-shell .toolbar-search.is-open {
+  position: relative !important;
+  z-index: 7600 !important;
+  isolation: isolate !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .toolbar-search__results {
+  position: fixed !important;
+  top: var(--toolbar-search-overlay-top, calc(92px + env(safe-area-inset-top))) !important;
+  left: var(--toolbar-search-overlay-left, 12px) !important;
+  right: auto !important;
+  width: var(--toolbar-search-overlay-width, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: min(46dvh, 360px) !important;
+  z-index: 7650 !important;
+  overflow-y: auto !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+body.app-mobile-shell .toolbar-search__results::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+/* Mobile full-bleed top-shell final pass:
+   large focused/detail screens should start flush to the edges without cut rounded top corners. */
+body.app-mobile-shell .detail-modal--editor,
+body.app-mobile-shell .detail-modal--settings,
+body.app-mobile-shell .detail-modal--overview,
+body.app-mobile-shell .detail-modal--weather,
+body.app-mobile-shell .detail-modal--batch,
+body.app-mobile-shell .detail-modal--worklog,
+body.app-mobile-shell .journal-overlay-root,
+body.app-mobile-shell .journal-overlay-shell {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-modal__content,
+body.app-mobile-shell .detail-modal--settings .detail-modal__content,
+body.app-mobile-shell .detail-modal--overview .detail-modal__content,
+body.app-mobile-shell .detail-modal--weather .detail-modal__content,
+body.app-mobile-shell .detail-modal--batch .detail-modal__content,
+body.app-mobile-shell .detail-modal--worklog .detail-modal__content,
+body.app-mobile-shell .journal-overlay-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-modal__content,
+body.app-mobile-shell .detail-modal--settings .detail-modal__content,
+body.app-mobile-shell .detail-modal--overview .detail-modal__content,
+body.app-mobile-shell .detail-modal--weather .detail-modal__content,
+body.app-mobile-shell .detail-modal--batch .detail-modal__content,
+body.app-mobile-shell .detail-modal--worklog .detail-modal__content,
+body.app-mobile-shell .journal-overlay-shell {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-shell__nav,
+body.app-mobile-shell.app-focused-mode .category-shell__nav--compact,
+body.app-mobile-shell.app-focused-mode .category-panel--summary,
+body.app-mobile-shell.app-focused-mode .subcatalog,
+body.app-mobile-shell .detail-modal--editor .detail-copy--wide,
+body.app-mobile-shell .detail-modal--editor .detail-copy--editor,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor,
+body.app-mobile-shell .detail-modal--editor .editor-gallery,
+body.app-mobile-shell .detail-modal--settings .settings-sheet,
+body.app-mobile-shell .detail-modal--settings .settings-hero,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--overview .overview-manager.detail-copy--wide,
+body.app-mobile-shell .detail-modal--weather .weather-overview.detail-copy--wide,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager.detail-copy--wide,
+body.app-mobile-shell .detail-modal--worklog .worklog-manager.detail-copy--wide,
+body.app-mobile-shell .journal-overlay-shell__body {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+/* Mobile sticky back + rounded inner-panels final pass:
+   keep full-screen shells flat, but preserve rounded content cards and pin Back at the top. */
+body.app-mobile-shell .detail-modal__back,
+body.app-mobile-shell .image-lightbox__back {
+  position: fixed !important;
+  top: calc(10px + env(safe-area-inset-top)) !important;
+  left: 10px !important;
+  z-index: 7900 !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell__topline {
+  position: sticky !important;
+  top: calc(8px + env(safe-area-inset-top)) !important;
+  z-index: 7900 !important;
+}
+
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell.app-focused-mode .category-panel--summary,
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .detail-modal--settings .settings-hero,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--settings .settings-panel--wide,
+body.app-mobile-shell .detail-modal--weather .weather-overview__hero,
+body.app-mobile-shell .detail-modal--weather .weather-overview__external,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group,
+body.app-mobile-shell .detail-modal--weather .weather-alert,
+body.app-mobile-shell .detail-modal--worklog .worklog-section,
+body.app-mobile-shell .journal-overlay-frame__head,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .journal-overlay-group {
+  border-top-left-radius: 24px !important;
+  border-top-right-radius: 24px !important;
+  border-bottom-left-radius: 24px !important;
+  border-bottom-right-radius: 24px !important;
+  overflow: hidden !important;
+}
+
+/* Mobile focused width parity final pass:
+   subcategories must keep the same side gutters and visual density as the main menu. */
+body.app-mobile-shell.app-focused-mode .content {
+  width: auto !important;
+  max-width: none !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  gap: 14px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-shell__nav,
+body.app-mobile-shell.app-focused-mode .category-shell__nav--compact,
+body.app-mobile-shell.app-focused-mode .category-panel--summary,
+body.app-mobile-shell.app-focused-mode .subcatalog,
+body.app-mobile-shell.app-focused-mode .subcatalog--overview {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-shell__nav,
+body.app-mobile-shell.app-focused-mode .category-shell__nav--compact {
+  margin: 12px 0 10px !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .breadcrumb--compact {
+  padding: 0 8px 2px !important;
+}
+
+/* Mobile section surface parity:
+   journal/tasks/weather helper sections should look like the same app family, not flatter than category cards. */
+body.app-mobile-shell .home-section,
+body.app-mobile-shell .progress-card,
+body.app-mobile-shell .journal-disclosure,
+body.app-mobile-shell .worklog-section,
+body.app-mobile-shell .journal-tag-filter {
+  padding: 16px !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(123, 105, 77, 0.14) !important;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(245, 238, 227, 0.94)) !important;
+  box-shadow:
+    0 12px 26px rgba(58, 47, 31, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .home-section__header,
+body.app-mobile-shell .worklog-section__head,
+body.app-mobile-shell .journal-disclosure__summary,
+body.app-mobile-shell .journal-tag-filter__head {
+  margin: 0 0 10px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Mobile harmony cleanup final pass:
+   equivalent panels, form cells, weather cards and journal add controls must share one visual language. */
+body.app-mobile-shell .journal-overlay-stack {
+  justify-items: stretch !important;
+}
+
+body.app-mobile-shell .journal-overlay-stack > * {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .field-block,
+body.app-mobile-shell .detail-modal--editor .status-date-row__field,
+body.app-mobile-shell .detail-modal--editor .category-manager__field,
+body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter,
+body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__selection-card,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor > .upload-field--compact,
+body.app-mobile-shell .detail-modal--editor .category-manager__field--preview,
+body.app-mobile-shell .detail-modal--worklog .relation-disclosure,
+body.app-mobile-shell .journal-overlay-shell .relation-disclosure,
+body.app-mobile-shell .journal-overlay-shell .upload-field--compact,
+body.app-mobile-shell .journal-quick-actions,
+body.app-mobile-shell .journal-tag-filter,
+body.app-mobile-shell .settings-panel__storage-meta,
+body.app-mobile-shell .settings-panel__status,
+body.app-mobile-shell .settings-panel__account-grid > *,
+body.app-mobile-shell .entry-advanced {
+  padding: 14px !important;
+  gap: 10px !important;
+  border-radius: 22px !important;
+  border: 1px solid rgba(126, 112, 88, 0.14) !important;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(245, 238, 227, 0.94)) !important;
+  box-shadow:
+    0 10px 22px rgba(56, 47, 30, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .field-block > span,
+body.app-mobile-shell .detail-modal--editor .status-date-row__field span,
+body.app-mobile-shell .detail-modal--editor .field-block__heading,
+body.app-mobile-shell .detail-modal--editor .field-block__subfield-label {
+  margin: 0 !important;
+}
+
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell .home-section,
+body.app-mobile-shell .progress-card,
+body.app-mobile-shell .worklog-section,
+body.app-mobile-shell .journal-overlay-frame__head,
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .detail-modal--editor .detail-copy__actions,
+body.app-mobile-shell .detail-modal--weather .weather-week-card__summary,
+body.app-mobile-shell .detail-modal--weather .weather-day-card__temp,
+body.app-mobile-shell .detail-modal--weather .weather-day-card__metric,
+body.app-mobile-shell .detail-modal--weather .weather-day-card__badge,
+body.app-mobile-shell .detail-modal--weather .weather-day-card__today {
+  border-radius: 24px !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__actions {
+  padding: 14px !important;
+  border: 1px solid var(--mobile-unified-border) !important;
+  background: var(--mobile-unified-card-bg) !important;
+  box-shadow: var(--mobile-unified-inner-shadow) !important;
+}
+
+body.app-mobile-shell .journal-overlay-frame__head {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 12px !important;
+}
+
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .journal-overlay-shell__topline {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body.app-mobile-shell .weather-week-card,
+body.app-mobile-shell .weather-day-card,
+body.app-mobile-shell .weather-day-card__temp,
+body.app-mobile-shell .weather-day-card__metric,
+body.app-mobile-shell .weather-day-card__badge,
+body.app-mobile-shell .weather-day-card__today,
+body.app-mobile-shell .weather-overview__summary-chip {
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.95), rgba(244, 238, 227, 0.92)) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .entry-mode-switch--cards .entry-mode-switch__button,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--journal-entry-type .choice-chip span,
+body.app-mobile-shell .photo-quick-sheet .choice-group--journal-entry-type .choice-chip span,
+body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button,
+body.app-mobile-shell .journal-overlay-mobile-actions .journal-overlay-mode-switch .entry-mode-switch__button {
+  border-radius: 18px !important;
+  border: 1px solid rgba(111, 143, 59, 0.18) !important;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(247, 241, 230, 0.94)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 10px 20px rgba(61, 53, 38, 0.06) !important;
+  color: #355220 !important;
+  font-weight: 800 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .entry-mode-switch--cards .entry-mode-switch__button.is-active,
+body.app-mobile-shell .detail-modal--editor .entry-mode-switch--cards .entry-mode-switch__button[aria-pressed="true"],
+body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button.is-active,
+body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button[aria-pressed="true"],
+body.app-mobile-shell .journal-overlay-mobile-actions .journal-overlay-mode-switch .entry-mode-switch__button.is-active,
+body.app-mobile-shell .journal-overlay-mobile-actions .journal-overlay-mode-switch .entry-mode-switch__button[aria-pressed="true"],
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--journal-entry-type .choice-chip input:checked + span,
+body.app-mobile-shell .photo-quick-sheet .choice-group--journal-entry-type .choice-chip input:checked + span {
+  border-color: rgba(88, 118, 48, 0.34) !important;
+  background: linear-gradient(180deg, #8ab457, #6a9436) !important;
+  box-shadow:
+    0 14px 26px rgba(71, 95, 39, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  color: #fffaf0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-add,
+body.app-mobile-shell #journal-overlay-submit,
+body.app-mobile-shell #open-add-entry-from-journal,
+body.app-mobile-shell #open-add-task-from-worklog {
+  border-radius: 18px !important;
+  border: 1px solid rgba(88, 118, 48, 0.34) !important;
+  background: linear-gradient(180deg, #8ab457, #6a9436) !important;
+  box-shadow:
+    0 14px 26px rgba(71, 95, 39, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  color: #fffaf0 !important;
+}
+
+/* Mobile media + weather + focused-top harmony hardening:
+   restore fully rounded media surfaces, stop weather chips from clipping,
+   and keep focused category top spacing aligned with the main menu rhythm. */
+body.app-mobile-shell .catalog-card__image,
+body.app-mobile-shell .detail-image,
+body.app-mobile-shell .detail-image--editor,
+body.app-mobile-shell .category-preview,
+body.app-mobile-shell .journal-item__image,
+body.app-mobile-shell .journal-overlay-card__gallery .journal-item__image,
+body.app-mobile-shell .editor-gallery__mini,
+body.app-mobile-shell .editor-gallery__thumb,
+body.app-mobile-shell .memory-strip__hero {
+  border-radius: 22px !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--bird .catalog-card__image,
+body.app-mobile-shell .detail-modal--editor .category-preview {
+  border-radius: 22px !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__shade,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__image::before,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__image::after {
+  border-bottom-left-radius: 22px !important;
+  border-bottom-right-radius: 22px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .category-manager__preview-shell,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor {
+  border-radius: 24px !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .weather-week-card,
+body.app-mobile-shell .weather-day-card,
+body.app-mobile-shell .weather-day-card__temps,
+body.app-mobile-shell .weather-day-card__metrics,
+body.app-mobile-shell .weather-day-card__badges,
+body.app-mobile-shell .weather-week-card__summary {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .weather-day-card__temps {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .weather-day-card__temp {
+  min-height: 48px !important;
+  padding: 8px 8px 8px 7px !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .weather-day-card__metric,
+body.app-mobile-shell .weather-day-card__badge,
+body.app-mobile-shell .weather-day-card__today {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .weather-day-card__temp-icon {
+  margin-left: 0 !important;
+}
+
+body.app-mobile-shell .weather-day-card__temp-copy,
+body.app-mobile-shell .weather-day-card__metric strong {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
+  margin: 0 -12px 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-shell__nav,
+body.app-mobile-shell.app-focused-mode .category-shell__nav--compact {
+  margin: 0 0 8px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .breadcrumb--compact {
+  padding: 0 4px 2px !important;
+}
+
+/* Mobile top + back + detail-photo alignment final pass:
+   keep utility bar/weather aligned equally in main menu and subcategories,
+   pin Back to the top everywhere, and keep real detail photos less rounded. */
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .utility-bar.is-collapsed,
+body.app-mobile-shell.app-main-menu-mode .utility-bar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed,
+body.app-mobile-shell.app-focused-mode .utility-bar,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed,
+body.app-mobile-shell .mobile-toolbar-weather-slot,
+body.app-mobile-shell.app-main-menu-mode .mobile-toolbar-weather-slot,
+body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
+  width: calc(100% + 24px) !important;
+  max-width: none !important;
+  margin-left: -12px !important;
+  margin-right: -12px !important;
+}
+
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .utility-bar.is-collapsed,
+body.app-mobile-shell.app-main-menu-mode .utility-bar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed,
+body.app-mobile-shell.app-focused-mode .utility-bar,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed {
+  margin-top: 0 !important;
+  margin-bottom: 8px !important;
+}
+
+body.app-mobile-shell .mobile-toolbar-weather-slot,
+body.app-mobile-shell.app-main-menu-mode .mobile-toolbar-weather-slot,
+body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
+  justify-content: flex-end !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal__back,
+body.app-mobile-shell .journal-overlay-shell__back,
+body.app-mobile-shell .image-lightbox__back,
+body.app-mobile-shell .back-button {
+  position: fixed !important;
+  top: calc(10px + env(safe-area-inset-top)) !important;
+  left: 12px !important;
+  z-index: 9200 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-layout--editor,
+body.app-mobile-shell .detail-modal--editor .detail-layout--compact {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image--editor {
+  margin-top: -4px !important;
+  padding-top: 10px !important;
+  border-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image--editor::before,
+body.app-mobile-shell .detail-modal--editor .category-preview,
+body.app-mobile-shell .detail-modal--editor .category-preview img,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor img,
+body.app-mobile-shell .detail-image img {
+  border-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy--editor,
+body.app-mobile-shell .photo-quick-sheet {
+  padding-top: 6px !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline {
+  padding-top: 0 !important;
+  padding-bottom: 4px !important;
+  margin-bottom: -2px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .entry-mode-switch--cards {
+  margin-top: -6px !important;
+}
+
+/* Mobile unified search strip final lock:
+   the visible search/actions strip must keep the same height
+   in main menu aj po otvoreni kategorie. */
+body.app-mobile-shell .utility-bar.is-collapsed,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 8px !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+
+body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .menu-toolbar {
+  display: block !important;
+  max-height: none !important;
+  min-height: 48px !important;
+  padding: 6px 8px !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar__center,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar__center,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .menu-toolbar__center {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar__group--primary,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .menu-toolbar__group--primary {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: 100% !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell .utility-bar.is-collapsed .toolbar-search,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .toolbar-search,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .toolbar-search {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell .utility-bar.is-collapsed .toolbar-search__field,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .toolbar-search__field,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .toolbar-search__field,
+body.app-mobile-shell .utility-bar.is-collapsed .toolbar-search__field:focus-within,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .toolbar-search__field:focus-within,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .toolbar-search__field:focus-within,
+body.app-mobile-shell .utility-bar.is-collapsed .button--toolbar-add,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .button--toolbar-add,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .button--toolbar-add,
+body.app-mobile-shell .utility-bar.is-collapsed .button--toolbar-utility,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .button--toolbar-utility,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .button--toolbar-utility,
+body.app-mobile-shell .utility-bar.is-collapsed .toolbar-add-menu__summary,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .toolbar-add-menu__summary,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .toolbar-add-menu__summary {
+  min-height: 36px !important;
+  height: 36px !important;
+}
+
+/* Mobile weather min/max + top icon switch parity:
+   weather min/max cells need more breathing room,
+   and the mobile card-type switch should stay in one horizontal row
+   with the same family feel as card type pills. */
+body.app-mobile-shell .weather-day-card,
+body.app-mobile-shell .weather-day-card__temps,
+body.app-mobile-shell .weather-day-card__metrics,
+body.app-mobile-shell .weather-day-card__badges {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .weather-day-card__temps {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .weather-day-card__temp {
+  min-height: 50px !important;
+  padding: 8px 10px 8px 8px !important;
+  border-radius: 16px !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .weather-day-card__temp-copy {
+  gap: 1px !important;
+}
+
+body.app-mobile-shell .weather-day-card__temp-label,
+body.app-mobile-shell .weather-day-card__temps strong {
+  display: block !important;
+  line-height: 1.05 !important;
+}
+
+body.app-mobile-shell .weather-day-card__metric,
+body.app-mobile-shell .weather-day-card__badge,
+body.app-mobile-shell .weather-day-card__today {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-editor-mobile-switch {
+  margin-top: -4px !important;
+}
+
+body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch--topbar {
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  padding: 2px 0 !important;
+}
+
+body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button {
+  width: auto !important;
+  min-width: max-content !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 12px !important;
+  border-radius: 18px !important;
+}
+
+body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button-content {
+  gap: 8px !important;
+  width: auto !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button-icon {
+  width: 18px !important;
+  height: 18px !important;
+  font-size: 0.96rem !important;
+}
+
+body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  font-size: 0.8rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
 }
