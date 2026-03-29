@@ -384,8 +384,10 @@
   function canvasRenderDpr(canvas) {
     const deviceDpr = Math.max(1, Number(window.devicePixelRatio) || 1);
     const isMobileShell = isMobileWeatherShell();
+    const lowPerformanceMobile = isLowPerformanceMobileWeatherMode();
     if (canvas === state.skyCanvas) {
       if (isMobileShell) {
+        if (lowPerformanceMobile) return 1;
         if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1);
         if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1);
         if (state.activeCloudPreset === "partly") return Math.min(deviceDpr, 1.02);
@@ -405,6 +407,7 @@
         || state.activePhenomenon === "sleet"
         || state.activePhenomenon === "hail";
       if (isMobileShell) {
+        if (lowPerformanceMobile) return 1;
         if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1);
         if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, isPrecipScene ? 1.01 : 1);
         if (isHeavySky) return Math.min(deviceDpr, 1.01);
@@ -417,7 +420,7 @@
     }
 
     if (canvas === state.treeCanvas) {
-      if (isMobileShell) return Math.min(deviceDpr, 1);
+      if (isMobileShell) return 1;
       if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1.02);
       if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1.06);
       return Math.min(deviceDpr, 1.12);
@@ -693,6 +696,19 @@
 
   function animationFrameIntervalMs() {
     if (!isMobileWeatherShell()) return 0;
+    if (isLowPerformanceMobileWeatherMode()) {
+      if (state.activeSceneKey === "hail" || state.activePhenomenon === "storm") return 64;
+      if (
+        state.activePhenomenon === "rain"
+        || state.activePhenomenon === "snow"
+        || state.activePhenomenon === "sleet"
+        || state.activeCloudPreset === "overcast"
+        || state.activeCloudPreset === "cloudy"
+      ) {
+        return 56;
+      }
+      return 48;
+    }
     if (state.activeSceneKey === "hail" || state.activePhenomenon === "storm") return 36;
     if (
       state.activePhenomenon === "rain"
@@ -708,6 +724,12 @@
 
   function skyRedrawIntervalMs() {
     if (state.activeElectricityLevel > 0.04 || state.lightningValue > 0.02) return 16;
+    if (isLowPerformanceMobileWeatherMode()) {
+      if (state.activeCloudPreset === "overcast") return 120;
+      if (state.activeCloudPreset === "cloudy") return 96;
+      if (state.activeCloudPreset === "partly") return 76;
+      return 56;
+    }
     if (state.activeCloudPreset === "overcast") return 42;
     if (state.activeCloudPreset === "cloudy") return 34;
     if (state.activeCloudPreset === "partly") return 26;
@@ -715,6 +737,7 @@
   }
 
   function treeRedrawIntervalMs() {
+    if (isLowPerformanceMobileWeatherMode()) return 140;
     const wind = gustStrengthFactor();
     if (wind >= 0.88) return 24;
     if (wind >= 0.42) return 30;
@@ -722,7 +745,9 @@
   }
 
   function isTreeEnabled() {
-    return typeof document !== "undefined" && Boolean(document.body?.classList.contains("app-mobile-shell"));
+    return typeof document !== "undefined"
+      && Boolean(document.body?.classList.contains("app-mobile-shell"))
+      && !isLowPerformanceMobileWeatherMode();
   }
 
   function clearTreeLayer() {
@@ -745,8 +770,33 @@
     return clamp(navRect.top - Math.max(0, Number(padding) || 0), 0, fallback);
   }
 
+  function isLowPerformanceMobileWeatherMode() {
+    if (!isMobileWeatherShell()) return false;
+    const narrowScreen = Math.min(
+      Math.max(0, Number(window.innerWidth) || 0),
+      Math.max(0, Number(state.cssWidth) || 0) || Math.max(0, Number(window.innerWidth) || 0)
+    ) <= 820;
+    const coarsePointer = typeof window.matchMedia === "function"
+      ? window.matchMedia("(pointer: coarse)").matches
+      : false;
+    return coarsePointer || narrowScreen;
+  }
+
   function mobileParticleBudgetFactor() {
     if (!isMobileWeatherShell()) return 1;
+    if (isLowPerformanceMobileWeatherMode()) {
+      if (
+        state.activeSceneKey === "hail"
+        || state.activePhenomenon === "storm"
+        || state.activePhenomenon === "rain"
+        || state.activePhenomenon === "snow"
+        || state.activePhenomenon === "sleet"
+      ) {
+        return 0.42;
+      }
+      if (state.activeCloudPreset === "overcast" || state.activeCloudPreset === "cloudy") return 0.52;
+      return 0.62;
+    }
     if (
       state.activeSceneKey === "hail"
       || state.activePhenomenon === "storm"
@@ -3136,7 +3186,7 @@
     const capBoost = intensityMeta.band === "extreme"
       ? Math.min(3.0, (1 + stageBoost * 0.34 + intensityMeta.overdrive * 0.22) * Math.min(1.22, presenceBoost) * Math.min(1, mobileBudget + 0.08))
       : Math.min(2.6, (1 + stageBoost * 0.28 + intensityMeta.overdrive * 0.18) * Math.min(1.18, presenceBoost) * Math.min(1, mobileBudget + 0.08));
-    if (areWindTrailsActive()) {
+    if (areWindTrailsActive() && !isLowPerformanceMobileWeatherMode()) {
       state.windTrails = makeWindLayer();
     }
     if (strength <= 0.02) return;
@@ -4518,6 +4568,7 @@
     if (!state.precipCtx || !state.fxCtx) return;
     const w = state.cssWidth;
     const h = state.cssHeight;
+    const lowPerformanceMobile = isLowPerformanceMobileWeatherMode();
     state.precipCtx.clearRect(0, 0, w, h);
     state.fxCtx.clearRect(0, 0, w, h);
     // Predna cloud overlay vrstva posobila v rohoch ako staticky texturovy flak.
@@ -4531,14 +4582,16 @@
     if (state.snowNear.length) drawSnowLayer(state.snowNear, time);
     if (state.hailMid.length) drawHailLayer(state.hailMid, false, time);
     if (state.hailNear.length) drawHailLayer(state.hailNear, true, time);
-    if (state.windTrails.length) drawWindTrails(time);
+    if (!lowPerformanceMobile && state.windTrails.length) drawWindTrails(time);
 
-    drawGroundHaze();
-    drawWeatherFloor(time);
-    drawSnowGroundAccumulation(time);
-    drawHailGroundAccumulation(time);
+    if (!lowPerformanceMobile) {
+      drawGroundHaze();
+      drawWeatherFloor(time);
+      drawSnowGroundAccumulation(time);
+      drawHailGroundAccumulation(time);
+    }
     drawLightningBolt();
-    drawSplashes();
+    if (!lowPerformanceMobile) drawSplashes();
   }
 
   function resetRainDrop(drop, time) {
