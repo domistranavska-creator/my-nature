@@ -32846,6 +32846,73 @@ body.app-mobile-shell .season-card--memories {
   margin-right: 0 !important;
 }
 
+/* Mobile flat pass:
+   zrusit zaoblenia len v mobile, aby sa rozlozenie citalo rovno a bez optickeho posunu. */
+body.app-mobile-shell .page-shell,
+body.app-mobile-shell .hero,
+body.app-mobile-shell .hero__text,
+body.app-mobile-shell .content,
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .menu-toolbar,
+body.app-mobile-shell .utility-bar__settings,
+body.app-mobile-shell .panel,
+body.app-mobile-shell .panel--menu,
+body.app-mobile-shell .panel--sticky,
+body.app-mobile-shell .catalog-card--main-menu-card,
+body.app-mobile-shell .catalog-card--main-menu-card::before,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell .catalog-card--child .catalog-card__image,
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell .category-action-disclosure__summary,
+body.app-mobile-shell .category-action-panel,
+body.app-mobile-shell .category-action-panel--inline,
+body.app-mobile-shell .season-card,
+body.app-mobile-shell .home-card,
+body.app-mobile-shell .home-section,
+body.app-mobile-shell .sidebar-preview-card,
+body.app-mobile-shell .progress-card,
+body.app-mobile-shell .memory-strip__frame,
+body.app-mobile-shell .memory-strip__hero,
+body.app-mobile-shell .toolbar-add-menu__summary,
+body.app-mobile-shell .toolbar-add-menu__panel,
+body.app-mobile-shell .toolbar-add-submenu__panel,
+body.app-mobile-shell .button,
+body.app-mobile-shell .button--toolbar-home,
+body.app-mobile-shell .button--toolbar-add,
+body.app-mobile-shell .button--toolbar-utility,
+body.app-mobile-shell .detail-modal,
+body.app-mobile-shell .detail-modal__content,
+body.app-mobile-shell .detail-modal__back,
+body.app-mobile-shell .detail-copy__headline,
+body.app-mobile-shell .settings-sheet,
+body.app-mobile-shell .settings-hero,
+body.app-mobile-shell .settings-panel,
+body.app-mobile-shell .settings-panel--wide,
+body.app-mobile-shell .weather-overview__hero,
+body.app-mobile-shell .weather-overview__external,
+body.app-mobile-shell .weather-overview .overview-group,
+body.app-mobile-shell .weather-alert,
+body.app-mobile-shell .weather-week-card,
+body.app-mobile-shell .weather-day-card,
+body.app-mobile-shell .task-item,
+body.app-mobile-shell .journal-item,
+body.app-mobile-shell .journal-overlay-shell,
+body.app-mobile-shell .journal-overlay-frame__head,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .journal-tag-filter,
+body.app-mobile-shell .mobile-bottom-nav,
+body.app-mobile-shell .mobile-bottom-nav__button,
+body.app-mobile-shell input:not([type="checkbox"]):not([type="radio"]),
+body.app-mobile-shell select,
+body.app-mobile-shell textarea,
+body.app-mobile-shell .tag,
+body.app-mobile-shell .choice-chip span,
+body.app-mobile-shell .filter,
+body.app-mobile-shell .breadcrumb__item {
+  border-radius: 0 !important;
+}
+
 body.app-mobile-shell .content {
   overflow-x: hidden !important;
   overflow-y: visible !important;
@@ -32866,4 +32933,210 @@ body.app-mobile-shell .mobile-toolbar-weather-slot {
 body.app-mobile-shell .mobile-toolbar-weather-slot {
   padding-left: 0 !important;
   padding-right: 0 !important;
+}
+
+/* Mobile main menu hard reset:
+   home screen must stay centered, naturally scrollable and free from late negative-margin toolbar locks. */
+body.app-mobile-shell.app-main-menu-mode .content {
+  margin: 0 !important;
+  padding: 0 12px calc(24px + env(safe-area-inset-bottom)) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  border-radius: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar__center,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .utility-bar__settings,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar__group--settings {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .toolbar-search,
+body.app-mobile-shell.app-main-menu-mode .mobile-toolbar-weather-slot,
+body.app-mobile-shell.app-main-menu-mode .catalog-grid--main-menu,
+body.app-mobile-shell.app-main-menu-mode .panel--menu,
+body.app-mobile-shell.app-main-menu-mode .main-menu,
+body.app-mobile-shell.app-main-menu-mode .menu-group,
+body.app-mobile-shell.app-main-menu-mode .workspace-layout--menu,
+body.app-mobile-shell.app-main-menu-mode .workspace-side,
+body.app-mobile-shell.app-main-menu-mode .panel--sticky,
+body.app-mobile-shell.app-main-menu-mode .season-card--memories,
+body.app-mobile-shell.app-main-menu-mode .progress-overview,
+body.app-mobile-shell.app-main-menu-mode .season-grid--sidebar {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .panel--menu,
+body.app-mobile-shell.app-main-menu-mode .main-menu,
+body.app-mobile-shell.app-main-menu-mode .menu-group,
+body.app-mobile-shell.app-main-menu-mode .workspace-layout--menu,
+body.app-mobile-shell.app-main-menu-mode .panel--sticky {
+  display: block !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .catalog-grid--main-menu {
+  margin-top: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .season-card--memories {
+  height: auto !important;
+  align-self: auto !important;
+  justify-self: stretch !important;
+}
+
+/* Mobile modal shell reset:
+   dennik je stabilny, ostatne obrazovky dorovname na rovnaky fullscreen flow bez bocneho posunu. */
+body.app-mobile-shell .detail-modal[open] {
+  position: fixed !important;
+  inset: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  transform: none !important;
+}
+
+body.app-mobile-shell .detail-modal__content {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  border-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-copy,
+body.app-mobile-shell .detail-copy--wide,
+body.app-mobile-shell .detail-copy--editor,
+body.app-mobile-shell .worklog-manager.detail-copy--wide,
+body.app-mobile-shell .weather-overview.detail-copy--wide,
+body.app-mobile-shell .overview-manager.detail-copy--wide,
+body.app-mobile-shell .category-manager.detail-copy--wide,
+body.app-mobile-shell .batch-sowing-manager.detail-copy--wide,
+body.app-mobile-shell .settings-sheet,
+body.app-mobile-shell .settings-hero,
+body.app-mobile-shell .settings-grid,
+body.app-mobile-shell .settings-panel,
+body.app-mobile-shell .settings-panel--wide {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Mobile home final pass:
+   hlavne menu musi tiect prirodzene zhora nadol bez zaseknuteho body locku a bez sticky sidebaru. */
+body.app-mobile-shell:not(.app-detail-locked) {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: auto !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode,
+body.app-mobile-shell.app-main-menu-mode .page-shell,
+body.app-mobile-shell.app-main-menu-mode .content {
+  overflow-y: auto !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .workspace-layout--menu {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 14px !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .workspace-main,
+body.app-mobile-shell.app-main-menu-mode .workspace-side,
+body.app-mobile-shell.app-main-menu-mode .panel,
+body.app-mobile-shell.app-main-menu-mode .panel--menu,
+body.app-mobile-shell.app-main-menu-mode .panel--sticky,
+body.app-mobile-shell.app-main-menu-mode #catalog,
+body.app-mobile-shell.app-main-menu-mode .home-board {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .workspace-side,
+body.app-mobile-shell.app-main-menu-mode .panel--sticky {
+  position: static !important;
+  top: auto !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .panel--sticky {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .home-board {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .home-grid,
+body.app-mobile-shell.app-main-menu-mode .home-entity-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 14px !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .home-hero,
+body.app-mobile-shell.app-main-menu-mode .home-card,
+body.app-mobile-shell.app-main-menu-mode .home-section,
+body.app-mobile-shell.app-main-menu-mode .season-card,
+body.app-mobile-shell.app-main-menu-mode .progress-card,
+body.app-mobile-shell.app-main-menu-mode .insight-strip__slide,
+body.app-mobile-shell.app-main-menu-mode .sidebar-preview-card,
+body.app-mobile-shell.app-main-menu-mode .mini-list__more,
+body.app-mobile-shell.app-main-menu-mode .mini-list__more--inline,
+body.app-mobile-shell.app-main-menu-mode .button,
+body.app-mobile-shell.app-main-menu-mode .catalog-card--main-menu-card {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: none !important;
+  animation: none !important;
 }

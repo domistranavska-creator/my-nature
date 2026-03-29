@@ -383,7 +383,14 @@
 
   function canvasRenderDpr(canvas) {
     const deviceDpr = Math.max(1, Number(window.devicePixelRatio) || 1);
+    const isMobileShell = isMobileWeatherShell();
     if (canvas === state.skyCanvas) {
+      if (isMobileShell) {
+        if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1);
+        if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1.02);
+        if (state.activeCloudPreset === "partly") return Math.min(deviceDpr, 1.06);
+        return Math.min(deviceDpr, 1.1);
+      }
       if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1.12);
       if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1.22);
       if (state.activeCloudPreset === "partly") return Math.min(deviceDpr, 1.36);
@@ -397,6 +404,12 @@
         || state.activePhenomenon === "snow"
         || state.activePhenomenon === "sleet"
         || state.activePhenomenon === "hail";
+      if (isMobileShell) {
+        if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, isPrecipScene ? 1.04 : 1);
+        if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, isPrecipScene ? 1.08 : 1.02);
+        if (isHeavySky) return Math.min(deviceDpr, 1.08);
+        return Math.min(deviceDpr, isPrecipScene ? 1.12 : 1.06);
+      }
       if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, isPrecipScene ? 1.30 : 1.24);
       if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, isPrecipScene ? 1.38 : 1.30);
       if (isHeavySky) return Math.min(deviceDpr, 1.42);
@@ -404,6 +417,7 @@
     }
 
     if (canvas === state.treeCanvas) {
+      if (isMobileShell) return Math.min(deviceDpr, 1);
       if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1.02);
       if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1.06);
       return Math.min(deviceDpr, 1.12);

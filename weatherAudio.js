@@ -1841,6 +1841,26 @@
         }
       });
 
+      const ensureGroupFallback = (groupName, layerKeys, fallbackVolume) => {
+        const hasGroupLayer = Object.keys(activeLayers).some((layerKey) => {
+          const config = this.getLoopConfig(layerKey);
+          return config?.group === groupName;
+        });
+        if (hasGroupLayer) return;
+        for (const layerKey of asArray(layerKeys)) {
+          const config = this.getLoopConfig(layerKey);
+          if (!config || !config.fileList.length) continue;
+          activeLayers[layerKey] = Math.max(activeLayers[layerKey] || 0, Math.min(MAX_LAYER_GAIN, fallbackVolume));
+          return;
+        }
+      };
+
+      if (nextState.timeOfDay === "day" && nextState.weather === "overcast") {
+        ensureGroupFallback("time", ["day_garden_soft", "day_forest_air"], 0.0048);
+        ensureGroupFallback("weather", ["overcast_air_heavy"], 0.0044);
+        ensureGroupFallback("texture", ["crowns_soft", "crowns_medium"], 0.0038);
+      }
+
       const groupTargets = this.resolveGroupTargets(nextState, preset, evaluation);
       const stabilizedLayers = this.stabilizeLoopContinuity(activeLayers, nextState);
       return {
@@ -1953,10 +1973,16 @@
         case "dawn_garden_air":
           return base * clamp(((0.08 + (calm * 0.14)) - (cloud * 0.08) - (rain * 0.05) - (nextState.weather === "overcast" ? 0.02 : 0)) * (isWinter ? 0.50 : isAutumn ? 0.74 : 0.88), 0, 0.24);
         case "day_garden_soft":
+          if (nextState.weather === "overcast") {
+            return base * clamp(((0.13 + (calm * 0.16)) - (cloud * 0.10) - (heat * 0.02)) * (isWinter ? 0.48 : isAutumn ? 0.76 : 0.92), 0.03, 0.28);
+          }
           return base * clamp(((0.10 + (calm * 0.15)) - (cloud * 0.14) - (heat * 0.03) - (nextState.weather === "overcast" ? 0.06 : 0)) * (isWinter ? 0.42 : isAutumn ? 0.70 : 0.84), 0, 0.24);
         case "day_garden_open":
           return base * clamp(((0.06 + (calm * 0.10)) - (cloud * 0.12) - (heat * 0.03) - (nextState.weather === "overcast" ? 0.05 : 0)) * (isWinter ? 0.38 : isAutumn ? 0.70 : 0.80), 0, 0.18);
         case "day_forest_air":
+          if (nextState.weather === "overcast") {
+            return base * clamp(((0.10 + (calm * 0.12)) - (cloud * 0.07) - (heat * 0.01)) * (isWinter ? 0.62 : 0.88), 0.04, 0.22);
+          }
           return base * clamp(((0.08 + (calm * 0.10)) - (cloud * 0.10) - (heat * 0.02) - (nextState.weather === "overcast" ? 0.03 : 0)) * (isWinter ? 0.56 : 0.82), 0, 0.18);
         case "evening_softbirds":
           return base * clamp(((0.24 + (calm * 0.34)) - (rain * 0.22) - (wind * 0.12)) * (isWinter ? 0.38 : isAutumn ? 0.70 : 1), 0, 1);
@@ -1981,6 +2007,10 @@
           return base * clamp(0.006 + (wind * 0.09) + (cloud * 0.016), 0, 0.08);
         case "overcast_air_heavy":
           if (nextState.timeOfDay === "night") return 0;
+          if (nextState.weather === "overcast") {
+            if (wind < 0.14 && fog < 0.12 && rain < 0.06 && cloud < 0.52) return 0;
+            return base * clamp(0.018 + (wind * 0.06) + (cloud * 0.03) + (fog * 0.02), 0.014, 0.10);
+          }
           if (wind < 0.36 && fog < 0.26 && rain < 0.16) return 0;
           return base * clamp(0.008 + (wind * 0.08) + (cloud * 0.022) + (fog * 0.02), 0, 0.08);
         case "fog_air_soft":
@@ -2020,6 +2050,14 @@
           return base * clamp(0.28 + (heat * 0.56), 0.16, 1);
         case "crowns_soft":
           if (nextState.timeOfDay === "night") return 0;
+          if (nextState.weather === "overcast") {
+            if (wind < 0.18) return 0;
+            return base * clamp(
+              0.006 + ((wind - 0.18) * 0.05) + (cloud * 0.003),
+              0.004,
+              0.028
+            );
+          }
           if (wind < 0.46) return 0;
           return base * clamp(
             (wind - 0.40) * 0.10,
@@ -2027,6 +2065,14 @@
             0.06
           );
         case "crowns_medium":
+          if (nextState.weather === "overcast") {
+            if (wind < 0.26 && rain < 0.20) return 0;
+            return base * clamp(
+              0.010 + (wind * 0.032) + (rain * 0.02),
+              0.006,
+              0.04
+            );
+          }
           if (wind < 0.68 && rain < 0.38) return 0;
           return base * clamp(
             (0.004 + (wind * 0.06) + (rain * 0.03)) * (nextState.weather === "overcast" ? 0.28 : 0.40),

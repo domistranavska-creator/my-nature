@@ -1006,6 +1006,27 @@ function unlockDetailBodyScroll() {
   unlockBodyScroll("detail");
 }
 
+function reconcileBodyScrollState() {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  const hasDetailOverlay = Boolean(detailModal?.open);
+  const hasJournalOverlay = Boolean(journalOverlayRoot());
+  const hasLightboxOverlay = Boolean(imageLightboxEl?.open);
+  const hasAuthOverlay = Boolean(authGateRoot());
+  if (hasDetailOverlay || hasJournalOverlay || hasLightboxOverlay || hasAuthOverlay) return;
+
+  const body = document.body;
+  const hasInlineLock =
+    body.classList.contains("app-detail-locked")
+    || body.style.position === "fixed"
+    || body.style.overflow === "hidden"
+    || Boolean(body.style.top)
+    || Boolean(body.style.left)
+    || Boolean(body.style.width);
+
+  if (!bodyScrollLockOwners.size && !hasInlineLock) return;
+  unlockBodyScroll();
+}
+
 function scheduleWalkMapResize(map) {
   if (!map) return;
   requestAnimationFrame(() => map.invalidateSize());
@@ -3509,6 +3530,7 @@ function render() {
   safeStep("zvýraznenia", syncOverviewHighlights);
   safeStep("mapy prechádzok", () => hydrateWalkMaps(document));
   syncAuthGate();
+  reconcileBodyScrollState();
 }
 
 function renderMainMenu() {
