@@ -1,7 +1,8 @@
 body.app-mobile-shell .page-shell {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
   background: transparent !important;
   z-index: 1;
 }
