@@ -2828,7 +2828,8 @@ function openJournalQuickActions(activeType = "") {
   `;
 }
 
-function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
+function openJournalComposer(editingEntryId = "", preferredEntryType = "", options = {}) {
+  const composerOptions = options && typeof options === "object" ? options : {};
   const editingEntry = editingEntryId
     ? normalizedJournalList().find((entry) => entry.id === editingEntryId) || null
     : null;
@@ -2836,13 +2837,17 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "") {
   const isMobileJournalShell = document.body.classList.contains("app-mobile-shell");
   const root = ensureJournalOverlayRoot();
   let existingImages = editingEntry ? [...journalImages(editingEntry)] : [];
-  let pendingFiles = [];
+  let pendingFiles = Array.isArray(composerOptions.imageFiles)
+    ? composerOptions.imageFiles.filter((file) => file instanceof File && file.size)
+    : [];
   let pendingUrls = [];
   let existingVideo = editingEntry ? journalVideo(editingEntry) : "";
   let existingVideoPath = String(editingEntry?.videoPath || "").trim();
   let existingVideoName = String(editingEntry?.videoName || "").trim();
   let existingVideoMimeType = String(editingEntry?.videoMimeType || "").trim();
-  let pendingVideoFile = null;
+  let pendingVideoFile = composerOptions.videoFile instanceof File && composerOptions.videoFile.size
+    ? composerOptions.videoFile
+    : null;
   let pendingVideoUrl = "";
   const initialDateParts = journalDateParts(editingEntry?.date || "");
   const initialDate = initialDateParts.date || todayISO();
@@ -5075,11 +5080,15 @@ function renderMainMenu() {
   syncWeatherPrecipUi(activeWeatherThemePrecipOverride ?? resolveAutoWeatherPrecipitationAmount(), activeWeatherThemePrecipOverride === null);
   syncWeatherTempUi(activeWeatherThemeTemperatureOverride ?? resolveAutoWeatherTemperature(), activeWeatherThemeTemperatureOverride === null);
   syncWeatherSceneUi(weatherSceneOnlyActive);
-  syncWeatherInlineDebugText();
-  syncWeatherAudioDebugPanel();
   bindMainMenuWeatherAudioControlEvents();
-  bindMainMenuWeatherAudioDebugEvents();
-  ensureMainMenuWeatherAudioDebugTicker();
+  if (showMobileWeatherDebugPanel) {
+    syncWeatherInlineDebugText();
+    syncWeatherAudioDebugPanel();
+    bindMainMenuWeatherAudioDebugEvents();
+    ensureMainMenuWeatherAudioDebugTicker();
+  } else {
+    stopMainMenuWeatherAudioDebugTicker();
+  }
 }
 
 function ensureSettingsToolbarButton() {
@@ -5454,7 +5463,24 @@ function ensureMobileCameraPicker() {
     host.hidden = true;
     host.setAttribute("aria-hidden", "true");
     host.innerHTML = `
-      <input id="mobile-camera-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" capture="environment" hidden>
+      <div class="mobile-camera-picker__scrim" data-mobile-camera-close></div>
+      <div class="mobile-camera-picker__sheet" role="dialog" aria-modal="true" aria-label="Pridať médiá">
+        <div class="mobile-camera-picker__head">
+          <strong>Pridať médiá</strong>
+          <span>Vyber, či chceš fotiť, zobrať niečo z mobilu alebo pridať video.</span>
+        </div>
+        <div class="mobile-camera-picker__actions">
+          <button class="mobile-camera-picker__button" type="button" data-mobile-camera-action="capture-photo">Odfotiť</button>
+          <button class="mobile-camera-picker__button" type="button" data-mobile-camera-action="pick-photo">Vybrať fotku</button>
+          <button class="mobile-camera-picker__button" type="button" data-mobile-camera-action="capture-video">Natočiť video</button>
+          <button class="mobile-camera-picker__button" type="button" data-mobile-camera-action="pick-video">Vybrať video</button>
+          <button class="mobile-camera-picker__button mobile-camera-picker__button--ghost" type="button" data-mobile-camera-close>Zrušiť</button>
+        </div>
+      </div>
+      <input id="mobile-camera-capture-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" capture="environment" hidden>
+      <input id="mobile-camera-gallery-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" hidden>
+      <input id="mobile-video-capture-input" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" capture="environment" hidden>
+      <input id="mobile-video-gallery-input" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" hidden>
     `;
     document.body.appendChild(host);
   }
@@ -5465,27 +5491,91 @@ function ensureMobileCameraPicker() {
 
   if (host.dataset.bound !== "true") {
     host.dataset.bound = "true";
-    const input = host.querySelector("#mobile-camera-input");
-    input?.addEventListener("change", () => {
-      const file = Array.from(input.files || []).find((item) => item instanceof File && item.size) || null;
-      input.value = "";
-      if (!file) return;
-      openQuickPhotoEntryFlow(file);
+    const closePicker = () => {
+      host.hidden = true;
+      host.setAttribute("aria-hidden", "true");
+      host.classList.remove("is-open");
+    };
+    const openInput = (selector) => {
+      const input = host.querySelector(selector);
+      if (input instanceof HTMLInputElement) {
+        input.click();
+      }
+    };
+    host.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+      if (target.closest("[data-mobile-camera-close]")) {
+        event.preventDefault();
+        closePicker();
+        return;
+      }
+      const actionButton = target.closest("[data-mobile-camera-action]");
+      if (!(actionButton instanceof HTMLButtonElement)) return;
+      event.preventDefault();
+      const action = String(actionButton.getAttribute("data-mobile-camera-action") || "").trim();
+      if (action === "capture-photo") {
+        openInput("#mobile-camera-capture-input");
+        return;
+      }
+      if (action === "pick-photo") {
+        openInput("#mobile-camera-gallery-input");
+        return;
+      }
+      if (action === "capture-video") {
+        openInput("#mobile-video-capture-input");
+        return;
+      }
+      if (action === "pick-video") {
+        openInput("#mobile-video-gallery-input");
+      }
     });
+    const bindFileInput = (selector, kind = "image") => {
+      const input = host.querySelector(selector);
+      input?.addEventListener("change", () => {
+        const file = Array.from(input.files || []).find((item) => item instanceof File && item.size) || null;
+        input.value = "";
+        closePicker();
+        if (!file) return;
+        if (kind === "video") {
+          openJournalComposer("", "note", { videoFile: file });
+          return;
+        }
+        openQuickPhotoEntryFlow(file).catch((error) => {
+          console.error("Rýchly fotozápis sa teraz nepodarilo otvoriť.", error);
+        });
+      });
+    };
+    bindFileInput("#mobile-camera-capture-input", "image");
+    bindFileInput("#mobile-camera-gallery-input", "image");
+    bindFileInput("#mobile-video-capture-input", "video");
+    bindFileInput("#mobile-video-gallery-input", "video");
   }
 
-  return host.querySelector("#mobile-camera-input");
+  return host;
 }
 
 function openMobileCameraPicker() {
-  const input = ensureMobileCameraPicker();
-  input?.click();
+  const host = ensureMobileCameraPicker();
+  if (!host) return;
+  host.hidden = false;
+  host.setAttribute("aria-hidden", "false");
+  host.classList.add("is-open");
 }
 
-function openQuickPhotoEntryFlow(photoFile) {
+async function openQuickPhotoEntryFlow(photoFile) {
   if (!(photoFile instanceof File) || !photoFile.size) return;
 
-  const previewUrl = URL.createObjectURL(photoFile);
+  let previewUrl = "";
+  try {
+    previewUrl = await fileToOptimizedDataUrl(photoFile, 1280, 0.78);
+  } catch (error) {
+    previewUrl = URL.createObjectURL(photoFile);
+  }
+  if (!previewUrl) {
+    previewUrl = URL.createObjectURL(photoFile);
+  }
+  const shouldRevokePreviewUrl = String(previewUrl || "").startsWith("blob:");
   const suggestedPlace = lastSuggestedJournalPlace();
   const defaultEntryType = "note";
   let currentWeatherSnapshot = homeWeatherSnapshot || null;
@@ -5538,7 +5628,9 @@ function openQuickPhotoEntryFlow(photoFile) {
   const textInput = formEl?.elements.text;
 
   const cleanupQuickPhotoFlow = () => {
-    URL.revokeObjectURL(previewUrl);
+    if (shouldRevokePreviewUrl && previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
   };
 
   detailModal.addEventListener("close", cleanupQuickPhotoFlow, { once: true });
@@ -6828,10 +6920,16 @@ function bindMainMenuWeatherAudioControlEvents() {
   mainMenuWeatherAudioControlsBound = true;
 }
 
+function stopMainMenuWeatherAudioDebugTicker() {
+  if (!mainMenuWeatherAudioDebugTimer || typeof window === "undefined") return;
+  window.clearInterval(mainMenuWeatherAudioDebugTimer);
+  mainMenuWeatherAudioDebugTimer = 0;
+}
+
 function ensureMainMenuWeatherAudioDebugTicker() {
-  if (typeof window === "undefined" || mainMenuWeatherAudioDebugTimer) return;
+  if (typeof window === "undefined" || mainMenuWeatherAudioDebugTimer || !shouldShowWeatherDebugUi()) return;
   mainMenuWeatherAudioDebugTimer = window.setInterval(() => {
-    if (typeof document === "undefined" || !document.body?.classList.contains("app-mobile-shell")) return;
+    if (typeof document === "undefined" || !document.body?.classList.contains("app-mobile-shell") || !shouldShowWeatherDebugUi()) return;
     updateMainMenuWeatherAudioDebugPanel();
   }, 320);
 }
