@@ -782,6 +782,10 @@
     return coarsePointer || narrowScreen;
   }
 
+  function shouldUseStaticMobileWeatherScene() {
+    return isLowPerformanceMobileWeatherMode();
+  }
+
   function mobileParticleBudgetFactor() {
     if (!isMobileWeatherShell()) return 1;
     if (isLowPerformanceMobileWeatherMode()) {
@@ -3478,7 +3482,24 @@
     if (state.splashes.length > maxSplashes) state.splashes.shift();
   }
 
+  function stopAnimationLoop() {
+    if (!state.rafId) return;
+    window.cancelAnimationFrame(state.rafId);
+    state.rafId = 0;
+  }
+
   function ensureAnimation() {
+    if (shouldUseStaticMobileWeatherScene()) {
+      stopAnimationLoop();
+      const now = performance.now();
+      state.startTs = now;
+      state.lastFrameTs = 0;
+      state.lastSkyDrawTs = 0;
+      state.lastTreeDrawTs = 0;
+      state.frameScale = 1;
+      renderFrame(now);
+      return;
+    }
     if (state.rafId) return;
     state.startTs = performance.now();
     state.lastFrameTs = 0;

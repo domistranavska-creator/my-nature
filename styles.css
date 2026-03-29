@@ -35054,3 +35054,380 @@ body.app-mobile-shell .weather-audio-inline {
   backdrop-filter: blur(8px) saturate(110%) !important;
   -webkit-backdrop-filter: blur(8px) saturate(110%) !important;
 }
+
+/* Mobile list/settings performance pass:
+   odrody a nastavenia dostanú ľahšie povrchy, menej dekorácií a lacnejší scroll. */
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry {
+  contain: layout paint style !important;
+  content-visibility: auto;
+  contain-intrinsic-size: 560px !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.99), rgba(247, 241, 231, 0.98)) !important;
+  box-shadow: 0 8px 16px rgba(56, 47, 30, 0.06) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety::after,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry::after,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry::after,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__image::after {
+  content: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety:hover,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety:focus-visible,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry:hover,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry:focus-visible,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry:hover,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry:focus-visible {
+  transform: none !important;
+  box-shadow: 0 8px 16px rgba(56, 47, 30, 0.06) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image {
+  box-shadow: none !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image img {
+  transition: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__body,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__body,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__body {
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__shade .eyebrow {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .detail-modal__content::before {
+  content: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .detail-modal__content,
+body.app-mobile-shell .detail-modal--settings .settings-sheet,
+body.app-mobile-shell .detail-modal--settings .settings-hero,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--settings .settings-panel__storage-meta,
+body.app-mobile-shell .detail-modal--settings .settings-panel__status,
+body.app-mobile-shell .detail-modal--settings .settings-panel__account-grid > *,
+body.app-mobile-shell .detail-modal--settings .settings-form input,
+body.app-mobile-shell .detail-modal--settings .settings-form select,
+body.app-mobile-shell .detail-modal--settings .settings-form textarea {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(255, 251, 244, 0.98) !important;
+  box-shadow: 0 6px 14px rgba(56, 47, 30, 0.05) !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel {
+  contain: layout paint style !important;
+  content-visibility: auto;
+  contain-intrinsic-size: 320px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card,
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell .home-section,
+body.app-mobile-shell .progress-card,
+body.app-mobile-shell .journal-disclosure,
+body.app-mobile-shell .worklog-section,
+body.app-mobile-shell .category-panel--summary {
+  contain: layout paint style !important;
+  content-visibility: auto;
+  contain-intrinsic-size: 280px !important;
+}
+
+/* Mobile emergency lite mode:
+   final override to suppress the heaviest blur, animation and decorative layers
+   on real phones where scroll and typing must stay smooth. */
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .toolbar-search__field,
+body.app-mobile-shell .button--toolbar-add,
+body.app-mobile-shell .button--toolbar-utility,
+body.app-mobile-shell .toolbar-add-menu__summary,
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell .catalog-card,
+body.app-mobile-shell .catalog-card__image,
+body.app-mobile-shell .catalog-card__body,
+body.app-mobile-shell .home-card,
+body.app-mobile-shell .home-section,
+body.app-mobile-shell .progress-card,
+body.app-mobile-shell .worklog-section,
+body.app-mobile-shell .detail-modal__content,
+body.app-mobile-shell .detail-modal--settings .settings-sheet,
+body.app-mobile-shell .detail-modal--settings .settings-hero,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--settings .settings-panel__storage-meta,
+body.app-mobile-shell .detail-modal--settings .settings-panel__status,
+body.app-mobile-shell .detail-modal--settings .settings-panel__account-grid > *,
+body.app-mobile-shell .detail-modal--settings .settings-form input,
+body.app-mobile-shell .detail-modal--settings .settings-form select,
+body.app-mobile-shell .detail-modal--settings .settings-form textarea,
+body.app-mobile-shell .journal-overlay-root,
+body.app-mobile-shell .journal-overlay-shell,
+body.app-mobile-shell .journal-overlay-frame__head,
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .journal-overlay-card .journal-item__date-badge,
+body.app-mobile-shell .journal-overlay-card .journal-weather__pill,
+body.app-mobile-shell .journal-overlay-card__place,
+body.app-mobile-shell .journal-overlay-card .journal-item__action {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+  box-shadow: 0 4px 10px rgba(56, 47, 30, 0.045) !important;
+}
+
+body.app-mobile-shell .catalog-card::before,
+body.app-mobile-shell .catalog-card::after,
+body.app-mobile-shell .home-card::before,
+body.app-mobile-shell .home-card::after,
+body.app-mobile-shell .progress-card::before,
+body.app-mobile-shell .progress-card::after,
+body.app-mobile-shell .detail-modal__content::before,
+body.app-mobile-shell .journal-overlay-shell::before,
+body.app-mobile-shell .detail-modal--settings .settings-panel::before,
+body.app-mobile-shell .detail-modal--settings .settings-panel::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell .catalog-card,
+body.app-mobile-shell .catalog-card *,
+body.app-mobile-shell .detail-modal__content,
+body.app-mobile-shell .detail-modal__content *,
+body.app-mobile-shell .journal-overlay-shell,
+body.app-mobile-shell .journal-overlay-shell *,
+body.app-mobile-shell .detail-modal--settings .settings-sheet,
+body.app-mobile-shell .detail-modal--settings .settings-sheet *,
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .utility-bar * {
+  transition: none !important;
+  animation: none !important;
+  will-change: auto !important;
+}
+
+body.app-mobile-shell .hero__overlay::before,
+body.app-mobile-shell .hero__overlay::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell .catalog-card__image img,
+body.app-mobile-shell .home-gallery__item img,
+body.app-mobile-shell .journal-item__image,
+body.app-mobile-shell .journal-item__image img,
+body.app-mobile-shell #variety-preview {
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+body.app-mobile-shell .menu-group,
+body.app-mobile-shell .subcatalog,
+body.app-mobile-shell .detail-modal--settings .settings-sheet,
+body.app-mobile-shell .journal-overlay-list,
+body.app-mobile-shell .journal-overlay-group {
+  contain: layout paint style !important;
+  content-visibility: auto;
+  contain-intrinsic-size: 320px !important;
+}
+
+/* Mobile variety card compact equal-size fix:
+   all odrodove karty stay equally sized, image dominates vertically,
+   and the info under it is lighter and smaller. */
+body.app-mobile-shell .catalog-grid--varieties {
+  grid-auto-rows: 1fr !important;
+  align-items: stretch !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry {
+  align-self: stretch !important;
+  min-height: 268px !important;
+  height: 268px !important;
+  max-height: 268px !important;
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: 0 0 !important;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--category-accent, #7e9f4b) 10%, rgba(255, 255, 255, 0.18)) 0, transparent 42%),
+    linear-gradient(180deg, rgba(241, 235, 223, 0.62), rgba(225, 218, 205, 0.48)) !important;
+  border-color: rgba(255, 249, 240, 0.2) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__main-hit,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety > .catalog-card__main-hit {
+  display: grid !important;
+  grid-template-rows: 128px auto 1fr !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  align-content: start !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image {
+  margin: 2px 8px 0 !important;
+  min-height: 128px !important;
+  height: 128px !important;
+  max-height: 128px !important;
+  aspect-ratio: auto !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--category-accent, #7e9f4b) 4%, rgba(247, 241, 231, 0.84)),
+      rgba(234, 226, 214, 0.76)
+    ) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image img {
+  padding: 7px !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__shade {
+  padding: 6px 8px 5px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__title {
+  font-size: 0.9rem !important;
+  line-height: 1.05 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__quick {
+  flex: 0 0 auto !important;
+  align-content: start !important;
+  max-height: 54px !important;
+  overflow: hidden !important;
+  padding: 4px 8px 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  gap: 2px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__body,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__body,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__body {
+  flex: 0 0 auto !important;
+  align-content: start !important;
+  padding: 2px 8px 8px !important;
+  gap: 2px !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__meta,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__note-preview {
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 4px 8px !important;
+  background: rgba(247, 240, 230, 0.84) !important;
+  font-size: 0.64rem !important;
+  line-height: 1.1 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__meta {
+  max-height: 36px !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__note-preview {
+  max-height: 32px !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__meta.is-empty,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__note-preview.is-empty,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__quick.is-empty {
+  display: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__note-preview::before {
+  content: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card .tag {
+  min-height: 16px !important;
+  padding: 0 5px !important;
+  font-size: 0.53rem !important;
+  line-height: 1 !important;
+}
+
+@media (min-width: 341px) {
+  body.app-mobile-shell .catalog-grid--varieties > .catalog-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1 !important;
+    justify-self: center !important;
+    align-self: start !important;
+    width: calc((100% - 10px) / 2) !important;
+    max-width: calc((100% - 10px) / 2) !important;
+  }
+}
+
+/* Mobile selected choice chips:
+   selected options must stay readable, darker text, brighter green surface. */
+body.app-mobile-shell .detail-modal--editor .choice-chip input:checked + span,
+body.app-mobile-shell .detail-modal--editor .choice-chip input:checked + span:hover,
+body.app-mobile-shell .detail-modal--editor .choice-chip input:focus-visible:checked + span,
+body.app-mobile-shell .photo-quick-sheet .choice-chip input:checked + span,
+body.app-mobile-shell .photo-quick-sheet .choice-chip input:checked + span:hover,
+body.app-mobile-shell .photo-quick-sheet .choice-chip input:focus-visible:checked + span {
+  background: linear-gradient(180deg, #c6ee8f, #9fd55a) !important;
+  border-color: rgba(104, 145, 42, 0.62) !important;
+  color: #1e2816 !important;
+  text-shadow: none !important;
+  box-shadow:
+    0 10px 20px rgba(111, 156, 46, 0.22),
+    0 0 0 1px rgba(202, 239, 143, 0.45) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.52) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--status .choice-chip input:checked + span,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--status .choice-chip input:checked + span:hover,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--status .choice-chip input:focus-visible:checked + span,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--places .choice-chip input:checked + span,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--places .choice-chip input:checked + span:hover,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--places .choice-chip input:focus-visible:checked + span,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--compact-meta .choice-chip input:checked + span,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--compact-meta .choice-chip input:checked + span:hover,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--compact-meta .choice-chip input:focus-visible:checked + span,
+body.app-mobile-shell .detail-modal--editor .choice-chip--toggle-inline input:checked + span,
+body.app-mobile-shell .detail-modal--editor .choice-chip--toggle-inline input:checked + span:hover,
+body.app-mobile-shell .detail-modal--editor .choice-chip--toggle-inline input:focus-visible:checked + span {
+  background: linear-gradient(180deg, #c6ee8f, #9fd55a) !important;
+  border-color: rgba(104, 145, 42, 0.62) !important;
+  color: #1b2414 !important;
+  text-shadow: none !important;
+  box-shadow:
+    0 12px 24px rgba(111, 156, 46, 0.24),
+    0 0 0 1px rgba(202, 239, 143, 0.52) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.56) !important;
+}

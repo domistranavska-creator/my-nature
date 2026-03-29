@@ -2305,6 +2305,8 @@ const worklogQuickOriginalParentEl = worklogPanelToggleEl?.parentElement || null
 const journalQuickOriginalParentEl = journalPanelToggleEl?.parentElement || null;
 let lastDeleted = loadUndoState();
 const imageLightboxState = { images: [], index: 0, label: "Fotka" };
+let deferredCategoryCardImageObserver = null;
+let deferredVarietyCardImageObserver = null;
 let toolbarSearchQuery = "";
 let toolbarSearchLastResults = [];
 let toolbarAddMenuOverlayHostEl = null;
@@ -4846,6 +4848,8 @@ function renderMainMenu() {
     </section>
   `;
 
+  syncDeferredCategoryCardImages(mainMenuEl);
+
   mainMenuEl.querySelectorAll("[data-open-main-category]").forEach((item) => {
     item.addEventListener("click", (event) => {
       activeCategoryId = item.dataset.openMainCategory;
@@ -5798,6 +5802,7 @@ function renderProgressOverview() {
 }
 
 function setupSowingTipMarquee() {
+  if (typeof document !== "undefined" && document.body?.classList.contains("app-mobile-shell")) return;
   const marquee = document.getElementById("sowing-tip-marquee");
   if (!marquee) return;
 
@@ -5934,7 +5939,11 @@ function renderCatalog() {
       ` : ""}
     `;
 
-  syncCatalogCardImagePresentation(catalogEl);
+  syncDeferredCategoryCardImages(catalogEl);
+  syncDeferredVarietyCardImages(catalogEl);
+  if (!shouldUseMobileDeferredVarietyImages()) {
+    syncCatalogCardImagePresentation(catalogEl);
+  }
   if (typeof window !== "undefined") {
     window.requestAnimationFrame(() => {
       if (!document.body.classList.contains("app-mobile-shell")) return;
@@ -9329,7 +9338,7 @@ function renderChildCategoryCard(category) {
     <article class="catalog-card catalog-card--child catalog-card--clickable catalog-card--${category.nodeType || "kind"}" style="--category-accent:${escapeAttribute(category.color || "#7e9f4b")}">
       <button class="catalog-card__main-hit" type="button" data-open-category="${category.id}" aria-label="Otvoriť kategóriu ${escapeHtml(category.name)}">
         <div class="catalog-card__image">
-          <img src="${escapeAttribute(categoryCardImage(category))}" alt="${escapeHtml(category.name)}">
+          ${renderCategoryCardImageTag(category, category.name)}
         </div>
         <div class="catalog-card__body catalog-card__body--category">
           <div class="catalog-card__head catalog-card__head--category">
@@ -9347,7 +9356,7 @@ function renderMainMenuCategoryCard(category) {
     <article class="catalog-card catalog-card--child catalog-card--main-menu-card catalog-card--${category.nodeType || "kind"}" style="--category-accent:${escapeAttribute(category.color || "#7e9f4b")}">
       <button class="catalog-card__main-hit" type="button" data-open-main-category="${category.id}" aria-label="Otvoriť kategóriu ${escapeHtml(category.name)}">
         <div class="catalog-card__image">
-          <img src="${escapeAttribute(categoryCardImage(category))}" alt="${escapeHtml(category.name)}">
+          ${renderCategoryCardImageTag(category, category.name)}
         </div>
         <div class="catalog-card__body catalog-card__body--category">
           <div class="catalog-card__head catalog-card__head--category">
@@ -9370,16 +9379,22 @@ function syncCatalogCardImagePresentation(root = document) {
       const height = img.naturalHeight || img.height || 0;
       const source = img.currentSrc || img.src || "";
       const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+      frame.classList.remove("catalog-card__image--soft-fit", "catalog-card__image--landscape", "catalog-card__image--portrait");
       if (!source) return;
+
+      if (isMobileShell) {
+        frame.style.removeProperty("--card-image");
+        frame.style.removeProperty("--card-image-ratio");
+        return;
+      }
 
       frame.style.setProperty("--card-image", `url(${JSON.stringify(source)})`);
       frame.style.setProperty("--card-image-ratio", width && height ? `${width} / ${height}` : "1 / 1");
-      frame.classList.remove("catalog-card__image--soft-fit", "catalog-card__image--landscape", "catalog-card__image--portrait");
 
       if (!width || !height) return;
 
       const ratio = width / height;
-      const portraitThreshold = isMobileShell ? 1.05 : 0.86;
+      const portraitThreshold = 0.86;
       if (ratio > 1.18 || ratio < portraitThreshold) {
         frame.classList.add("catalog-card__image--soft-fit");
         frame.classList.add(ratio > 1.18 ? "catalog-card__image--landscape" : "catalog-card__image--portrait");
@@ -9462,7 +9477,7 @@ function renderVarietyCard(variety) {
     <article class="catalog-card catalog-card--variety" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
       <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť odrodu ${escapeHtml(variety.name)}">
         <div class="catalog-card__image">
-          <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(variety.name)}">
+          ${renderVarietyCardImageTag(variety, variety.name)}
           <div class="catalog-card__shade">
             <h3 class="catalog-card__title">${escapeHtml(variety.name)}</h3>
           </div>
@@ -9535,7 +9550,7 @@ function renderUniversalCard(item, category, previewText) {
   return `
     <article class="catalog-card catalog-card--clickable catalog-card--variety ${isBirdCard ? "catalog-card--bird" : ""}" data-open-variety="${item.id}" tabindex="0" role="button" aria-label="Otvoriť kartu ${escapeHtml(entryDisplayName(item))}" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
       <div class="catalog-card__image">
-        <img src="${escapeAttribute(primaryVarietyImage(item))}" alt="${escapeHtml(entryDisplayName(item))}">
+        ${renderVarietyCardImageTag(item, entryDisplayName(item))}
         <div class="catalog-card__shade">
           <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(item))}</h3>
           ${birdIdentityHtml}
@@ -9563,7 +9578,7 @@ function renderQuickEntryCard(variety) {
     <article class="catalog-card catalog-card--variety catalog-card--quick-entry" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
       <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť záznam ${escapeHtml(entryDisplayName(variety))}">
         <div class="catalog-card__image">
-          <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(entryDisplayName(variety))}">
+          ${renderVarietyCardImageTag(variety, entryDisplayName(variety))}
           <div class="catalog-card__shade">
             <p class="eyebrow">${escapeHtml(entryKindLabel(variety))}</p>
             <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(variety))}</h3>
@@ -9592,7 +9607,7 @@ function renderGalleryEntryCard(variety) {
     <article class="catalog-card catalog-card--variety catalog-card--gallery-entry" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
       <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť galériu ${escapeHtml(entryDisplayName(variety))}">
         <div class="catalog-card__image">
-          <img src="${escapeAttribute(primaryVarietyImage(variety))}" alt="${escapeHtml(entryDisplayName(variety))}">
+          ${renderVarietyCardImageTag(variety, entryDisplayName(variety))}
           <div class="catalog-card__shade">
             <p class="eyebrow">Galéria</p>
             <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(variety))}</h3>
@@ -10137,6 +10152,8 @@ function syncOverviewHighlights() {
     clearInterval(overviewHighlightsInterval);
     overviewHighlightsInterval = null;
   }
+
+  if (typeof document !== "undefined" && document.body?.classList.contains("app-mobile-shell")) return;
 
   const memoryItems = latestJournalImages();
   const weather = insightWeatherSignals();
@@ -16076,6 +16093,83 @@ function primaryVarietyImage(variety) {
   return normalizeVarietyImages(variety)[0] || cardPlaceholderImage(cardType(variety));
 }
 
+function shouldUseMobileDeferredVarietyImages() {
+  if (typeof window === "undefined") return false;
+  const narrowScreen = Math.max(0, Number(window.innerWidth) || 0) <= 820;
+  const coarsePointer = typeof window.matchMedia === "function"
+    ? window.matchMedia("(pointer: coarse)").matches
+    : false;
+  return coarsePointer || narrowScreen || Boolean(document.body?.classList.contains("app-mobile-shell"));
+}
+
+function deferredCardImageRootMargin() {
+  return shouldUseMobileDeferredVarietyImages() ? "120px 0px" : "280px 0px";
+}
+
+function shouldDeferVarietyCardImageSource(source = "") {
+  const normalized = String(source || "").trim();
+  return shouldUseMobileDeferredVarietyImages()
+    && isProcessableImageDataUrl(normalized)
+    && normalized.length > 18000;
+}
+
+function renderVarietyCardImageTag(item, altText) {
+  const source = primaryVarietyImage(item);
+  if (!shouldDeferVarietyCardImageSource(source)) {
+    return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+  }
+  return `<img src="${escapeAttribute(cardPlaceholderImage(cardType(item)))}" data-lazy-variety-image="${escapeAttribute(item.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+}
+
+function resolveDeferredVarietyCardImageSource(varietyId = "") {
+  const normalizedId = String(varietyId || "").trim();
+  if (!normalizedId) return "";
+  const variety = state.varieties.find((item) => item.id === normalizedId);
+  return variety ? primaryVarietyImage(variety) : "";
+}
+
+function activateDeferredVarietyCardImage(img) {
+  if (!(img instanceof HTMLImageElement)) return;
+  const varietyId = String(img.getAttribute("data-lazy-variety-image") || "").trim();
+  if (!varietyId) return;
+  const source = resolveDeferredVarietyCardImageSource(varietyId);
+  if (!source) return;
+  img.src = source;
+  img.removeAttribute("data-lazy-variety-image");
+  if (deferredVarietyCardImageObserver) {
+    try {
+      deferredVarietyCardImageObserver.unobserve(img);
+    } catch (error) {
+      // Ignore stale observer detach errors.
+    }
+  }
+}
+
+function syncDeferredVarietyCardImages(root = document) {
+  if (!shouldUseMobileDeferredVarietyImages()) return;
+  const pendingImages = [...root.querySelectorAll("img[data-lazy-variety-image]")];
+  if (!pendingImages.length) return;
+
+  if ("IntersectionObserver" in window) {
+    if (!deferredVarietyCardImageObserver) {
+      deferredVarietyCardImageObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          activateDeferredVarietyCardImage(entry.target);
+        });
+      }, {
+        root: null,
+        rootMargin: deferredCardImageRootMargin(),
+        threshold: 0.01
+      });
+    }
+    pendingImages.forEach((img) => deferredVarietyCardImageObserver.observe(img));
+    return;
+  }
+
+  pendingImages.forEach((img) => activateDeferredVarietyCardImage(img));
+}
+
 function normalizeVarietyRecord(item) {
   const images = normalizeVarietyImages(item);
   const places = normalizePlaceList(item?.places?.length ? item.places : item?.place);
@@ -16349,6 +16443,70 @@ function categoryCardImage(category) {
   const restored = restoreSeedCategoryImage(category);
   if (restored) return restored;
   return categoryPlaceholderImage(category);
+}
+
+function shouldDeferCategoryCardImageSource(source = "") {
+  const normalized = String(source || "").trim();
+  return shouldUseMobileDeferredVarietyImages()
+    && isProcessableImageDataUrl(normalized)
+    && normalized.length > 18000;
+}
+
+function renderCategoryCardImageTag(category, altText) {
+  const source = categoryCardImage(category);
+  if (!shouldDeferCategoryCardImageSource(source)) {
+    return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+  }
+  return `<img src="${escapeAttribute(categoryPlaceholderImage(category))}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+}
+
+function resolveDeferredCategoryCardImageSource(categoryId = "") {
+  const normalizedId = String(categoryId || "").trim();
+  if (!normalizedId) return "";
+  const category = state.categories.find((item) => item.id === normalizedId);
+  return category ? categoryCardImage(category) : "";
+}
+
+function activateDeferredCategoryCardImage(img) {
+  if (!(img instanceof HTMLImageElement)) return;
+  const categoryId = String(img.getAttribute("data-lazy-category-image") || "").trim();
+  if (!categoryId) return;
+  const source = resolveDeferredCategoryCardImageSource(categoryId);
+  if (!source) return;
+  img.src = source;
+  img.removeAttribute("data-lazy-category-image");
+  if (deferredCategoryCardImageObserver) {
+    try {
+      deferredCategoryCardImageObserver.unobserve(img);
+    } catch (error) {
+      // Ignore stale observer detach errors.
+    }
+  }
+}
+
+function syncDeferredCategoryCardImages(root = document) {
+  if (!shouldUseMobileDeferredVarietyImages()) return;
+  const pendingImages = [...root.querySelectorAll("img[data-lazy-category-image]")];
+  if (!pendingImages.length) return;
+
+  if ("IntersectionObserver" in window) {
+    if (!deferredCategoryCardImageObserver) {
+      deferredCategoryCardImageObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          activateDeferredCategoryCardImage(entry.target);
+        });
+      }, {
+        root: null,
+        rootMargin: deferredCardImageRootMargin(),
+        threshold: 0.01
+      });
+    }
+    pendingImages.forEach((img) => deferredCategoryCardImageObserver.observe(img));
+    return;
+  }
+
+  pendingImages.forEach((img) => activateDeferredCategoryCardImage(img));
 }
 
 function fileToDataUrl(file) {
