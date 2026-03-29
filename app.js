@@ -3514,179 +3514,15 @@ function render() {
 function renderMainMenu() {
   const grouped = groupedCategories();
   const roots = grouped.map(({ root }) => root);
-  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
-  const activeWeatherThemeDebugOverride = loadMobileWeatherThemeDebugOverride();
-  const activeWeatherThemeDebugId = activeWeatherThemeDebugOverride?.id || "auto";
-  const activeWeatherThemeCloudOverride = loadMobileWeatherThemeCloudOverride();
-  const activeWeatherThemePhase = loadMobileWeatherThemePhaseOverride();
-  const activeWeatherThemeSeason = loadMobileWeatherThemeSeasonOverride();
-  const activeWeatherThemeTemperatureOverride = loadMobileWeatherThemeTemperatureOverride();
-  const activeWeatherThemeWindOverride = loadMobileWeatherThemeWindOverride();
-  const activeWeatherThemePrecipOverride = loadMobileWeatherThemePrecipOverride();
-  const weatherSceneOnlyActive = isMobileShell && loadMobileWeatherSceneOnlyPreference();
-  const autoWeatherWindSpeed = homeWeatherSnapshot
-    ? weatherWindSpeedKmh(homeWeatherSnapshot)
-    : weatherWindSpeedFallbackForCategory(activeWeatherThemeDebugOverride?.wind || "calm");
-  const effectiveWeatherWindSpeed = activeWeatherThemeWindOverride ?? autoWeatherWindSpeed;
-  const autoWeatherPrecipitationAmount = homeWeatherSnapshot ? weatherPrecipitationMm(homeWeatherSnapshot) : 0;
-  const effectiveWeatherPrecipitationAmount = activeWeatherThemePrecipOverride ?? autoWeatherPrecipitationAmount;
-  const autoWeatherTemperature = homeWeatherSnapshot ? (weatherTemperatureC(homeWeatherSnapshot) ?? 16) : 16;
-  const effectiveWeatherTemperature = activeWeatherThemeTemperatureOverride ?? autoWeatherTemperature;
-  const weatherWindDebugLabel = activeWeatherThemeWindOverride === null
-    ? `Auto · ${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`
-    : `${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`;
-  const weatherPrecipitationDebugLabel = activeWeatherThemePrecipOverride === null
-    ? `Auto · ${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`
-    : `${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`;
-  const weatherTemperatureDebugLabel = activeWeatherThemeTemperatureOverride === null
-    ? `Auto · ${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`
-    : `${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`;
-  const weatherBackgroundDebugState = typeof window !== "undefined" && window.weatherBackgroundEngine?.getDebugState
-    ? window.weatherBackgroundEngine.getDebugState()
-    : null;
-  const weatherBackgroundDebugText = formatWeatherBackgroundDebugText(weatherBackgroundDebugState);
-  const weatherAudioDebugState = typeof window !== "undefined" && window.weatherAudioEngine?.getState
-    ? window.weatherAudioEngine.getState()
-    : null;
-  const weatherAudioDebugMarkup = renderWeatherAudioDebugMarkup(weatherAudioDebugState);
-  const weatherAudioInlineMarkup = renderWeatherAudioInlineMarkup(weatherAudioDebugState);
+  if (typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell") && loadMobileWeatherSceneOnlyPreference()) {
+    saveMobileWeatherSceneOnlyPreference(false);
+  }
   applyMobileWeatherSceneMode();
   mainMenuEl.innerHTML = `
     <section class="menu-group">
       <div class="home-section__header">
       <div></div>
       </div>
-      ${isMobileShell ? `
-        <div class="weather-theme-debug-layout">
-          <details class="weather-theme-debug"${activeWeatherThemeDebugId !== "auto" || activeWeatherThemeCloudOverride !== "" || activeWeatherThemePhase !== "" || activeWeatherThemeSeason !== "" || activeWeatherThemeWindOverride !== null || activeWeatherThemePrecipOverride !== null || activeWeatherThemeTemperatureOverride !== null || weatherSceneOnlyActive ? " open" : ""}>
-            <summary class="weather-theme-debug__summary">Test počasia</summary>
-            <div class="weather-theme-debug__scene">
-              <button
-                class="weather-theme-debug__scene-button ${weatherSceneOnlyActive ? "is-active" : ""}"
-                type="button"
-                data-mobile-weather-scene-toggle="1"
-                aria-pressed="${weatherSceneOnlyActive ? "true" : "false"}"
-              >${weatherSceneOnlyActive ? "Čisté pozadie je zapnuté" : "Čisté pozadie"}</button>
-              <p class="weather-theme-debug__scene-note" data-mobile-weather-scene-note>${weatherSceneOnlyActive ? "Karty a ďalší obsah sú skryté, aby bolo vidno celé pozadie." : "Dočasne skryje karty a obsah, aby si vedela odfotiť celé pozadie."}</p>
-            </div>
-            <div class="weather-theme-debug__period">
-              ${MOBILE_WEATHER_PHASE_DEBUG_OPTIONS.map((item) => `
-                <button class="weather-theme-debug__mode ${item.id === activeWeatherThemePhase ? "is-active" : ""}" type="button" data-mobile-weather-phase="${escapeAttribute(item.id)}">${escapeHtml(item.label)}</button>
-              `).join("")}
-            </div>
-            <div class="weather-theme-debug__section-label">Sezóna</div>
-            <div class="weather-theme-debug__chips">
-              ${MOBILE_WEATHER_SEASON_DEBUG_OPTIONS.map((item) => `
-                <button
-                  class="weather-theme-debug__chip ${item.id === activeWeatherThemeSeason ? "is-active" : ""}"
-                  type="button"
-                  data-mobile-weather-season="${escapeAttribute(item.id)}"
-                >${escapeHtml(item.label)}</button>
-              `).join("")}
-            </div>
-            <div class="weather-theme-debug__section-label">Oblačnosť</div>
-            <div class="weather-theme-debug__chips">
-              ${MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.map((item) => `
-                <button
-                  class="weather-theme-debug__chip ${item.id === activeWeatherThemeCloudOverride ? "is-active" : ""}"
-                  type="button"
-                  data-mobile-weather-cloud="${escapeAttribute(item.id)}"
-                >${escapeHtml(item.label)}</button>
-              `).join("")}
-            </div>
-            <div class="weather-theme-debug__section-label">Javy</div>
-            ${MOBILE_WEATHER_THEME_DEBUG_OPTIONS.length > 1 ? `
-              <div class="weather-theme-debug__chips">
-                ${MOBILE_WEATHER_THEME_DEBUG_OPTIONS.map((item) => `
-                  <button
-                    class="weather-theme-debug__chip ${item.id === activeWeatherThemeDebugId ? "is-active" : ""}"
-                    type="button"
-                    data-mobile-weather-debug="${escapeAttribute(item.id)}"
-                  >${escapeHtml(item.label)}</button>
-                `).join("")}
-              </div>
-            ` : ""}
-            <div class="weather-theme-debug__wind weather-theme-debug__wind--precip">
-              <div class="weather-theme-debug__wind-head">
-                <span class="weather-theme-debug__wind-caption">Zrážky</span>
-                <span class="weather-theme-debug__wind-value" data-mobile-weather-precip-label>${escapeHtml(weatherPrecipitationDebugLabel)}</span>
-              </div>
-              <div class="weather-theme-debug__wind-controls">
-                <button class="weather-theme-debug__mode ${activeWeatherThemePrecipOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-precip-auto="1">Auto</button>
-                <input
-                  class="weather-theme-debug__range weather-theme-debug__range--precip"
-                  type="range"
-                  min="0"
-                  max="12"
-                  step="0.2"
-                  value="${escapeAttribute(effectiveWeatherPrecipitationAmount.toFixed(1))}"
-                  data-mobile-weather-precip-range
-                  aria-label="Intenzita zrážok v milimetroch"
-                >
-              </div>
-              <div class="weather-theme-debug__scale" aria-hidden="true">
-                <span>0</span>
-                <span>2</span>
-                <span>6</span>
-                <span>12 mm</span>
-              </div>
-            </div>
-            <div class="weather-theme-debug__wind">
-              <div class="weather-theme-debug__wind-head">
-                <span class="weather-theme-debug__wind-caption">Vietor</span>
-                <span class="weather-theme-debug__wind-value" data-mobile-weather-wind-label>${escapeHtml(weatherWindDebugLabel)}</span>
-              </div>
-              <div class="weather-theme-debug__wind-controls">
-                <button class="weather-theme-debug__mode ${activeWeatherThemeWindOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-wind-auto="1">Auto</button>
-                <input
-                  class="weather-theme-debug__range"
-                  type="range"
-                  min="0"
-                  max="70"
-                  step="2"
-                  value="${escapeAttribute(Math.round(effectiveWeatherWindSpeed))}"
-                  data-mobile-weather-wind-range
-                  aria-label="Sila vetra v kilometroch za hodinu"
-                >
-              </div>
-              <div class="weather-theme-debug__scale" aria-hidden="true">
-                <span>0</span>
-                <span>20</span>
-                <span>40</span>
-                <span>70 km/h</span>
-              </div>
-            </div>
-            <div class="weather-theme-debug__wind weather-theme-debug__wind--temp">
-              <div class="weather-theme-debug__wind-head">
-                <span class="weather-theme-debug__wind-caption">Teplota</span>
-                <span class="weather-theme-debug__wind-value" data-mobile-weather-temp-label>${escapeHtml(weatherTemperatureDebugLabel)}</span>
-              </div>
-              <div class="weather-theme-debug__wind-controls">
-                <button class="weather-theme-debug__mode ${activeWeatherThemeTemperatureOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-temp-auto="1">Auto</button>
-                <input
-                  class="weather-theme-debug__range weather-theme-debug__range--temp"
-                  type="range"
-                  min="-15"
-                  max="38"
-                  step="1"
-                  value="${escapeAttribute(String(Math.round(effectiveWeatherTemperature)))}"
-                  data-mobile-weather-temp-range
-                  aria-label="Teplota v stupňoch Celzia"
-                >
-              </div>
-              <div class="weather-theme-debug__scale" aria-hidden="true">
-                <span>-15</span>
-                <span>0</span>
-                <span>20</span>
-                <span>38 °C</span>
-              </div>
-            </div>
-            <p class="weather-theme-debug__inline-state" data-mobile-weather-inline-state style="margin:10px 0 0; padding:8px 10px; border-radius:14px; background:rgba(16,22,30,.08); color:#314233; font-size:12px; line-height:1.35; word-break:break-word;">Debug: ${escapeHtml(weatherBackgroundDebugText)}</p>
-          </details>
-          ${weatherAudioDebugMarkup}
-        </div>
-      ` : ""}
-      ${isMobileShell ? weatherAudioInlineMarkup : ""}
       <div class="catalog-grid catalog-grid--main-menu">
         ${roots.map(renderMainMenuCategoryCard).join("")}
       </div>
@@ -3717,6 +3553,13 @@ function renderMainMenu() {
       openCategoryManager(button.dataset.editMainCategory);
     });
   });
+
+  const hasMobileWeatherDebugControls = Boolean(
+    mainMenuEl.querySelector("[data-mobile-weather-debug], [data-mobile-weather-cloud], [data-mobile-weather-phase], [data-mobile-weather-season], [data-mobile-weather-wind-range], [data-mobile-weather-precip-range], [data-mobile-weather-temp-range], [data-mobile-weather-scene-toggle], [data-mobile-weather-audio-panel], [data-mobile-weather-audio-inline]")
+  );
+  if (!hasMobileWeatherDebugControls) {
+    return;
+  }
 
   mainMenuEl.querySelectorAll("[data-mobile-weather-debug]").forEach((button) => {
     button.addEventListener("click", (event) => {

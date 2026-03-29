@@ -3474,9 +3474,9 @@
         overcastWash.addColorStop(0.46, "rgba(112,108,138,0.15)");
         overcastWash.addColorStop(1, "rgba(150,138,142,0.11)");
       } else {
-        overcastWash.addColorStop(0, "rgba(136,146,158,0.18)");
-        overcastWash.addColorStop(0.46, "rgba(160,170,182,0.15)");
-        overcastWash.addColorStop(1, "rgba(188,198,208,0.12)");
+        overcastWash.addColorStop(0, "rgba(116,126,140,0.32)");
+        overcastWash.addColorStop(0.46, "rgba(144,154,168,0.24)");
+        overcastWash.addColorStop(1, "rgba(180,190,200,0.18)");
       }
       ctx.save();
       ctx.fillStyle = overcastWash;
@@ -3535,8 +3535,8 @@
       if (preset === "cloudy") return { top: "#2c2758", mid: "#84396f", bottom: "#df7558", haze: "rgba(248,126,108,0.34)", glow: "rgba(255,92,162,0.38)" };
       return { top: "#30295d", mid: "#962f78", bottom: "#ff8b52", haze: "rgba(255,146,112,0.40)", glow: "rgba(255,86,152,0.52)" };
     }
-    if (preset === "overcast") return { top: "#47525d", mid: "#7a8791", bottom: "#c2cbd2", haze: "rgba(214,220,224,0.14)", glow: "rgba(238,230,210,0.03)" };
-    if (preset === "cloudy") return { top: "#55789b", mid: "#93aabc", bottom: "#d0dce4", haze: "rgba(232,238,242,0.11)", glow: "rgba(255,225,170,0.06)" };
+    if (preset === "overcast") return { top: "#3b4651", mid: "#677681", bottom: "#bbc4cc", haze: "rgba(210,217,223,0.22)", glow: "rgba(228,232,236,0.05)" };
+    if (preset === "cloudy") return { top: "#486783", mid: "#7f98ab", bottom: "#c8d5de", haze: "rgba(224,232,238,0.16)", glow: "rgba(244,222,176,0.08)" };
     if (preset === "partly") {
       if (isHot) return { top: "#3d8fe0", mid: "#8fc0ea", bottom: "#dde9ee", haze: "rgba(255,240,206,0.12)", glow: "rgba(255,210,126,0.26)" };
       if (isCold) return { top: "#4a97e0", mid: "#9bc4e7", bottom: "#e3edf3", haze: "rgba(238,247,255,0.12)", glow: "rgba(255,235,194,0.18)" };
@@ -3978,8 +3978,8 @@
     const cloudyBlanket = mobileDenseBlanket && state.activeCloudPreset === "cloudy";
     const presetSheetBase = state.activeCloudPreset === "overcast" ? (overcastBlanket ? 4 : 4) : state.activeCloudPreset === "cloudy" ? (cloudyBlanket ? 3 : 3) : 1;
     const sheetCount = presetSheetBase + (coverage >= 0.92 ? (overcastBlanket ? 2 : 1) : 0) + (windStrength > 0.7 ? 1 : 0);
-    const presetAlphaBoost = state.activeCloudPreset === "overcast" ? (overcastBlanket ? 0.09 : 0.08) : state.activeCloudPreset === "cloudy" ? (cloudyBlanket ? 0.05 : 0.04) : 0.015;
-    const baseAlpha = (isNight ? (overcastBlanket ? 0.05 : cloudyBlanket ? 0.04 : 0.06) : (overcastBlanket ? 0.07 : cloudyBlanket ? 0.05 : 0.08)) + presetAlphaBoost + coverage * (overcastBlanket ? 0.05 : cloudyBlanket ? 0.04 : 0.08);
+    const presetAlphaBoost = state.activeCloudPreset === "overcast" ? (overcastBlanket ? 0.13 : 0.10) : state.activeCloudPreset === "cloudy" ? (cloudyBlanket ? 0.07 : 0.05) : 0.015;
+    const baseAlpha = (isNight ? (overcastBlanket ? 0.05 : cloudyBlanket ? 0.04 : 0.06) : (overcastBlanket ? 0.12 : cloudyBlanket ? 0.08 : 0.08)) + presetAlphaBoost + coverage * (overcastBlanket ? 0.08 : cloudyBlanket ? 0.05 : 0.08);
     for (let i = 0; i < sheetCount; i += 1) {
       const sheetRatio = sheetCount <= 1 ? 0 : i / Math.max(1, sheetCount - 1);
       const topBiasRatio = overcastBlanket ? Math.pow(sheetRatio, 1.55) : cloudyBlanket ? Math.pow(sheetRatio, 1.28) : sheetRatio;
@@ -5348,7 +5348,7 @@
       scene: state.activeSceneKey,
       period: state.activePeriod,
       phase: state.activePhase,
-      hasVideo: true,
+      hasVideo: false,
       source: "canvas-local",
       precipitation: state.activePhenomenon || "none",
       precipitationAmount: Number.isFinite(state.activePrecipitationAmount) ? Number(state.activePrecipitationAmount.toFixed(1)) : null,

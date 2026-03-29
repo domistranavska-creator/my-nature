@@ -27021,30 +27021,30 @@ body.app-mobile-shell[data-mobile-weather-period="day"][data-mobile-weather-vari
 
 body.app-mobile-shell[data-mobile-weather-period="day"][data-mobile-weather-variant="cloudy"] {
   --mobile-cloud-layer:
-    linear-gradient(180deg, rgba(240, 244, 249, 0.36) 0%, rgba(240, 244, 249, 0.2) 16%, rgba(240, 244, 249, 0) 36%),
+    linear-gradient(180deg, rgba(224, 232, 240, 0.52) 0%, rgba(224, 232, 240, 0.32) 16%, rgba(224, 232, 240, 0) 38%),
     radial-gradient(ellipse 40% 10.8% at 13.4% 9%, rgba(255, 255, 255, 0.92) 0 36%, rgba(255, 255, 255, 0.58) 50%, rgba(255, 255, 255, 0) 76%),
     radial-gradient(ellipse 34% 9.6% at 24.6% 8.1%, rgba(255, 255, 255, 0.95) 0 36%, rgba(255, 255, 255, 0.66) 49%, rgba(255, 255, 255, 0) 75%),
     radial-gradient(ellipse 28% 8.8% at 37% 10.8%, rgba(255, 255, 255, 0.86) 0 35%, rgba(255, 255, 255, 0.5) 48%, rgba(255, 255, 255, 0) 75%),
-    radial-gradient(ellipse 54% 13.6% at 25.6% 14.4%, rgba(179, 194, 210, 0.28) 0 37%, rgba(179, 194, 210, 0) 77%),
+    radial-gradient(ellipse 54% 13.6% at 25.6% 14.4%, rgba(155, 170, 188, 0.42) 0 37%, rgba(155, 170, 188, 0) 77%),
     radial-gradient(ellipse 46% 12.4% at 78.8% 18.6%, rgba(247, 249, 252, 0.8) 0 36%, rgba(247, 249, 252, 0.34) 49%, rgba(247, 249, 252, 0) 76%),
-    radial-gradient(ellipse 54% 14.2% at 80.2% 23.2%, rgba(176, 191, 208, 0.24) 0 37%, rgba(176, 191, 208, 0) 78%),
-    radial-gradient(ellipse 42% 11.4% at 18.2% 34.8%, rgba(255, 255, 255, 0.56) 0 36%, rgba(255, 255, 255, 0.2) 49%, rgba(255, 255, 255, 0) 76%);
-  --mobile-cloud-opacity: 0.95;
-  --mobile-cloud-filter: blur(1.15px);
+    radial-gradient(ellipse 54% 14.2% at 80.2% 23.2%, rgba(152, 168, 186, 0.36) 0 37%, rgba(152, 168, 186, 0) 78%),
+    radial-gradient(ellipse 42% 11.4% at 18.2% 34.8%, rgba(246, 249, 252, 0.62) 0 36%, rgba(246, 249, 252, 0.24) 49%, rgba(246, 249, 252, 0) 76%);
+  --mobile-cloud-opacity: 0.98;
+  --mobile-cloud-filter: blur(1.2px) saturate(0.95) brightness(0.93);
 }
 
 body.app-mobile-shell[data-mobile-weather-period="day"][data-mobile-weather-variant="overcast"] {
   --mobile-cloud-layer:
-    linear-gradient(180deg, rgba(229, 235, 242, 0.64) 0%, rgba(229, 235, 242, 0.44) 16%, rgba(229, 235, 242, 0.14) 34%, rgba(229, 235, 242, 0) 56%),
+    linear-gradient(180deg, rgba(205, 214, 224, 0.82) 0%, rgba(205, 214, 224, 0.58) 16%, rgba(205, 214, 224, 0.2) 34%, rgba(205, 214, 224, 0) 56%),
     radial-gradient(ellipse 52% 12.2% at 14.8% 8.8%, rgba(243, 246, 250, 0.92) 0 37%, rgba(243, 246, 250, 0.54) 50%, rgba(243, 246, 250, 0) 76%),
     radial-gradient(ellipse 42% 10.8% at 25.2% 8.4%, rgba(241, 245, 250, 0.94) 0 37%, rgba(241, 245, 250, 0.58) 50%, rgba(241, 245, 250, 0) 76%),
     radial-gradient(ellipse 36% 10.4% at 38% 11.2%, rgba(235, 241, 247, 0.84) 0 36%, rgba(235, 241, 247, 0.42) 49%, rgba(235, 241, 247, 0) 76%),
-    radial-gradient(ellipse 68% 15.2% at 26.4% 15.8%, rgba(164, 178, 194, 0.32) 0 37%, rgba(164, 178, 194, 0) 78%),
+    radial-gradient(ellipse 68% 15.2% at 26.4% 15.8%, rgba(136, 150, 166, 0.48) 0 37%, rgba(136, 150, 166, 0) 78%),
     radial-gradient(ellipse 58% 13.8% at 80.4% 18.8%, rgba(236, 241, 247, 0.82) 0 37%, rgba(236, 241, 247, 0.36) 50%, rgba(236, 241, 247, 0) 77%),
-    radial-gradient(ellipse 68% 16.2% at 81.8% 24%, rgba(156, 171, 188, 0.28) 0 37%, rgba(156, 171, 188, 0) 79%),
-    radial-gradient(ellipse 54% 13.6% at 46% 36.8%, rgba(226, 234, 242, 0.48) 0 36%, rgba(226, 234, 242, 0.16) 48%, rgba(226, 234, 242, 0) 76%);
-  --mobile-cloud-opacity: 0.96;
-  --mobile-cloud-filter: blur(1.25px) saturate(0.96) brightness(0.98);
+    radial-gradient(ellipse 68% 16.2% at 81.8% 24%, rgba(130, 146, 164, 0.42) 0 37%, rgba(130, 146, 164, 0) 79%),
+    radial-gradient(ellipse 54% 13.6% at 46% 36.8%, rgba(214, 224, 234, 0.62) 0 36%, rgba(214, 224, 234, 0.24) 48%, rgba(214, 224, 234, 0) 76%);
+  --mobile-cloud-opacity: 0.99;
+  --mobile-cloud-filter: blur(1.45px) saturate(0.92) brightness(0.88);
 }
 
 body.app-mobile-shell[data-mobile-weather-period="night"][data-mobile-weather-variant="mostly-clear"] {
@@ -28198,9 +28198,9 @@ body.app-mobile-shell[data-mobile-weather-period="day"][data-mobile-weather-vari
 
 body.app-mobile-shell[data-mobile-weather-period="day"][data-mobile-weather-variant="cloudy"] {
   --mobile-weather-master-scene:
-    radial-gradient(circle at 23.8% 9%, rgba(255, 243, 200, 0.76) 0 6%, rgba(255, 220, 104, 0.22) 10.8%, rgba(255, 220, 104, 0) 20.5%),
-    linear-gradient(114deg, rgba(248, 238, 205, 0.08) 0%, rgba(248, 238, 205, 0) 32%),
-    linear-gradient(180deg, #8caac2 0%, #b8cad8 44%, #e9eff3 100%);
+    radial-gradient(circle at 23.8% 9%, rgba(240, 233, 206, 0.6) 0 5.6%, rgba(240, 233, 206, 0.18) 10%, rgba(240, 233, 206, 0) 18.5%),
+    linear-gradient(114deg, rgba(224, 218, 204, 0.12) 0%, rgba(224, 218, 204, 0) 30%),
+    linear-gradient(180deg, #768ea3 0%, #a2b4c1 44%, #dfe7ec 100%);
   --mobile-cloud-art:
     url("assets/weather/cloud-bank-dense-day.svg"),
     url("assets/weather/cloud-bank-soft-day.svg");
@@ -28208,14 +28208,14 @@ body.app-mobile-shell[data-mobile-weather-period="day"][data-mobile-weather-vari
   --mobile-cloud-position: -54px -2px, calc(100% + 18px) 58px;
   --mobile-cloud-repeat: no-repeat, no-repeat;
   --mobile-cloud-zone-height: 310px;
-  --mobile-cloud-opacity: 0.95;
-  --mobile-cloud-filter: none;
+  --mobile-cloud-opacity: 0.99;
+  --mobile-cloud-filter: saturate(0.94) brightness(0.9);
 }
 
 body.app-mobile-shell[data-mobile-weather-period="day"][data-mobile-weather-variant="overcast"] {
   --mobile-weather-master-scene:
-    radial-gradient(circle at 23.8% 9%, rgba(247, 242, 220, 0.34) 0 5.2%, rgba(247, 242, 220, 0.12) 9.2%, rgba(247, 242, 220, 0) 18%),
-    linear-gradient(180deg, #7f8f9d 0%, #a4b0b7 44%, #d4dadd 100%);
+    radial-gradient(circle at 23.8% 9%, rgba(222, 220, 214, 0.22) 0 4.8%, rgba(222, 220, 214, 0.08) 8.8%, rgba(222, 220, 214, 0) 16.8%),
+    linear-gradient(180deg, #5f6f7d 0%, #8b99a2 44%, #c7d0d4 100%);
   --mobile-cloud-art:
     url("assets/weather/cloud-bank-overcast-day.svg"),
     url("assets/weather/cloud-bank-dense-day.svg");
@@ -28223,8 +28223,8 @@ body.app-mobile-shell[data-mobile-weather-period="day"][data-mobile-weather-vari
   --mobile-cloud-position: center -10px, calc(100% + 30px) 66px;
   --mobile-cloud-repeat: no-repeat, no-repeat;
   --mobile-cloud-zone-height: 348px;
-  --mobile-cloud-opacity: 0.96;
-  --mobile-cloud-filter: none;
+  --mobile-cloud-opacity: 1;
+  --mobile-cloud-filter: saturate(0.9) brightness(0.82);
 }
 
 body.app-mobile-shell[data-mobile-weather-period="night"][data-mobile-weather-variant="mostly-clear"] {
@@ -32690,4 +32690,125 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry:focus-
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry:hover::before,
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry:focus-within::before {
   border-color: rgba(255, 255, 255, 0.58) !important;
+}
+
+/* Mobile stability cleanup:
+   hide leftover weather debug panels, keep native vertical scroll,
+   and calm down the most broken stacked mobile layouts. */
+body.app-mobile-shell .weather-theme-debug-layout,
+body.app-mobile-shell .weather-theme-debug,
+body.app-mobile-shell .weather-audio-debug,
+body.app-mobile-shell [data-mobile-weather-inline-state] {
+  display: none !important;
+}
+
+body.app-mobile-shell .content,
+body.app-mobile-shell .workspace-layout,
+body.app-mobile-shell .workspace-main,
+body.app-mobile-shell .panel--menu,
+body.app-mobile-shell .main-menu,
+body.app-mobile-shell .category-shell,
+body.app-mobile-shell .subcatalog,
+body.app-mobile-shell.app-focused-mode .workspace-main > .panel {
+  min-height: 0 !important;
+  overflow-y: visible !important;
+  overscroll-behavior-y: auto !important;
+  touch-action: pan-y !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__header,
+body.app-mobile-shell .detail-modal--worklog .task-item--done .task-item__header {
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__main,
+body.app-mobile-shell .detail-modal--worklog .task-item--done .task-item__main {
+  grid-column: 1 !important;
+  grid-row: auto !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__status,
+body.app-mobile-shell .detail-modal--worklog .task-item--done .task-item__status {
+  grid-column: 1 !important;
+  grid-row: auto !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__actions,
+body.app-mobile-shell .detail-modal--worklog .task-item--done .task-item__actions {
+  grid-column: 1 !important;
+  grid-row: auto !important;
+  justify-self: start !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline {
+  position: static !important;
+  top: auto !important;
+  padding: 4px 0 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline h3 {
+  font-size: clamp(1.7rem, 8vw, 2.05rem) !important;
+  line-height: 1.06 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__actions {
+  position: static !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__actions .button {
+  width: auto !important;
+  min-width: min(220px, 100%) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .category-manager__field--image,
+body.app-mobile-shell .detail-modal--editor .category-manager__field--preview,
+body.app-mobile-shell .detail-modal--editor .category-manager__field--notes {
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .category-manager__preview-shell {
+  min-height: 0 !important;
+  padding: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .category-preview {
+  width: min(180px, 100%) !important;
+  height: min(180px, 100%) !important;
+  max-width: 180px !important;
+  max-height: 180px !important;
+  margin: 0 auto !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .category-manager__field--notes textarea {
+  min-height: 132px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__selection-head {
+  align-items: flex-start !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .batch-sowing__toolbar.batch-sowing__toolbar--triple,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__toolbar.batch-sowing__toolbar--double {
+  grid-template-columns: 1fr !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .batch-sowing__list {
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item {
+  min-height: 0 !important;
 }
