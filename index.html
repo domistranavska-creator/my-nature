@@ -4,7 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#f2eee3">
+  <meta name="application-name" content="Môj prírodný svet">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Môj prírodný svet">
   <title>Môj prírodný svet</title>
+  <link rel="manifest" href="manifest.webmanifest?v=2026-03-29-1905">
+  <link rel="icon" type="image/svg+xml" href="assets/pwa/favicon.svg?v=2026-03-29-1905">
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png?v=2026-03-29-1905">
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -100,7 +109,7 @@
             <article class="season-card season-card--memories">
               <div class="season-card__head">
                 <h3>Spomienky</h3>
-                <button class="button button--ghost mini-list__more mini-list__more--inline" type="button" id="open-all-journal-from-memories">Otvoriť denník</button>
+                <button class="button button--ghost mini-list__more mini-list__more--inline" type="button" id="open-all-journal-from-memories">Zobraziť všetky zápisy</button>
               </div>
               <div id="memory-strip" class="memory-strip"></div>
               <div id="insight-strip" class="insight-strip"></div>
@@ -149,5 +158,6 @@
   <script src="weatherBackground.js?v=2026-03-29-0015"></script>
   <script src="weatherAudio.js?v=2026-03-29-0015"></script>
   <script src="app.js?v=2026-03-29-0019"></script>
+  <script src="pwa.js?v=2026-03-29-1905"></script>
 </body>
 </html>
