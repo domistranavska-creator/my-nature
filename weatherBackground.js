@@ -387,9 +387,9 @@
     if (canvas === state.skyCanvas) {
       if (isMobileShell) {
         if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1);
-        if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1.02);
-        if (state.activeCloudPreset === "partly") return Math.min(deviceDpr, 1.06);
-        return Math.min(deviceDpr, 1.1);
+        if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1);
+        if (state.activeCloudPreset === "partly") return Math.min(deviceDpr, 1.02);
+        return Math.min(deviceDpr, 1.04);
       }
       if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1.12);
       if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1.22);
@@ -405,10 +405,10 @@
         || state.activePhenomenon === "sleet"
         || state.activePhenomenon === "hail";
       if (isMobileShell) {
-        if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, isPrecipScene ? 1.04 : 1);
-        if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, isPrecipScene ? 1.08 : 1.02);
-        if (isHeavySky) return Math.min(deviceDpr, 1.08);
-        return Math.min(deviceDpr, isPrecipScene ? 1.12 : 1.06);
+        if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1);
+        if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, isPrecipScene ? 1.01 : 1);
+        if (isHeavySky) return Math.min(deviceDpr, 1.01);
+        return Math.min(deviceDpr, isPrecipScene ? 1.02 : 1);
       }
       if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, isPrecipScene ? 1.30 : 1.24);
       if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, isPrecipScene ? 1.38 : 1.30);
@@ -691,6 +691,21 @@
     return clamp(Number(state.frameScale) || 1, 0.7, 2.4);
   }
 
+  function animationFrameIntervalMs() {
+    if (!isMobileWeatherShell()) return 0;
+    if (state.activeSceneKey === "hail" || state.activePhenomenon === "storm") return 36;
+    if (
+      state.activePhenomenon === "rain"
+      || state.activePhenomenon === "snow"
+      || state.activePhenomenon === "sleet"
+      || state.activeCloudPreset === "overcast"
+      || state.activeCloudPreset === "cloudy"
+    ) {
+      return 34;
+    }
+    return 32;
+  }
+
   function skyRedrawIntervalMs() {
     if (state.activeElectricityLevel > 0.04 || state.lightningValue > 0.02) return 16;
     if (state.activeCloudPreset === "overcast") return 42;
@@ -728,6 +743,21 @@
     const navRect = nav?.getBoundingClientRect?.();
     if (!navRect || !Number.isFinite(navRect.top)) return fallback;
     return clamp(navRect.top - Math.max(0, Number(padding) || 0), 0, fallback);
+  }
+
+  function mobileParticleBudgetFactor() {
+    if (!isMobileWeatherShell()) return 1;
+    if (
+      state.activeSceneKey === "hail"
+      || state.activePhenomenon === "storm"
+      || state.activePhenomenon === "rain"
+      || state.activePhenomenon === "snow"
+      || state.activePhenomenon === "sleet"
+    ) {
+      return 0.68;
+    }
+    if (state.activeCloudPreset === "overcast" || state.activeCloudPreset === "cloudy") return 0.76;
+    return 0.84;
   }
 
   function ensureSnowGroundSeeds() {
@@ -3074,6 +3104,7 @@
     const windBoost = 1 + gustStrengthFactor() * 0.38;
     const liquidAmount = effectiveLiquidAmount();
     const snowAmount = effectiveSnowAmount();
+    const mobileBudget = mobileParticleBudgetFactor();
     const stageBoost = intensityMeta.band === "extreme"
       ? 2.05
       : intensityMeta.band === "heavy"
@@ -3100,11 +3131,11 @@
           : 1;
     const chaosDensityBoost = 1 + precipitationChaosFactor() * 0.12;
     const countBoost = intensityMeta.band === "extreme"
-      ? Math.min(4.8, (1 + stageBoost * 0.72 + intensityMeta.overdrive * 0.42) * chaosDensityBoost * presenceBoost)
-      : Math.min(4.0, (1 + stageBoost * 0.58 + intensityMeta.overdrive * 0.32) * (1 + precipitationChaosFactor() * 0.06) * presenceBoost);
+      ? Math.min(4.8, (1 + stageBoost * 0.72 + intensityMeta.overdrive * 0.42) * chaosDensityBoost * presenceBoost * mobileBudget)
+      : Math.min(4.0, (1 + stageBoost * 0.58 + intensityMeta.overdrive * 0.32) * (1 + precipitationChaosFactor() * 0.06) * presenceBoost * mobileBudget);
     const capBoost = intensityMeta.band === "extreme"
-      ? Math.min(3.0, (1 + stageBoost * 0.34 + intensityMeta.overdrive * 0.22) * Math.min(1.22, presenceBoost))
-      : Math.min(2.6, (1 + stageBoost * 0.28 + intensityMeta.overdrive * 0.18) * Math.min(1.18, presenceBoost));
+      ? Math.min(3.0, (1 + stageBoost * 0.34 + intensityMeta.overdrive * 0.22) * Math.min(1.22, presenceBoost) * Math.min(1, mobileBudget + 0.08))
+      : Math.min(2.6, (1 + stageBoost * 0.28 + intensityMeta.overdrive * 0.18) * Math.min(1.18, presenceBoost) * Math.min(1, mobileBudget + 0.08));
     if (areWindTrailsActive()) {
       state.windTrails = makeWindLayer();
     }
@@ -3347,9 +3378,10 @@
     const items = [];
     const strength = gustStrengthFactor();
     const gustDelta = Math.max(0, state.activeWindGustSpeed - state.activeWindSpeed);
+    const mobileBudget = mobileParticleBudgetFactor();
     const count = state.activePhenomenon === "snow"
-      ? Math.max(3, Math.round(3 + strength * 5 + gustDelta / 10))
-      : Math.max(8, Math.round(8 + strength * 14 + gustDelta / 8));
+      ? Math.max(2, Math.round((3 + strength * 5 + gustDelta / 10) * mobileBudget))
+      : Math.max(5, Math.round((8 + strength * 14 + gustDelta / 8) * mobileBudget));
     for (let i = 0; i < count; i += 1) {
       items.push({
         x: Math.random() * state.cssWidth,
@@ -3392,7 +3424,8 @@
 
   function addSplash(x, y, alpha) {
     state.splashes.push({ x, y, life: 1, alpha, r: 1.5 + Math.random() * 2.2 });
-    if (state.splashes.length > 120) state.splashes.shift();
+    const maxSplashes = isMobileWeatherShell() ? 56 : 120;
+    if (state.splashes.length > maxSplashes) state.splashes.shift();
   }
 
   function ensureAnimation() {
@@ -3406,6 +3439,8 @@
     state.forceTreeRedraw = true;
     const step = (ts) => {
       state.rafId = window.requestAnimationFrame(step);
+      const frameInterval = animationFrameIntervalMs();
+      if (frameInterval > 0 && state.lastFrameTs && (ts - state.lastFrameTs) < frameInterval) return;
       renderFrame(ts);
     };
     state.rafId = window.requestAnimationFrame(step);

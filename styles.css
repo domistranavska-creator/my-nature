@@ -35030,3 +35030,27 @@ body.app-mobile-shell .detail-editor-mobile-switch .entry-mode-switch__button-la
   line-height: 1 !important;
   white-space: nowrap !important;
 }
+
+/* Mobile performance guard:
+   keep the premium look, but reduce the heaviest blur/animation work on real phones. */
+body.app-mobile-shell .hero__overlay::after {
+  filter: blur(calc(var(--mobile-weather-hero-cloud-blur, 1px) * 0.72)) !important;
+  animation-duration: 44s !important;
+}
+
+body.app-mobile-shell .detail-modal::backdrop,
+body.app-mobile-shell .journal-overlay-root {
+  backdrop-filter: blur(10px) saturate(114%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(114%) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-modal__content,
+body.app-mobile-shell .detail-modal--settings .detail-modal__content,
+body.app-mobile-shell .detail-modal--overview .detail-modal__content,
+body.app-mobile-shell .detail-modal--weather .detail-modal__content,
+body.app-mobile-shell .detail-modal--batch .detail-modal__content,
+body.app-mobile-shell .journal-overlay-shell,
+body.app-mobile-shell .weather-audio-inline {
+  backdrop-filter: blur(12px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(118%) !important;
+}
