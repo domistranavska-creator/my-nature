@@ -100,6 +100,27 @@
     return "mild";
   }
 
+  function isRealMobileRuntimeAudioMode() {
+    if (typeof document === "undefined" || typeof window === "undefined") return false;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("mobile-preview-embedded") === "1") return false;
+    } catch (error) {
+      // Ignore URL parsing failures and continue with viewport heuristics.
+    }
+    if (window.parent !== window) return false;
+    const narrowScreen = Math.max(0, Number(window.innerWidth) || 0) <= 820;
+    const coarsePointer = typeof window.matchMedia === "function"
+      ? window.matchMedia("(pointer: coarse)").matches
+      : false;
+    return (coarsePointer && narrowScreen)
+      || /Android|iPhone|iPad|iPod|Mobile/i.test(String(navigator?.userAgent || ""));
+  }
+
+  function mobileAudioLoopDelayMs() {
+    return isRealMobileRuntimeAudioMode() ? 140 : 0;
+  }
+
   function layerDef(options) {
     return {
       group: "weather",
@@ -1257,7 +1278,9 @@
       this.enabled = true;
       this.debug = loadDebugPreference();
       this.activated = false;
-      this.preferDirectAudio = typeof window !== "undefined" && /^file:/i.test(String(window.location?.protocol || ""));
+      this.lowPerformanceMobile = isRealMobileRuntimeAudioMode();
+      this.preferDirectAudio = this.lowPerformanceMobile
+        || (typeof window !== "undefined" && /^file:/i.test(String(window.location?.protocol || "")));
       this.audioContext = null;
       this.masterGain = null;
       this.groupNodes = {};
@@ -1284,6 +1307,7 @@
         fadeRate: this.fadeRateFromSeconds(4)
       };
       this.volumeRaf = 0;
+      this.volumeTimer = 0;
       this.lastFrameTs = 0;
       this.handleUserActivation = this.handleUserActivation.bind(this);
       this.stepMix = this.stepMix.bind(this);
@@ -1410,7 +1434,10 @@
     }
 
     preloadAudioAssets(layerKeys = []) {
-      asArray(layerKeys).forEach((layerKey) => {
+      const keys = this.lowPerformanceMobile
+        ? asArray(layerKeys).slice(0, 2)
+        : asArray(layerKeys);
+      keys.forEach((layerKey) => {
         this.ensureLoopLayer(layerKey);
       });
     }
@@ -1440,7 +1467,7 @@
       if (!config || !config.fileList.length) return null;
       if (this.loopLayers.has(layerKey)) return this.loopLayers.get(layerKey);
       const audio = new Audio(pickRandom(config.fileList));
-      audio.preload = "auto";
+      audio.preload = this.lowPerformanceMobile ? "metadata" : "auto";
       audio.loop = true;
       audio.volume = 0;
       audio.muted = false;
@@ -1785,10 +1812,14 @@
         blockedSet.add("mosquito_pass");
       }
 
-      const allowedDetails = asArray(preset.allowDetails).filter((detailKey) => {
+      const allowedDetails = (this.lowPerformanceMobile ? [] : asArray(preset.allowDetails)).filter((detailKey) => {
         if (blockedSet.has(detailKey)) return false;
         return this.isDetailEligible(detailKey, nextState, { ignoreCooldown: true });
       });
+
+      if (this.lowPerformanceMobile) {
+        mutedDueToPriority.push("Na reálnom mobile sú detailné zvuky utlmené, aby appka menej sekala.");
+      }
 
       const blockedReasons = {};
       Object.keys(SOUNDSCAPE_CONFIG.detailEvents).forEach((detailKey) => {
@@ -1826,11 +1857,16 @@
     computeActiveLayers(nextState, evaluation) {
       const preset = evaluation.preset;
       const activeLayers = {};
-      const activeLayerKeys = uniq([
-        ...asArray(preset.timeLayers),
-        ...asArray(preset.weatherLayers),
-        ...asArray(preset.textureLayers)
-      ]);
+      const activeLayerKeys = this.lowPerformanceMobile
+        ? uniq([
+          ...asArray(preset.timeLayers).slice(0, 1),
+          ...asArray(preset.weatherLayers).slice(0, 1)
+        ])
+        : uniq([
+          ...asArray(preset.timeLayers),
+          ...asArray(preset.weatherLayers),
+          ...asArray(preset.textureLayers)
+        ]);
 
       activeLayerKeys.forEach((layerKey) => {
         const config = this.getLoopConfig(layerKey);
@@ -2224,13 +2260,41 @@
       return layer;
     }
 
-    startMixLoop() {
-      if (typeof window === "undefined" || this.volumeRaf) return;
+    stopMixLoop() {
+      if (typeof window === "undefined") return;
+      if (this.volumeRaf) {
+        window.cancelAnimationFrame(this.volumeRaf);
+        this.volumeRaf = 0;
+      }
+      if (this.volumeTimer) {
+        window.clearTimeout(this.volumeTimer);
+        this.volumeTimer = 0;
+      }
+    }
+
+    queueNextMixStep() {
+      if (typeof window === "undefined") return;
+      const delayMs = mobileAudioLoopDelayMs();
+      if (delayMs > 0) {
+        if (this.volumeTimer) return;
+        this.volumeTimer = window.setTimeout(() => {
+          this.volumeTimer = 0;
+          this.stepMix(performance.now());
+        }, delayMs);
+        return;
+      }
+      if (this.volumeRaf) return;
       this.volumeRaf = window.requestAnimationFrame(this.stepMix);
+    }
+
+    startMixLoop() {
+      if (typeof window === "undefined") return;
+      this.queueNextMixStep();
     }
 
     stepMix(timestamp) {
       this.volumeRaf = 0;
+      this.volumeTimer = 0;
       const frameTs = Number(timestamp) || 0;
       const deltaMs = this.lastFrameTs ? Math.max(8, frameTs - this.lastFrameTs) : 16.7;
       this.lastFrameTs = frameTs;
@@ -2297,7 +2361,7 @@
       });
 
       if (keepRunning && typeof window !== "undefined") {
-        this.volumeRaf = window.requestAnimationFrame(this.stepMix);
+        this.queueNextMixStep();
       } else {
         this.lastFrameTs = 0;
       }

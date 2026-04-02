@@ -35,6 +35,12 @@ const MOBILE_WEATHER_SOUND_KEY = "moja-zahrada-mobile-weather-sound-v1";
 const MOBILE_WEATHER_SOUND_VOLUME_KEY = "moja-zahrada-mobile-weather-sound-volume-v1";
 const IMAGE_FILE_ACCEPT = "image/*,.jpg,.jpeg,.png,.webp,.heic,.heif";
 const VIDEO_FILE_ACCEPT = "video/*,.mp4,.mov,.m4v,.webm,.3gp";
+const JOURNAL_IMAGE_MAX_DIMENSION = 1280;
+const JOURNAL_IMAGE_QUALITY = 0.8;
+const QUICK_CAPTURE_PREVIEW_MAX_DIMENSION = 1440;
+const QUICK_CAPTURE_PREVIEW_QUALITY = 0.82;
+const CATEGORY_IMAGE_MAX_DIMENSION = 1280;
+const CATEGORY_IMAGE_QUALITY = 0.8;
 const SUPABASE_IMAGE_BUCKET = "mojazahrada-images";
 const SUPABASE_VIDEO_FILE_LIMIT_BYTES = 100 * 1024 * 1024;
 const GARDEN_WEATHER_PLACE = "Zákopčie, Slovensko";
@@ -565,30 +571,79 @@ function walkMapPoints(walkValue) {
   return Array.isArray(walk?.gpsPoints) ? walk.gpsPoints.filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude)) : [];
 }
 
-function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCount = 0 } = {}) {
+function renderWalkMapDeferredShellMarkup(points = [], { compact = false, live = false, photoCount = 0 } = {}) {
+  const safePoints = Array.isArray(points) ? points.filter((point) => Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)) : [];
+  if (!safePoints.length) return "";
+  return `
+    <button class="journal-walk__map-launch" type="button" data-walk-map-activate>
+      <span class="journal-walk__map-launch-icon" aria-hidden="true">${ICONS.walkGps}</span>
+      <span class="journal-walk__map-launch-copy">
+        <strong>Zobraziť mapu prechádzky</strong>
+        <span>${escapeHtml(countedLabel(safePoints.length, "GPS bod", "GPS body", "GPS bodov"))}</span>
+      </span>
+    </button>
+  `;
+}
+
+function renderWalkMapInnerMarkup(points = [], { compact = false, live = false, photoCount = 0, collapsible = false } = {}) {
+  const safePoints = Array.isArray(points) ? points.filter((point) => Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)) : [];
+  if (!safePoints.length) return "";
+  return `
+    <div
+      class="journal-walk__map ${compact ? "journal-walk__map--compact" : ""} ${live ? "journal-walk__map--live" : ""}"
+      data-walk-map
+      data-walk-map-photo-count="${escapeAttribute(String(Math.max(0, Number(photoCount) || 0)))}"
+      data-walk-map-points="${escapeAttribute(JSON.stringify(safePoints.map((point) => ({
+        latitude: point.latitude,
+        longitude: point.longitude
+      }))))}"
+    ></div>
+    ${compact && collapsible ? `
+      <button class="journal-walk__map-collapse" type="button" data-walk-map-collapse aria-label="Skryť mapu" title="Skryť mapu">Skryť mapu</button>
+    ` : ""}
+    ${compact ? "" : `
+      <button class="journal-walk__map-expand" type="button" data-walk-map-fullscreen aria-label="Celá mapa" title="Celá mapa">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 4H4v4"></path>
+          <path d="M16 4h4v4"></path>
+          <path d="M20 16v4h-4"></path>
+          <path d="M4 16v4h4"></path>
+        </svg>
+      </button>
+    `}
+  `;
+}
+
+function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCount = 0, deferred = false } = {}) {
   const points = walkMapPoints(walkValue);
   if (points.length < 1) return "";
-  return `
-    <div class="journal-walk__map-shell ${compact ? "journal-walk__map-shell--compact" : ""} ${live ? "journal-walk__map-shell--live" : ""}" data-walk-map-shell>
+  const encodedPoints = escapeAttribute(JSON.stringify(points.map((point) => ({
+    latitude: point.latitude,
+    longitude: point.longitude
+  }))));
+  const encodedPhotoCount = escapeAttribute(String(Math.max(0, Number(photoCount) || 0)));
+
+  if (deferred) {
+    return `
       <div
-        class="journal-walk__map ${compact ? "journal-walk__map--compact" : ""} ${live ? "journal-walk__map--live" : ""}"
-        data-walk-map
-        data-walk-map-photo-count="${escapeAttribute(String(Math.max(0, Number(photoCount) || 0)))}"
-        data-walk-map-points="${escapeAttribute(JSON.stringify(points.map((point) => ({
-          latitude: point.latitude,
-          longitude: point.longitude
-        }))))}"
-      ></div>
-      ${compact ? "" : `
-        <button class="journal-walk__map-expand" type="button" data-walk-map-fullscreen aria-label="Celá mapa" title="Celá mapa">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M8 4H4v4"></path>
-            <path d="M16 4h4v4"></path>
-            <path d="M20 16v4h-4"></path>
-            <path d="M4 16v4h4"></path>
-          </svg>
-        </button>
-      `}
+        class="journal-walk__map-shell journal-walk__map-shell--deferred ${compact ? "journal-walk__map-shell--compact" : ""} ${live ? "journal-walk__map-shell--live" : ""}"
+        data-walk-map-shell
+        data-walk-map-points="${encodedPoints}"
+        data-walk-map-photo-count="${encodedPhotoCount}"
+      >
+        ${renderWalkMapDeferredShellMarkup(points, { compact, live, photoCount })}
+      </div>
+    `;
+  }
+
+  return `
+    <div
+      class="journal-walk__map-shell ${compact ? "journal-walk__map-shell--compact" : ""} ${live ? "journal-walk__map-shell--live" : ""}"
+      data-walk-map-shell
+      data-walk-map-points="${encodedPoints}"
+      data-walk-map-photo-count="${encodedPhotoCount}"
+    >
+      ${renderWalkMapInnerMarkup(points, { compact, live, photoCount })}
     </div>
   `;
 }
@@ -806,6 +861,18 @@ let state = loadState();
 let activeCategoryId = state.categories[0]?.id || null;
 let activeFilter = "all";
 let isFocusedView = false;
+let derivedDataCacheVersion = 0;
+let derivedDataCache = {
+  version: -1,
+  categoriesById: new Map(),
+  childrenByParent: new Map(),
+  orderedCategories: [],
+  groupedCategories: [],
+  descendantsById: new Map(),
+  varietiesByCategory: new Map(),
+  varietiesByCategoryTree: new Map(),
+  sortedVarietiesByCategory: new Map()
+};
 let imageBackgroundCleanupScheduled = false;
 let sowingTipInterval = null;
 let overviewHighlightsInterval = null;
@@ -1832,9 +1899,35 @@ function isCompactAppShellViewport() {
   return isEmbeddedMobilePreviewMode() || window.innerWidth <= MOBILE_APP_SHELL_MAX_WIDTH;
 }
 
+function isRealMobileRuntimeMode() {
+  if (typeof document === "undefined" || typeof window === "undefined") return false;
+  if (!isCompactAppShellViewport()) return false;
+  if (isEmbeddedMobilePreviewMode()) return false;
+  if (window.parent !== window) return false;
+  return typeof window.matchMedia === "function"
+    ? window.matchMedia("(pointer: coarse)").matches
+    : /Android|iPhone|iPad|iPod|Mobile/i.test(String(navigator?.userAgent || ""));
+}
+
+function isLiteMobileRuntimeMode() {
+  if (!isRealMobileRuntimeMode() || typeof window === "undefined") return false;
+  const coarsePointer = typeof window.matchMedia === "function"
+    ? window.matchMedia("(pointer: coarse)").matches
+    : false;
+  const lowDeviceMemory = Number.isFinite(Number(navigator?.deviceMemory))
+    ? Number(navigator.deviceMemory) <= 6
+    : false;
+  const lowCpuThreads = Number.isFinite(Number(navigator?.hardwareConcurrency))
+    ? Number(navigator.hardwareConcurrency) <= 8
+    : false;
+  return coarsePointer || lowDeviceMemory || lowCpuThreads;
+}
+
 function syncResponsiveAppShellClass() {
   if (typeof document === "undefined") return;
   document.body.classList.toggle("app-mobile-shell", isCompactAppShellViewport());
+  document.body.classList.toggle("app-mobile-runtime", isRealMobileRuntimeMode());
+  document.body.classList.toggle("app-mobile-performance-lite", isLiteMobileRuntimeMode());
   document.body.classList.toggle("app-mobile-preview-embedded", isEmbeddedMobilePreviewMode());
   document.documentElement.classList.toggle("app-mobile-preview-embedded-root", isEmbeddedMobilePreviewMode());
   syncToolbarAddMenuOverlayState();
@@ -1886,6 +1979,43 @@ function setMobilePreviewEnabled(enabled) {
   syncMobilePreviewClass();
   render();
   syncMobileToolbarScrollState();
+}
+
+function scheduleGlobalViewportMaintenance({ resize = false, scroll = false } = {}) {
+  if (typeof window === "undefined") return;
+  if (
+    scroll
+    && !resize
+    && isRealMobileRuntimeMode()
+    && !isEmbeddedMobilePreviewMode()
+    && !toolbarAddMenuEl?.open
+  ) {
+    return;
+  }
+  mobileViewportMaintenanceNeedsResize = mobileViewportMaintenanceNeedsResize || Boolean(resize);
+  mobileViewportMaintenanceNeedsScroll = mobileViewportMaintenanceNeedsScroll || Boolean(scroll);
+  if (mobileViewportMaintenanceRaf) return;
+
+  mobileViewportMaintenanceRaf = window.requestAnimationFrame(() => {
+    mobileViewportMaintenanceRaf = 0;
+    const shouldSyncResize = mobileViewportMaintenanceNeedsResize;
+    const shouldSyncScroll = mobileViewportMaintenanceNeedsScroll;
+    mobileViewportMaintenanceNeedsResize = false;
+    mobileViewportMaintenanceNeedsScroll = false;
+
+    if (shouldSyncResize) {
+      syncResponsiveAppShellClass();
+      return;
+    }
+
+    if (shouldSyncScroll) {
+      syncMobileToolbarScrollState();
+      if (toolbarAddMenuEl?.open) {
+        positionToolbarAddMenuOverlay();
+      }
+      scheduleEmbeddedMobilePreviewMetricsPush();
+    }
+  });
 }
 
 function lockBodyScroll(owner = "") {
@@ -2135,6 +2265,55 @@ function createWalkTileLayer(map, mapEl) {
   return applyProvider(0);
 }
 
+function activateDeferredWalkMapShell(shell) {
+  if (!shell || shell.dataset.walkMapActivated === "true") return;
+  const compact = shell.classList.contains("journal-walk__map-shell--compact");
+  const live = shell.classList.contains("journal-walk__map-shell--live");
+  const points = walkMapPointsFromElement(shell);
+  const photoCount = Math.max(0, Number(shell.getAttribute("data-walk-map-photo-count") || 0) || 0);
+  if (!points.length) return;
+  shell.dataset.walkMapActivated = "true";
+  shell.classList.remove("journal-walk__map-shell--deferred");
+  shell.innerHTML = renderWalkMapInnerMarkup(points, { compact, live, photoCount, collapsible: compact });
+  hydrateWalkMaps(shell);
+  refreshWalkMaps(shell);
+  bindWalkMapActivators(shell);
+}
+
+function collapseDeferredWalkMapShell(shell) {
+  if (!shell || shell.dataset.walkMapActivated !== "true") return;
+  const compact = shell.classList.contains("journal-walk__map-shell--compact");
+  const live = shell.classList.contains("journal-walk__map-shell--live");
+  const points = walkMapPointsFromElement(shell);
+  const photoCount = Math.max(0, Number(shell.getAttribute("data-walk-map-photo-count") || 0) || 0);
+  shell.dataset.walkMapActivated = "false";
+  shell.classList.add("journal-walk__map-shell--deferred");
+  shell.innerHTML = renderWalkMapDeferredShellMarkup(points, { compact, live, photoCount });
+  bindWalkMapActivators(shell);
+}
+
+function bindWalkMapActivators(root = document) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll("[data-walk-map-activate]").forEach((button) => {
+    if (button.dataset.walkMapActivateBound === "true") return;
+    button.dataset.walkMapActivateBound = "true";
+    button.addEventListener("click", () => {
+      const shell = button.closest("[data-walk-map-shell]");
+      if (!shell) return;
+      activateDeferredWalkMapShell(shell);
+    });
+  });
+  root.querySelectorAll("[data-walk-map-collapse]").forEach((button) => {
+    if (button.dataset.walkMapCollapseBound === "true") return;
+    button.dataset.walkMapCollapseBound = "true";
+    button.addEventListener("click", () => {
+      const shell = button.closest("[data-walk-map-shell]");
+      if (!shell) return;
+      collapseDeferredWalkMapShell(shell);
+    });
+  });
+}
+
 function fitWalkMapViewport(map, { polyline = null, point = null, compact = false, live = false, points = [] } = {}) {
   if (!map) return;
   const padding = live ? [20, 20] : compact ? [16, 16] : [24, 24];
@@ -2310,18 +2489,141 @@ let deferredVarietyCardImageObserver = null;
 let toolbarSearchQuery = "";
 let toolbarSearchLastResults = [];
 let toolbarAddMenuOverlayHostEl = null;
+let mobileViewportMaintenanceRaf = 0;
+let mobileViewportMaintenanceNeedsResize = false;
+let mobileViewportMaintenanceNeedsScroll = false;
+let mobileCameraPickerTargetInputEl = null;
+let mobileCameraPickerTargetOptions = null;
+
+function invalidateDerivedDataCaches() {
+  derivedDataCacheVersion += 1;
+  derivedDataCache = {
+    version: -1,
+    categoriesById: new Map(),
+    childrenByParent: new Map(),
+    orderedCategories: [],
+    groupedCategories: [],
+    descendantsById: new Map(),
+    varietiesByCategory: new Map(),
+    varietiesByCategoryTree: new Map(),
+    sortedVarietiesByCategory: new Map()
+  };
+}
+
+function ensureDerivedDataCache() {
+  if (derivedDataCache.version === derivedDataCacheVersion) return derivedDataCache;
+
+  const categories = Array.isArray(state?.categories) ? state.categories : [];
+  const varieties = Array.isArray(state?.varieties) ? state.varieties : [];
+  const categoriesById = new Map(categories.map((item) => [item.id, item]));
+  const childrenByParent = new Map();
+  const sortSiblings = (items) => [...items].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "sk"));
+
+  categories.forEach((item) => {
+    const parentId = String(item.parentCategoryId || "").trim();
+    if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+    childrenByParent.get(parentId).push(item);
+  });
+
+  childrenByParent.forEach((items, parentId) => {
+    childrenByParent.set(parentId, sortSiblings(items));
+  });
+
+  const orderedCategoriesList = [];
+  const visited = new Set();
+  const walkOrdered = (parentId = "") => {
+    const siblings = childrenByParent.get(parentId) || [];
+    siblings.forEach((item) => {
+      if (visited.has(item.id)) return;
+      visited.add(item.id);
+      orderedCategoriesList.push(item);
+      walkOrdered(item.id);
+    });
+  };
+
+  walkOrdered("");
+  sortSiblings(categories).forEach((item) => {
+    if (visited.has(item.id)) return;
+    visited.add(item.id);
+    orderedCategoriesList.push(item);
+    walkOrdered(item.id);
+  });
+
+  const descendantsById = new Map();
+  const computeDescendants = (categoryId = "") => {
+    const normalizedId = String(categoryId || "").trim();
+    if (descendantsById.has(normalizedId)) return descendantsById.get(normalizedId);
+    const descendants = [];
+    const branchChildren = childrenByParent.get(normalizedId) || [];
+    branchChildren.forEach((child) => {
+      descendants.push(child.id);
+      descendants.push(...computeDescendants(child.id));
+    });
+    descendantsById.set(normalizedId, descendants);
+    return descendants;
+  };
+
+  categories.forEach((item) => computeDescendants(item.id));
+
+  const varietiesByCategory = new Map();
+  varieties.forEach((item) => {
+    const categoryId = String(item.categoryId || "").trim();
+    if (!varietiesByCategory.has(categoryId)) varietiesByCategory.set(categoryId, []);
+    varietiesByCategory.get(categoryId).push(item);
+  });
+
+  const rankVariety = (item) => {
+    if (isGalleryEntry(item)) return 0;
+    if (isQuickEntry(item)) return 1;
+    return 2;
+  };
+  const sortedVarietiesByCategory = new Map();
+  varietiesByCategory.forEach((items, categoryId) => {
+    sortedVarietiesByCategory.set(
+      categoryId,
+      [...items].sort((a, b) => rankVariety(a) - rankVariety(b) || entryDisplayName(a).localeCompare(entryDisplayName(b), "sk", { sensitivity: "base" }))
+    );
+  });
+
+  const varietiesByCategoryTree = new Map();
+  categories.forEach((item) => {
+    const categoryIds = [item.id, ...(descendantsById.get(item.id) || [])];
+    const categoryIdSet = new Set(categoryIds);
+    varietiesByCategoryTree.set(
+      item.id,
+      varieties.filter((variety) => categoryIdSet.has(String(variety.categoryId || "").trim()))
+    );
+  });
+
+  const groupedCategories = orderedCategoriesList
+    .filter((item) => !item.parentCategoryId && (item.nodeType === "parent" || item.id === FALLBACK_CATEGORY_ID))
+    .map((root) => ({
+      root,
+      children: childrenByParent.get(root.id) || []
+    }));
+
+  derivedDataCache = {
+    version: derivedDataCacheVersion,
+    categoriesById,
+    childrenByParent,
+    orderedCategories: orderedCategoriesList,
+    groupedCategories,
+    descendantsById,
+    varietiesByCategory,
+    varietiesByCategoryTree,
+    sortedVarietiesByCategory
+  };
+  return derivedDataCache;
+}
 
 wireStaticEvents();
 render();
 syncResponsiveAppShellClass();
 window.addEventListener("resize", () => {
-  syncResponsiveAppShellClass();
-  positionToolbarAddMenuOverlay();
+  scheduleGlobalViewportMaintenance({ resize: true });
 }, { passive: true });
 window.addEventListener("scroll", () => {
-  syncMobileToolbarScrollState();
-  scheduleEmbeddedMobilePreviewMetricsPush();
-  positionToolbarAddMenuOverlay();
+  scheduleGlobalViewportMaintenance({ scroll: true });
 }, { passive: true });
 scheduleImageBackgroundCleanup();
 hydrateStateFromFolderStorage().catch((error) => {
@@ -2389,29 +2691,18 @@ function syncToolbarAddMenuOverlayState() {
 }
 
 function openMainMenuView() {
-  closeUtilityDrawers();
   isFocusedView = false;
-  render();
+  renderMainMenuNavigation();
   const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
   if (isMobileShell) {
-    const scrollMainMenuTop = () => {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-      if (document.scrollingElement) {
-        document.scrollingElement.scrollTop = 0;
-        document.scrollingElement.scrollLeft = 0;
-      }
-      if (pageShellEl && typeof pageShellEl.scrollTo === "function") {
-        pageShellEl.scrollTo({ top: 0, left: 0, behavior: "auto" });
-      }
-    };
-    scrollMainMenuTop();
+    scrollNavigationViewportTop();
     if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(scrollMainMenuTop);
+      window.requestAnimationFrame(scrollNavigationViewportTop);
     }
     return;
   }
   const menuTop = menuPanelEl?.offsetTop ?? 0;
-  window.scrollTo({ top: Math.max(0, menuTop - 12), behavior: "smooth" });
+  window.scrollTo({ top: Math.max(0, menuTop - 12), behavior: navigationScrollBehavior() });
 }
 
 function normalizedJournalList() {
@@ -2661,6 +2952,8 @@ function bindJournalOverlayCardActions(container) {
       openJournalComposer(button.dataset.editJournalOverlay || "");
     });
   });
+
+  bindWalkMapActivators(container);
 }
 
 function openJournalOverlayList(initialTagKey = "") {
@@ -2988,6 +3281,9 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const videoStatusPercentEl = root.querySelector("#journal-overlay-video-status-percent");
   const videoStatusBarEl = root.querySelector("#journal-overlay-video-status-bar");
   const videoStatusDetailEl = root.querySelector("#journal-overlay-video-status-detail");
+
+  enableMobileMediaPickerForInput(imageInput, { multiple: true });
+  enableMobileMediaPickerForInput(videoInput);
   const moodPickerEl = root.querySelector("#add-entry-mood-picker");
   const weatherMountEl = root.querySelector("#journal-overlay-header-weather");
   const walkFieldsEl = root.querySelector("#journal-overlay-walk-fields");
@@ -3833,7 +4129,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
       const selectedEntryType = String(form.get("entryType") || editingEntry?.entryType || initialEntryType || "note").trim() || "note";
 
       const newImages = pendingFiles.length
-        ? await Promise.all(pendingFiles.map((file) => fileToOptimizedDataUrl(file, 720, 0.68)))
+        ? await Promise.all(pendingFiles.map((file) => fileToOptimizedDataUrl(file, JOURNAL_IMAGE_MAX_DIMENSION, JOURNAL_IMAGE_QUALITY)))
         : [];
       const images = [...existingImages, ...newImages];
       const linkedVarietyId = String(form.get("linkedVarietyId") || "").trim();
@@ -4075,6 +4371,54 @@ function clearToolbarSearch({ keepFocus = false } = {}) {
   if (!keepFocus) input?.blur();
 }
 
+function navigationScrollBehavior() {
+  return isRealMobileRuntimeMode() ? "auto" : "smooth";
+}
+
+function scrollNavigationViewportTop() {
+  const behavior = navigationScrollBehavior();
+  window.scrollTo({ top: 0, left: 0, behavior });
+  if (document.scrollingElement) {
+    document.scrollingElement.scrollTop = 0;
+    document.scrollingElement.scrollLeft = 0;
+  }
+  if (pageShellEl && typeof pageShellEl.scrollTo === "function") {
+    pageShellEl.scrollTo({ top: 0, left: 0, behavior });
+  }
+}
+
+function renderFocusedCategoryNavigation() {
+  ensureActiveCategory();
+  closeUtilityDrawers();
+  updateMenuVisibility();
+  renderCatalog();
+  reconcileBodyScrollState();
+  syncMainMenuTouchScrollState();
+  scheduleEmbeddedMobilePreviewMetricsPush();
+}
+
+function openFocusedCategoryNavigation(categoryId = "", { scrollToTop = true } = {}) {
+  const normalizedId = String(categoryId || "").trim();
+  if (!normalizedId) return;
+  activeCategoryId = normalizedId;
+  isFocusedView = true;
+  renderFocusedCategoryNavigation();
+  if (scrollToTop) {
+    scrollNavigationViewportTop();
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(scrollNavigationViewportTop);
+    }
+  }
+}
+
+function renderMainMenuNavigation() {
+  closeUtilityDrawers();
+  updateMenuVisibility();
+  reconcileBodyScrollState();
+  syncMainMenuTouchScrollState();
+  scheduleEmbeddedMobilePreviewMetricsPush();
+}
+
 function toolbarSearchMatches(query = "") {
   const normalizedQuery = slugify(query);
   if (!normalizedQuery || normalizedQuery.length < 2) return [];
@@ -4166,19 +4510,16 @@ function renderToolbarSearchResults() {
       clearToolbarSearch();
       closeToolbarAddMenu();
       if (kind === "category") {
-        activeCategoryId = id;
-        isFocusedView = true;
-        render();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        openFocusedCategoryNavigation(id);
         return;
       }
       const card = state.varieties.find((item) => item.id === id);
       if (card?.categoryId) {
-        activeCategoryId = card.categoryId;
-        isFocusedView = true;
+        openFocusedCategoryNavigation(card.categoryId, { scrollToTop: false });
+      } else {
+        render();
       }
-      render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollNavigationViewportTop();
       openStoredCardEditor(id);
     });
   });
@@ -4852,18 +5193,12 @@ function renderMainMenu() {
 
   mainMenuEl.querySelectorAll("[data-open-main-category]").forEach((item) => {
     item.addEventListener("click", (event) => {
-      activeCategoryId = item.dataset.openMainCategory;
-      isFocusedView = true;
-      render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      openFocusedCategoryNavigation(item.dataset.openMainCategory || "");
     });
     item.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        activeCategoryId = item.dataset.openMainCategory;
-        isFocusedView = true;
-        render();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        openFocusedCategoryNavigation(item.dataset.openMainCategory || "");
       }
     });
   });
@@ -5458,6 +5793,128 @@ function lastSuggestedJournalPlace() {
   return shortWeatherPlace || "";
 }
 
+function shouldUseRuntimeMobileMediaPicker() {
+  if (typeof document === "undefined" || typeof window === "undefined") return false;
+  if (!document.body?.classList.contains("app-mobile-shell")) return false;
+  if (isEmbeddedMobilePreviewMode()) return false;
+  if (window.parent !== window) return false;
+  return typeof window.matchMedia === "function"
+    ? window.matchMedia("(pointer: coarse)").matches
+    : /Android|iPhone|iPad|iPod|Mobile/i.test(String(navigator?.userAgent || ""));
+}
+
+function deriveMobileMediaPickerOptionsForInput(input, overrides = {}) {
+  const accept = String(overrides.accept || input?.getAttribute?.("accept") || "").toLowerCase();
+  const imageAllowed = accept.includes("image/") || accept.includes(".jpg") || accept.includes(".jpeg") || accept.includes(".png") || accept.includes(".webp");
+  const videoAllowed = accept.includes("video/") || accept.includes(".mp4") || accept.includes(".mov") || accept.includes(".webm") || accept.includes(".m4v") || accept.includes(".3gp");
+  const multiple = overrides.multiple === undefined ? Boolean(input?.hasAttribute?.("multiple")) : Boolean(overrides.multiple);
+
+  const actions = [];
+  if (imageAllowed) {
+    actions.push({ id: "capture-photo", label: "Odfotiť" });
+    actions.push({ id: "pick-photo", label: multiple ? "Vybrať fotky" : "Vybrať fotku" });
+  }
+  if (videoAllowed) {
+    actions.push({ id: "capture-video", label: "Natočiť video" });
+    actions.push({ id: "pick-video", label: "Vybrať video" });
+  }
+
+  const title = videoAllowed && imageAllowed
+    ? "Pridať médium"
+    : videoAllowed
+      ? "Pridať video"
+      : multiple
+        ? "Pridať fotky"
+        : "Pridať fotku";
+
+  const subtitle = videoAllowed && imageAllowed
+    ? "Vyber, či chceš fotiť, zobrať niečo z mobilu alebo pridať video."
+    : videoAllowed
+      ? "Vyber, či chceš natočiť nové video alebo použiť video z mobilu."
+      : multiple
+        ? "Vyber, či chceš fotiť alebo zobrať fotky priamo z mobilu."
+        : "Vyber, či chceš odfotiť nový záber alebo vziať fotku z mobilu.";
+
+  return {
+    title,
+    subtitle,
+    actions,
+    multiple,
+    imageAllowed,
+    videoAllowed
+  };
+}
+
+function configureMobileCameraPickerHost(host, options = {}) {
+  if (!host) return;
+  const normalized = {
+    title: String(options.title || "Pridať médiá").trim() || "Pridať médiá",
+    subtitle: String(options.subtitle || "Vyber, čo chceš pridať.").trim() || "Vyber, čo chceš pridať.",
+    actions: Array.isArray(options.actions) ? options.actions : []
+  };
+
+  const titleEl = host.querySelector("[data-mobile-camera-title]");
+  const subtitleEl = host.querySelector("[data-mobile-camera-subtitle]");
+  if (titleEl) titleEl.textContent = normalized.title;
+  if (subtitleEl) subtitleEl.textContent = normalized.subtitle;
+
+  const actionsById = new Map(normalized.actions.map((item) => [String(item.id || "").trim(), item]));
+  host.querySelectorAll("[data-mobile-camera-action]").forEach((button) => {
+    const actionId = String(button.getAttribute("data-mobile-camera-action") || "").trim();
+    const action = actionsById.get(actionId);
+    button.hidden = !action;
+    button.disabled = !action;
+    if (action) {
+      button.textContent = String(action.label || "").trim() || button.textContent;
+    }
+  });
+}
+
+function triggerMobileMediaInputAction(input, action, options = {}) {
+  if (!(input instanceof HTMLInputElement)) return;
+  const normalizedAction = String(action || "").trim();
+  const config = deriveMobileMediaPickerOptionsForInput(input, options);
+  const wantsCapture = normalizedAction === "capture-photo" || normalizedAction === "capture-video";
+  const wantsVideo = normalizedAction === "capture-video" || normalizedAction === "pick-video";
+  const acceptValue = wantsVideo ? VIDEO_FILE_ACCEPT : IMAGE_FILE_ACCEPT;
+  const allowMultiple = !wantsCapture && !wantsVideo && Boolean(config.multiple);
+
+  input.setAttribute("accept", acceptValue);
+  if (wantsCapture) {
+    input.setAttribute("capture", "environment");
+  } else {
+    input.removeAttribute("capture");
+  }
+  if (allowMultiple) {
+    input.setAttribute("multiple", "");
+  } else {
+    input.removeAttribute("multiple");
+  }
+
+  input.dataset.mobileMediaPickerBypass = "true";
+  window.setTimeout(() => {
+    if (input.dataset.mobileMediaPickerBypass === "true") {
+      delete input.dataset.mobileMediaPickerBypass;
+    }
+  }, 0);
+  input.click();
+}
+
+function enableMobileMediaPickerForInput(input, options = {}) {
+  if (!(input instanceof HTMLInputElement) || input.type !== "file" || input.dataset.mobileMediaPickerBound === "true") return;
+  input.dataset.mobileMediaPickerBound = "true";
+  input.addEventListener("click", (event) => {
+    if (!shouldUseRuntimeMobileMediaPicker()) return;
+    if (input.dataset.mobileMediaPickerBypass === "true") {
+      delete input.dataset.mobileMediaPickerBypass;
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    openMobileMediaPickerForInput(input, options);
+  }, true);
+}
+
 function ensureMobileCameraPicker() {
   if (typeof document === "undefined") return null;
   let host = document.getElementById("mobile-camera-picker-host");
@@ -5470,8 +5927,8 @@ function ensureMobileCameraPicker() {
       <div class="mobile-camera-picker__scrim" data-mobile-camera-close></div>
       <div class="mobile-camera-picker__sheet" role="dialog" aria-modal="true" aria-label="Pridať médiá">
         <div class="mobile-camera-picker__head">
-          <strong>Pridať médiá</strong>
-          <span>Vyber, či chceš fotiť, zobrať niečo z mobilu alebo pridať video.</span>
+          <strong data-mobile-camera-title>Pridať médiá</strong>
+          <span data-mobile-camera-subtitle>Vyber, či chceš fotiť, zobrať niečo z mobilu alebo pridať video.</span>
         </div>
         <div class="mobile-camera-picker__actions">
           <button class="mobile-camera-picker__button" type="button" data-mobile-camera-action="capture-photo">Odfotiť</button>
@@ -5499,6 +5956,8 @@ function ensureMobileCameraPicker() {
       host.hidden = true;
       host.setAttribute("aria-hidden", "true");
       host.classList.remove("is-open");
+      mobileCameraPickerTargetInputEl = null;
+      mobileCameraPickerTargetOptions = null;
     };
     const openInput = (selector) => {
       const input = host.querySelector(selector);
@@ -5518,6 +5977,11 @@ function ensureMobileCameraPicker() {
       if (!(actionButton instanceof HTMLButtonElement)) return;
       event.preventDefault();
       const action = String(actionButton.getAttribute("data-mobile-camera-action") || "").trim();
+      if (mobileCameraPickerTargetInputEl instanceof HTMLInputElement) {
+        triggerMobileMediaInputAction(mobileCameraPickerTargetInputEl, action, mobileCameraPickerTargetOptions || {});
+        closePicker();
+        return;
+      }
       if (action === "capture-photo") {
         openInput("#mobile-camera-capture-input");
         return;
@@ -5559,9 +6023,32 @@ function ensureMobileCameraPicker() {
   return host;
 }
 
+function openMobileMediaPickerForInput(input, options = {}) {
+  const host = ensureMobileCameraPicker();
+  if (!host) return;
+  mobileCameraPickerTargetInputEl = input instanceof HTMLInputElement ? input : null;
+  mobileCameraPickerTargetOptions = options && typeof options === "object" ? options : {};
+  configureMobileCameraPickerHost(host, deriveMobileMediaPickerOptionsForInput(input, options));
+  host.hidden = false;
+  host.setAttribute("aria-hidden", "false");
+  host.classList.add("is-open");
+}
+
 function openMobileCameraPicker() {
   const host = ensureMobileCameraPicker();
   if (!host) return;
+  mobileCameraPickerTargetInputEl = null;
+  mobileCameraPickerTargetOptions = null;
+  configureMobileCameraPickerHost(host, {
+    title: "Pridať médiá",
+    subtitle: "Vyber, či chceš fotiť, zobrať niečo z mobilu alebo pridať video.",
+    actions: [
+      { id: "capture-photo", label: "Odfotiť" },
+      { id: "pick-photo", label: "Vybrať fotku" },
+      { id: "capture-video", label: "Natočiť video" },
+      { id: "pick-video", label: "Vybrať video" }
+    ]
+  });
   host.hidden = false;
   host.setAttribute("aria-hidden", "false");
   host.classList.add("is-open");
@@ -5572,7 +6059,7 @@ async function openQuickPhotoEntryFlow(photoFile) {
 
   let previewUrl = "";
   try {
-    previewUrl = await fileToOptimizedDataUrl(photoFile, 1280, 0.78);
+    previewUrl = await fileToOptimizedDataUrl(photoFile, QUICK_CAPTURE_PREVIEW_MAX_DIMENSION, QUICK_CAPTURE_PREVIEW_QUALITY);
   } catch (error) {
     previewUrl = URL.createObjectURL(photoFile);
   }
@@ -5677,7 +6164,7 @@ async function openQuickPhotoEntryFlow(photoFile) {
     event.preventDefault();
     const form = new FormData(formEl);
     const selectedEntryType = String(form.get("entryType") || defaultEntryType).trim() || defaultEntryType;
-    const optimizedImage = await fileToOptimizedDataUrl(photoFile, 720, 0.72);
+    const optimizedImage = await fileToOptimizedDataUrl(photoFile, JOURNAL_IMAGE_MAX_DIMENSION, JOURNAL_IMAGE_QUALITY);
     const linkedCategoryIds = activeCategoryId ? normalizeIdList([activeCategoryId]) : [];
     const linkedCategoryId = linkedCategoryIds[0] || "";
     const weatherSnapshot = currentWeatherSnapshot || homeWeatherSnapshot || await loadHomeWeatherSnapshot().catch(() => null);
@@ -6070,9 +6557,7 @@ function renderCatalog() {
 
   catalogEl.querySelectorAll("[data-open-category]").forEach((button) => {
     button.addEventListener("click", () => {
-      activeCategoryId = button.dataset.openCategory;
-      isFocusedView = true;
-      render();
+      openFocusedCategoryNavigation(button.dataset.openCategory || "");
     });
   });
 
@@ -6080,9 +6565,7 @@ function renderCatalog() {
     card.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      activeCategoryId = card.dataset.openCategory;
-      isFocusedView = true;
-      render();
+      openFocusedCategoryNavigation(card.dataset.openCategory || "");
     });
   });
 
@@ -6271,6 +6754,7 @@ function bindThingLinks(container = document) {
       openThingOverview(button.dataset.openThing || "");
     });
   });
+  bindDeferredJournalVideoActivators(container);
 }
 
 function journalEntriesNewestFirst() {
@@ -6288,9 +6772,89 @@ function journalVideo(entry) {
   return String(entry?.video || "").trim();
 }
 
+function shouldDeferInlineJournalVideo() {
+  return isLiteMobileRuntimeMode();
+}
+
+function renderDeferredJournalVideoShellContent(videoSource = "", title = "Video") {
+  const normalized = String(videoSource || "").trim();
+  if (!normalized) return "";
+  return `
+    <button
+      class="journal-item__video-launch"
+      type="button"
+      data-journal-video-activate
+      data-journal-video-src="${escapeAttribute(normalized)}"
+      data-journal-video-title="${escapeAttribute(title)}"
+      aria-label="Prehrať video"
+    >
+      <span class="journal-item__video-launch-icon" aria-hidden="true">▶</span>
+      <span class="journal-item__video-launch-copy">
+        <strong>Prehrať video</strong>
+        <span>Na mobile ho načítam až po kliknutí, aby denník nebrzdil scroll.</span>
+      </span>
+    </button>
+  `;
+}
+
+function renderDeferredJournalVideoShell(videoSource = "", title = "Video", className = "journal-item__video") {
+  const normalized = String(videoSource || "").trim();
+  if (!normalized) return "";
+  return `
+    <div class="${escapeAttribute(className)} journal-item__video-shell" data-journal-video-shell>
+      ${renderDeferredJournalVideoShellContent(normalized, title)}
+    </div>
+  `;
+}
+
+function activateDeferredJournalVideo(button) {
+  if (!(button instanceof HTMLButtonElement)) return;
+  const shell = button.closest("[data-journal-video-shell]");
+  if (!(shell instanceof HTMLElement)) return;
+  const videoSource = String(button.getAttribute("data-journal-video-src") || "").trim();
+  if (!videoSource) return;
+  const title = String(button.getAttribute("data-journal-video-title") || "Video").trim() || "Video";
+  shell.innerHTML = `
+    <div class="journal-item__video-shell-toolbar">
+      <button class="journal-item__video-collapse" type="button" data-journal-video-collapse>Skryť video</button>
+    </div>
+    <video controls playsinline preload="metadata" src="${escapeAttribute(videoSource)}" aria-label="${escapeAttribute(title)}"></video>
+  `;
+  bindDeferredJournalVideoActivators(shell);
+}
+
+function collapseDeferredJournalVideo(button) {
+  if (!(button instanceof HTMLButtonElement)) return;
+  const shell = button.closest("[data-journal-video-shell]");
+  if (!(shell instanceof HTMLElement)) return;
+  const videoEl = shell.querySelector("video");
+  const videoSource = String(videoEl?.getAttribute("src") || "").trim();
+  const title = String(videoEl?.getAttribute("aria-label") || "Video").trim() || "Video";
+  if (!videoSource) return;
+  shell.innerHTML = renderDeferredJournalVideoShellContent(videoSource, title);
+  bindDeferredJournalVideoActivators(shell);
+}
+
+function bindDeferredJournalVideoActivators(root = document) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll("[data-journal-video-activate]").forEach((button) => {
+    if (!(button instanceof HTMLButtonElement) || button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+    button.addEventListener("click", () => activateDeferredJournalVideo(button));
+  });
+  root.querySelectorAll("[data-journal-video-collapse]").forEach((button) => {
+    if (!(button instanceof HTMLButtonElement) || button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+    button.addEventListener("click", () => collapseDeferredJournalVideo(button));
+  });
+}
+
 function renderJournalVideoPlayer(videoSource = "", title = "Video", className = "journal-item__video") {
   const normalized = String(videoSource || "").trim();
   if (!normalized) return "";
+  if (shouldDeferInlineJournalVideo()) {
+    return renderDeferredJournalVideoShell(normalized, title, className);
+  }
   return `
     <div class="${escapeAttribute(className)}">
       <video controls playsinline preload="metadata" src="${escapeAttribute(normalized)}" aria-label="${escapeAttribute(title)}"></video>
@@ -8683,6 +9247,7 @@ function formatJournalWalkDuration(durationMinutes) {
 function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0 } = {}) {
   const walk = normalizeJournalWalk({ walk: walkValue }) || null;
   if (!walk) return "";
+  const deferCompactMap = compact && Boolean(document.body?.classList.contains("app-mobile-shell"));
 
   const startLabel = displayWalkPlaceLabel(walk.startPlace);
   const endLabel = displayWalkPlaceLabel(walk.endPlace);
@@ -8743,7 +9308,7 @@ function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0 }
           `).join("")}
         </div>
       ` : ""}
-      ${renderWalkMapMarkup(walk, { compact, photoCount })}
+      ${renderWalkMapMarkup(walk, { compact, photoCount, deferred: deferCompactMap })}
       ${previewPoints.length ? `
         <div class="journal-walk__points">
           ${previewPoints.map((point) => `<span class="journal-walk__point">${escapeHtml(point)}</span>`).join("")}
@@ -9895,15 +10460,61 @@ function renderMemories() {
 
 function insightWeatherSignals() {
   const weeks = Array.isArray(homeWeatherOverview?.weeks) ? homeWeatherOverview.weeks : [];
+  const trendDays = Array.isArray(homeWeatherTrend) ? homeWeatherTrend.filter((item) => item && item.date) : [];
+  const fallbackCurrentWeek = trendDays.length
+    ? {
+      key: "current",
+      label: "Tento týždeň",
+      days: trendDays.map((day) => ({
+        ...day,
+        calendarLabel: weatherCalendarDayLabel(day.date),
+        condition: currentWeatherConditionLabel(day.weatherCode, day.rainMm, day.rainMm, 0, 0),
+        icon: weatherDayVisual(day.weatherCode).icon,
+        simpleLabel: weatherDayVisual(day.weatherCode).label,
+        snow: false,
+        maxTempC: null,
+        minTempC: null,
+        windKmh: null,
+        wind: "",
+        sunshineHours: 0,
+        hardFrost: false,
+        groundFrostRisk: false,
+        hotDay: false,
+        veryHotDay: false,
+        heavyRain: Number(day.rainMm || 0) >= 10,
+        strongWind: false,
+        storm: false,
+        hail: false
+      })),
+      summary: weatherWeekSummary(trendDays.map((day) => ({
+        ...day,
+        maxTempC: null,
+        minTempC: null,
+        windKmh: null,
+        sunshineHours: 0
+      })))
+    }
+    : null;
+  const previousWeek = weeks.find((week) => week.key === "previous") || null;
   const currentWeek = weeks.find((week) => week.key === "current") || weeks[0] || null;
   const nextWeek = weeks.find((week) => week.key === "next") || null;
-  const upcomingDays = [...(currentWeek?.days || []), ...(nextWeek?.days || [])]
+  const currentWeekResolved = currentWeek || fallbackCurrentWeek;
+  const fallbackAlertPool = [
+    ...(currentWeekResolved?.days || []),
+    ...(nextWeek?.days || [])
+  ].filter((item) => item && item.date);
+  const upcomingDays = [...(currentWeekResolved?.days || []), ...(nextWeek?.days || [])]
     .filter((item) => item && item.date && !item.isPast)
     .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
   return {
-    alerts: Array.isArray(homeWeatherOverview?.alerts) ? homeWeatherOverview.alerts : [],
-    currentWeek,
+    alerts: Array.isArray(homeWeatherOverview?.alerts) && homeWeatherOverview.alerts.length
+      ? homeWeatherOverview.alerts
+      : buildWeatherAlerts(fallbackAlertPool),
+    previousWeek,
+    currentWeek: currentWeekResolved,
     nextWeek,
+    trendDays,
+    snapshot: homeWeatherSnapshot || null,
     upcomingDays,
     frostDay: upcomingDays.find((item) => item.hardFrost || item.groundFrostRisk) || null,
     rainDay: upcomingDays.find((item) => item.heavyRain) || null,
@@ -9994,6 +10605,241 @@ function weatherInsightWeekTip(week, eyebrow = "") {
   };
 }
 
+function weatherGrowingWindowTip(weather = insightWeatherSignals()) {
+  const stableDays = (weather.upcomingDays || [])
+    .filter((day) => day && !day.isPast)
+    .filter((day) => !day.hardFrost && !day.groundFrostRisk && !day.storm && !day.hail)
+    .filter((day) => Number.isFinite(day.minTempC) && day.minTempC >= 6)
+    .filter((day) => Number.isFinite(day.maxTempC) && day.maxTempC >= 13 && day.maxTempC <= 24)
+    .filter((day) => !Number.isFinite(day.windKmh) || day.windKmh < 25)
+    .slice(0, 3);
+  if (stableDays.length < 2) return null;
+  const firstDay = stableDays[0];
+  const lastDay = stableDays[Math.min(1, stableDays.length - 1)];
+  return {
+    key: `weather-growing-window-${firstDay.date}-${lastDay.date}`,
+    eyebrow: "Pestovanie",
+    title: "Stabilnejšie okno na výsev a presádzanie",
+    body: `${capitalizeLabel(firstDay.label)} až ${lastDay.label} vyzerajú podmienky pokojnejšie: rána bez výrazného chladu, slabší vietor a miernejšie denné teploty. To je lepšie okno na výsev, presádzanie aj jemnejšiu prácu v záhonoch.`
+  };
+}
+
+function weatherMoisturePressureTip(weather = insightWeatherSignals()) {
+  const wetDay = (weather.upcomingDays || [])
+    .find((day) => day && !day.isPast && (day.heavyRain || Number(day.rainMm || 0) >= 5));
+  if (!wetDay) return null;
+  return {
+    key: `weather-moisture-pressure-${wetDay.date}`,
+    eyebrow: "Pestovanie",
+    title: "Po vlhkejšom dni sleduj slimáky a tlak na plesne",
+    body: `${capitalizeLabel(wetDay.label)} ${wetDay.calendarLabel} môže prísť viac vlahy. Po takomto priebehu sa oplatí skontrolovať hustejšie porasty, spodné listy, slimáky a či niekde nestojí voda v nádobách.`
+  };
+}
+
+function weatherHarvestWindowTip(weather = insightWeatherSignals()) {
+  const dryDays = (weather.upcomingDays || [])
+    .filter((day) => day && !day.isPast)
+    .filter((day) => !day.storm && !day.hail && !day.heavyRain && Number(day.rainMm || 0) <= 1.5)
+    .filter((day) => !Number.isFinite(day.windKmh) || day.windKmh < 26)
+    .filter((day) => Number.isFinite(day.maxTempC) && day.maxTempC >= 16 && day.maxTempC <= 28)
+    .slice(0, 2);
+  if (dryDays.length < 2) return null;
+  return {
+    key: `weather-harvest-window-${dryDays[0].date}-${dryDays[1].date}`,
+    eyebrow: "Úroda",
+    title: "Suchšie okno na zber a spracovanie",
+    body: `${capitalizeLabel(dryDays[0].label)} a ${dryDays[1].label} vyzerajú suchšie a pokojnejšie. To býva lepší čas na zber, sušenie aj presun úrody bez zbytočnej vlhkosti navyše.`
+  };
+}
+
+function weatherTrendBridgeTip(weather = insightWeatherSignals()) {
+  const trendDays = Array.isArray(weather?.trendDays) ? weather.trendDays.filter((item) => item && item.date) : [];
+  if (!trendDays.length) return null;
+
+  const rainyDays = trendDays.filter((item) => Number(item.rainMm || 0) > 1).length;
+  const totalRainMm = trendDays.reduce((sum, item) => sum + Number(item.rainMm || 0), 0);
+  const maxRainMm = trendDays.reduce((max, item) => Math.max(max, Number(item.rainMm || 0)), 0);
+  const trendHint = weatherTrendInsight(trendDays);
+
+  if (rainyDays >= 4 || totalRainMm >= 16) {
+    return {
+      key: "weather-trend-bridge-wet",
+      eyebrow: "Vývoj počasia",
+      title: "Minulé dni boli vlhšie než býva príjemné",
+      body: `Za posledných 7 dní spadlo približne ${formatWeatherRain(totalRainMm) || "viac zrážok"} a ${countedLabel(rainyDays, "deň bol daždivý", "dni boli daždivé", "dní bolo daždivých")}. To je dobrá správa pre preschnutú pôdu, ale oplatí sa sledovať slimáky, spodné listy a miesta, kde sa drží voda.`
+    };
+  }
+
+  if (totalRainMm <= 3) {
+    return {
+      key: "weather-trend-bridge-dry",
+      eyebrow: "Vývoj počasia",
+      title: "Minulé dni boli skôr suchšie",
+      body: `Za posledných 7 dní spadlo len približne ${formatWeatherRain(totalRainMm) || "málo zrážok"}. To je príjemnejšie na prácu a zber, ale nádoby, skleník a čerstvé výsevy budú potrebovať pozornejšie sledovanie vlhkosti.`
+    };
+  }
+
+  if (maxRainMm >= 8) {
+    return {
+      key: "weather-trend-bridge-burst",
+      eyebrow: "Vývoj počasia",
+      title: "Týždeň mal aspoň jeden silnejší dažďový zásah",
+      body: `${trendHint || "Počasie sa menilo nerovnomerne."} Po výraznejšom daždi sa oplatí skontrolovať zle odtekajúce miesta, povrch nádob a citlivejšie porasty, ktoré sa vedia po nárazovej vode rýchlo položiť alebo zahnívať.`
+    };
+  }
+
+  return {
+    key: "weather-trend-bridge-calm",
+    eyebrow: "Vývoj počasia",
+    title: "Týždenný priebeh je zatiaľ pomerne pokojný",
+    body: `${trendHint || "Posledné dni boli skôr vyrovnané."} Ak nepríde náhla zmena, je to dobré okno na drobné práce, kontrolu rastu a dobehnutie vecí, ktoré odkladáš.`
+  };
+}
+
+function weatherSnapshotGardenTip(weather = insightWeatherSignals()) {
+  const snapshot = weather?.snapshot || null;
+  if (!snapshot) return null;
+  const temperatureC = weatherTemperatureC(snapshot);
+  const humidityPct = weatherHumidityPct(snapshot);
+  const precipitationMm = weatherPrecipitationMm(snapshot);
+  const windKmh = weatherWindSpeedKmh(snapshot);
+  const conditionLabel = String(snapshot.condition || "").trim().toLowerCase();
+
+  if (precipitationMm >= 5 || humidityPct >= 90) {
+    return {
+      key: "weather-snapshot-moisture",
+      eyebrow: "Dnes v záhrade",
+      title: "Dnes je vlhší tlak na porasty",
+      body: `Vzduch a povrch sú dnes vlhšie, takže sa oplatí sledovať slimáky, spodné listy, zahustené porasty a či niekde nestojí voda. Pri nádobe alebo skleníku môže tlak na plesne rásť rýchlejšie.`
+    };
+  }
+
+  if (windKmh >= 28) {
+    return {
+      key: "weather-snapshot-wind",
+      eyebrow: "Dnes v záhrade",
+      title: "Dnes viac vysušuje vietor",
+      body: `Aj keď nemusí byť extrémne teplo, vietor vie rýchlo vysušiť nádoby, povrch pôdy aj mladé sadenice. Pozri opory, fólie a citlivejšie listy otočené do prievanu.`
+    };
+  }
+
+  if (temperatureC !== null && temperatureC >= 26) {
+    return {
+      key: "weather-snapshot-heat",
+      eyebrow: "Dnes v záhrade",
+      title: "Dnes si pýta pozornosť presychanie",
+      body: `Pri dnešnej teplote okolo ${Math.round(temperatureC)} °C sa môžu rýchlejšie prehriať nádoby, skleník aj čerstvé výsevy. Sleduj vetranie, tienenie a rýchlosť presychania vrchnej vrstvy.`
+    };
+  }
+
+  if (temperatureC !== null && temperatureC <= 7) {
+    return {
+      key: "weather-snapshot-cold",
+      eyebrow: "Dnes v záhrade",
+      title: "Dnes je citlivejší chlad",
+      body: `Pri dnešnom chlade sa viac oplatí sledovať jemné priesady, skoré výsevy a rast v nádobách. Ranný priebeh môže byť dôležitejší než obedné zlepšenie.`
+    };
+  }
+
+  if ((temperatureC === null || (temperatureC >= 11 && temperatureC <= 22)) && windKmh < 20 && precipitationMm < 2 && !/búr|sneh/.test(conditionLabel)) {
+    return {
+      key: "weather-snapshot-calm",
+      eyebrow: "Dnes v záhrade",
+      title: "Dnes je pokojnejšie okno na jemné práce",
+      body: `Počasie je dnes skôr pokojné, takže je to lepší čas na kontrolu porastov, presádzanie, triedenie úrody alebo drobné práce, ktoré nechceš robiť v strese z vetra či dažďa.`
+    };
+  }
+
+  return null;
+}
+
+function weatherSowingContextTip(weather = insightWeatherSignals()) {
+  const sowingTips = buildSowingTips();
+  const firstTip = sowingTips[0] || null;
+  if (!firstTip) return null;
+
+  if (weather.frostDay) {
+    return {
+      key: `weather-sowing-frost-${weather.frostDay.date}`,
+      eyebrow: "Výsev a pestovanie",
+      title: firstTip.title,
+      body: `${firstTip.meta}. Len si daj pozor, že ${capitalizeLabel(weather.frostDay.label)} môže ešte prísť chladnejšie ráno, takže citlivejšie veci radšej nenechaj bez ochrany.`
+    };
+  }
+
+  if (weather.rainDay || weather.stormDay || weather.windDay) {
+    const signalLabel = weather.stormDay
+      ? "prudší zásah počasia"
+      : weather.windDay
+        ? "veterné podmienky"
+        : "vlhší priebeh";
+    return {
+      key: `weather-sowing-caution-${weather.rainDay?.date || weather.stormDay?.date || weather.windDay?.date || "now"}`,
+      eyebrow: "Výsev a pestovanie",
+      title: firstTip.title,
+      body: `${firstTip.meta}. Čas síce sedí, ale najbližšie dni môžu priniesť ${signalLabel}, takže pri výseve a presádzaní sa oplatí rátať s väčšou opatrnosťou a kontrolou povrchu pôdy.`
+    };
+  }
+
+  return {
+    key: `weather-sowing-good-${slugify(firstTip.title)}`,
+    eyebrow: "Výsev a pestovanie",
+    title: firstTip.title,
+    body: `${firstTip.meta}. Podľa počasia teraz nevidím výraznejší blokér, takže to vyzerá ako celkom priaznivé okno na jemné práce okolo výsevu a štartu rastu.`
+  };
+}
+
+function weatherPreviousVsCurrentWeekTip(weather = insightWeatherSignals()) {
+  const previousSummary = weather.previousWeek?.summary || null;
+  const currentSummary = weather.currentWeek?.summary || null;
+  if (!previousSummary || !currentSummary) return null;
+
+  const previousRain = Number(previousSummary.totalRainMm || 0);
+  const currentRain = Number(currentSummary.totalRainMm || 0);
+  const previousMax = Number.isFinite(previousSummary.hottestMax) ? previousSummary.hottestMax : null;
+  const currentMax = Number.isFinite(currentSummary.hottestMax) ? currentSummary.hottestMax : null;
+  const previousMin = Number.isFinite(previousSummary.coldestMin) ? previousSummary.coldestMin : null;
+  const currentMin = Number.isFinite(currentSummary.coldestMin) ? currentSummary.coldestMin : null;
+
+  if (currentRain - previousRain >= 10) {
+    return {
+      key: "weather-compare-previous-current-rain-more",
+      eyebrow: "Porovnanie týždňov",
+      title: "Tento týždeň je mokrejší než minulý",
+      body: `Minulý týždeň spadlo približne ${previousSummary.totalRain || "menej vody"}, teraz to vyzerá skôr na ${currentSummary.totalRain || "vyšší úhrn"}. To je dobré pre preschnutú pôdu, ale rastie riziko blata, slimákov a tlaku na plesne.`
+    };
+  }
+
+  if (previousRain - currentRain >= 10) {
+    return {
+      key: "weather-compare-previous-current-rain-less",
+      eyebrow: "Porovnanie týždňov",
+      title: "Dobrá správa: tento týždeň môže viac preschnúť",
+      body: `Po minulom vlhkejšom týždni s približne ${previousSummary.totalRain || "vyšším úhrnom"} to teraz vyzerá na ${currentSummary.totalRain || "menej zrážok"}. To môže pomôcť pôde aj úrode preschnúť, len sleduj nádoby a mladé výsevy.`
+    };
+  }
+
+  if (previousMin !== null && currentMin !== null && currentMin <= previousMin - 4) {
+    return {
+      key: "weather-compare-previous-current-colder",
+      eyebrow: "Porovnanie týždňov",
+      title: "Tento týždeň sú rána citlivejšie než minulý",
+      body: `Minulý týždeň išlo minimum približne na ${Math.round(previousMin)} °C, teraz môže padnúť k ${Math.round(currentMin)} °C. Pri skorom pestovaní a priesadách sa oplatí väčšia opatrnosť než minulý týždeň.`
+    };
+  }
+
+  if (previousMax !== null && currentMax !== null && currentMax >= previousMax + 4) {
+    return {
+      key: "weather-compare-previous-current-warmer",
+      eyebrow: "Porovnanie týždňov",
+      title: "Tento týždeň môže ísť rast rýchlejšie, ale aj presychanie",
+      body: `Maximá môžu ísť približne z ${Math.round(previousMax)} °C na ${Math.round(currentMax)} °C. To vie pomôcť rastu a práci v záhrade, ale nádoby, skleník a jemné listy budú rýchlejšie presychať.`
+    };
+  }
+
+  return null;
+}
+
 function buildSmartInsights(weather = insightWeatherSignals(), options = {}) {
   const includeAlerts = options?.includeAlerts !== false;
   const tips = [];
@@ -10023,11 +10869,32 @@ function buildSmartInsights(weather = insightWeatherSignals(), options = {}) {
     });
   }
 
+  const snapshotGardenTip = weatherSnapshotGardenTip(weather);
+  if (snapshotGardenTip) pushTip(tips, snapshotGardenTip);
+
+  const trendBridgeTip = weatherTrendBridgeTip(weather);
+  if (trendBridgeTip) pushTip(tips, trendBridgeTip);
+
   const currentWeekTip = weatherInsightWeekTip(weather.currentWeek, "Tento týždeň");
   if (currentWeekTip) pushTip(tips, currentWeekTip);
 
   const nextWeekTip = weatherInsightWeekTip(weather.nextWeek, "Ďalší týždeň");
   if (nextWeekTip) pushTip(tips, nextWeekTip);
+
+  const sowingContextTip = weatherSowingContextTip(weather);
+  if (sowingContextTip) pushTip(tips, sowingContextTip);
+
+  const growingWindowTip = weatherGrowingWindowTip(weather);
+  if (growingWindowTip) pushTip(tips, growingWindowTip);
+
+  const moisturePressureTip = weatherMoisturePressureTip(weather);
+  if (moisturePressureTip) pushTip(tips, moisturePressureTip);
+
+  const harvestWindowTip = weatherHarvestWindowTip(weather);
+  if (harvestWindowTip) pushTip(tips, harvestWindowTip);
+
+  const previousVsCurrentWeekTip = weatherPreviousVsCurrentWeekTip(weather);
+  if (previousVsCurrentWeekTip) pushTip(tips, previousVsCurrentWeekTip);
 
   if (weather.currentWeek?.summary && weather.nextWeek?.summary) {
     const currentRain = Number(weather.currentWeek.summary.totalRainMm || 0);
@@ -10123,16 +10990,27 @@ function renderInsightSignalDock(alerts = []) {
 function renderInsights() {
   if (!insightStripEl) return;
   const weather = insightWeatherSignals();
-  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
-  const compactAlerts = isMobileShell ? [] : [];
-  const tips = buildSmartInsights(weather, { includeAlerts: !isMobileShell || compactAlerts.length === 0 });
+  const isMobileRuntime = Boolean(document.body?.classList.contains("app-mobile-runtime"));
+  const compactAlerts = isMobileRuntime ? weather.alerts.slice(0, 3) : [];
+  const tips = buildSmartInsights(weather, { includeAlerts: !isMobileRuntime || compactAlerts.length === 0 });
   if (insightTipIndex >= tips.length) {
     insightTipIndex = 0;
   }
   insightStripEl.innerHTML = (tips.length || compactAlerts.length)
     ? `
       ${compactAlerts.length ? renderInsightSignalDock(compactAlerts) : ""}
-      ${tips.length ? `
+      ${tips.length && isMobileRuntime ? `
+        <div class="insight-strip__stack">
+          ${tips.slice(0, 3).map((tip) => `
+            <article class="insight-strip__slide insight-strip__slide--stacked is-active">
+              <p class="insight-strip__eyebrow">${escapeHtml(tip.eyebrow)}</p>
+              <h4>${escapeHtml(tip.title)}</h4>
+              <p>${escapeHtml(tip.body)}</p>
+            </article>
+          `).join("")}
+        </div>
+      ` : ""}
+      ${tips.length && !isMobileRuntime ? `
         <div class="insight-strip__ticker">
           ${tips.map((tip, index) => `
             <article class="insight-strip__slide ${index === insightTipIndex ? "is-active" : ""}">
@@ -10153,19 +11031,18 @@ function syncOverviewHighlights() {
     overviewHighlightsInterval = null;
   }
 
-  if (typeof document !== "undefined" && document.body?.classList.contains("app-mobile-shell")) return;
-
   const memoryItems = latestJournalImages();
   const weather = insightWeatherSignals();
-  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
-  const compactAlerts = isMobileShell ? [] : [];
-  const tips = buildSmartInsights(weather, { includeAlerts: !isMobileShell || compactAlerts.length === 0 });
+  const isMobileRuntime = Boolean(document.body?.classList.contains("app-mobile-runtime"));
+  const compactAlerts = isMobileRuntime ? weather.alerts.slice(0, 3) : [];
+  const tips = buildSmartInsights(weather, { includeAlerts: !isMobileRuntime || compactAlerts.length === 0 });
   const canRotateMemories = memoryItems.length > 1;
-  const canRotateTips = tips.length > 1;
+  const canRotateTips = !isMobileRuntime && tips.length > 1;
 
   if (!canRotateMemories && !canRotateTips) return;
 
   overviewHighlightsInterval = window.setInterval(() => {
+    if (typeof document !== "undefined" && document.hidden) return;
     overviewHighlightsStep += 1;
 
     if (canRotateMemories) {
@@ -10177,7 +11054,7 @@ function syncOverviewHighlights() {
       insightTipIndex = (insightTipIndex + 1) % tips.length;
       renderInsights();
     }
-  }, 6200);
+  }, isMobileRuntime ? 7600 : 6200);
 }
 
 function renderTaskManagerList(taskList, taskCount, rerender) {
@@ -10561,6 +11438,8 @@ function openAddEntryFlow(editingEntryId = "") {
   let weatherRequestCounter = 0;
   let currentWeatherSource = loadWeatherPreferences();
 
+  enableMobileMediaPickerForInput(imageInput, { multiple: true });
+
   const setEntryMode = (mode) => {
     formEl.dataset.entryMode = mode;
     modeSwitchEl?.querySelectorAll("[data-entry-mode]").forEach((button) => {
@@ -10793,7 +11672,7 @@ function openAddEntryFlow(editingEntryId = "") {
     const title = String(form.get("title") || "").trim();
     if (!title) return;
     const newImages = pendingFiles.length
-      ? await Promise.all(pendingFiles.map((file) => fileToOptimizedDataUrl(file, 720, 0.68)))
+      ? await Promise.all(pendingFiles.map((file) => fileToOptimizedDataUrl(file, JOURNAL_IMAGE_MAX_DIMENSION, JOURNAL_IMAGE_QUALITY)))
       : [];
     const images = [...existingImages, ...newImages];
     const linkedVarietyId = String(form.get("linkedVarietyId") || "");
@@ -10895,13 +11774,8 @@ function openThingOverview(thingKey) {
   }
 
   if (record.kind === "category") {
-    activeCategoryId = thingKey.replace("category:", "");
-    isFocusedView = true;
     if (detailModal.open && typeof detailModal.close === "function") detailModal.close();
-    render();
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
+    openFocusedCategoryNavigation(thingKey.replace("category:", ""));
     return;
   }
 
@@ -11209,6 +12083,8 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
   const preview = document.getElementById("category-preview");
   const clearImageButton = document.getElementById("clear-category-image");
 
+  enableMobileMediaPickerForInput(imageInput);
+
   const renderCategoryPreview = (image = "", altText = "") => {
     if (image) {
       preview.innerHTML = `<img src="${escapeAttribute(image)}" alt="${escapeHtml(altText || nameInput.value || "Kategoria")}">`;
@@ -11251,7 +12127,7 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
   imageInput.addEventListener("change", async () => {
     const file = imageInput.files?.[0];
     if (!file) return;
-    const dataUrl = await fileToOptimizedDataUrl(file, 720, 0.68);
+    const dataUrl = await fileToOptimizedDataUrl(file, CATEGORY_IMAGE_MAX_DIMENSION, CATEGORY_IMAGE_QUALITY);
     preview.dataset.uploaded = dataUrl;
     delete preview.dataset.removed;
     renderCategoryPreview(dataUrl, nameInput.value || "Kategoria");
@@ -11512,6 +12388,8 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   const ratingPicker = document.querySelector("[data-rating-picker]");
   const ratingInput = ratingPicker?.querySelector('input[name="rating"]') || null;
 
+  enableMobileMediaPickerForInput(imageInput, { multiple: true });
+
   const syncStatusDateField = () => {
     const selectedStatusSet = new Set(statusInputs.filter((input) => input.checked).map((input) => String(input.value || "").trim()));
     Object.entries(statusDateFields).forEach(([statusKey, field]) => {
@@ -11665,7 +12543,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   imageInput.addEventListener("change", async () => {
     const files = Array.from(imageInput.files || []);
     if (!files.length) return;
-    const imageMaxDimension = currentEntryKind === "gallery" ? 900 : currentEntryKind === "quick" ? 1100 : 1400;
+    const imageMaxDimension = currentEntryKind === "gallery" ? 1200 : currentEntryKind === "quick" ? 1280 : 1440;
     const uploaded = await Promise.all(files.map((file) => fileToOptimizedDataUrl(file, imageMaxDimension)));
     draftImages = [...draftImages, ...uploaded.filter(Boolean)];
     activeImageIndex = draftImages.length ? Math.min(activeImageIndex, draftImages.length - 1) : 0;
@@ -12300,24 +13178,15 @@ function renderTaskItem(task, { showDelete = true, labelClickable = true } = {})
 }
 
 function filteredVarietiesForCurrentCategory() {
-  const rank = (item) => {
-    if (isGalleryEntry(item)) return 0;
-    if (isQuickEntry(item)) return 1;
-    return 2;
-  };
-
-  return varietiesInCategory(activeCategoryId)
-    .slice()
-    .sort((a, b) => rank(a) - rank(b) || entryDisplayName(a).localeCompare(entryDisplayName(b), "sk", { sensitivity: "base" }));
+  return [...(ensureDerivedDataCache().sortedVarietiesByCategory.get(activeCategoryId) || [])];
 }
 
 function currentCategory() {
-  return state.categories.find((item) => item.id === activeCategoryId) || null;
+  return ensureDerivedDataCache().categoriesById.get(activeCategoryId) || null;
 }
 
 function categorySummary(categoryId) {
-  const descendantIds = collectDescendantCategoryIds(categoryId);
-  const varieties = state.varieties.filter((item) => descendantIds.includes(item.categoryId));
+  const varieties = varietiesInCategoryTree(categoryId);
   const sown = varieties.filter((item) => item.sowedAt).length;
   const planned = varieties.filter((item) => !item.sowedAt && (!item.status || item.status === "planned")).length;
   if (!varieties.length) return "zatiaľ prázdne";
@@ -12325,30 +13194,15 @@ function categorySummary(categoryId) {
 }
 
 function collectDescendantCategoryIds(categoryId) {
-  const ids = [];
-  const stack = [categoryId];
-  const visited = new Set();
-  while (stack.length) {
-    const currentId = stack.pop();
-    if (visited.has(currentId)) continue;
-    visited.add(currentId);
-    const children = state.categories.filter((item) => item.parentCategoryId === currentId);
-    children.forEach((child) => {
-      if (visited.has(child.id)) return;
-      ids.push(child.id);
-      stack.push(child.id);
-    });
-  }
-  return ids;
+  return [...(ensureDerivedDataCache().descendantsById.get(String(categoryId || "").trim()) || [])];
 }
 
 function varietiesInCategory(categoryId) {
-  return state.varieties.filter((item) => item.categoryId === categoryId);
+  return [...(ensureDerivedDataCache().varietiesByCategory.get(String(categoryId || "").trim()) || [])];
 }
 
 function varietiesInCategoryTree(categoryId) {
-  const categoryIds = new Set([categoryId, ...collectDescendantCategoryIds(categoryId)]);
-  return state.varieties.filter((item) => categoryIds.has(item.categoryId));
+  return [...(ensureDerivedDataCache().varietiesByCategoryTree.get(String(categoryId || "").trim()) || [])];
 }
 
 function categoryVarietyCountLabel(categoryId) {
@@ -12397,51 +13251,15 @@ function resetDetailModalClasses() {
 }
 
 function orderedCategories() {
-  const sortSiblings = (items) => [...items].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "sk"));
-  const categoriesByParent = state.categories.reduce((map, item) => {
-    const parentId = item.parentCategoryId || "";
-    if (!map.has(parentId)) map.set(parentId, []);
-    map.get(parentId).push(item);
-    return map;
-  }, new Map());
-
-  const ordered = [];
-  const visited = new Set();
-
-  const walk = (parentId = "") => {
-    const siblings = sortSiblings(categoriesByParent.get(parentId) || []);
-    siblings.forEach((item) => {
-      if (visited.has(item.id)) return;
-      visited.add(item.id);
-      ordered.push(item);
-      walk(item.id);
-    });
-  };
-
-  walk("");
-
-  sortSiblings(state.categories).forEach((item) => {
-    if (visited.has(item.id)) return;
-    visited.add(item.id);
-    ordered.push(item);
-    walk(item.id);
-  });
-
-  return ordered;
+  return ensureDerivedDataCache().orderedCategories;
 }
 
 function groupedCategories() {
-  const categories = orderedCategories();
-  return categories
-    .filter((item) => !item.parentCategoryId && (item.nodeType === "parent" || item.id === FALLBACK_CATEGORY_ID))
-    .map((root) => ({
-      root,
-      children: categories.filter((item) => item.parentCategoryId === root.id)
-    }));
+  return ensureDerivedDataCache().groupedCategories;
 }
 
 function childCategoriesOf(categoryId) {
-  return orderedCategories().filter((item) => item.parentCategoryId === categoryId);
+  return [...(ensureDerivedDataCache().childrenByParent.get(String(categoryId || "").trim()) || [])];
 }
 
 function isCategoryCompatibleWithCardType(cardTypeValue, categoryId) {
@@ -13953,6 +14771,8 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     const formEl = document.getElementById("universal-card-form");
     const categorySelectEl = formEl?.elements.categoryId;
 
+    enableMobileMediaPickerForInput(imageInput, { multiple: true });
+
     const syncPreview = () => {
       if (!draftImages.length) {
         activeImageIndex = 0;
@@ -14056,7 +14876,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     imageInput?.addEventListener("change", async () => {
       const files = Array.from(imageInput.files || []).filter((file) => file instanceof File && file.size);
       if (!files.length) return;
-      const newImages = await Promise.all(files.map((file) => fileToOptimizedDataUrl(file, 720, 0.68)));
+      const newImages = await Promise.all(files.map((file) => fileToOptimizedDataUrl(file, JOURNAL_IMAGE_MAX_DIMENSION, JOURNAL_IMAGE_QUALITY)));
       draftImages = [...draftImages, ...newImages];
       imageInput.value = "";
       renderUniversalGalleryEditor();
@@ -14482,7 +15302,7 @@ function ensureActiveCategory() {
 }
 
 function categoryName(categoryId) {
-  return state.categories.find((item) => item.id === categoryId)?.name || "Kategória";
+  return ensureDerivedDataCache().categoriesById.get(categoryId)?.name || "Kategória";
 }
 
 function entryKind(item) {
@@ -14652,11 +15472,13 @@ async function importStateFromFile(file) {
   saveImportBackupSnapshot(previousState);
   const previousActiveCategoryId = activeCategoryId;
   state = nextState;
+  invalidateDerivedDataCaches();
   if (!state.categories.some((item) => item.id === activeCategoryId)) {
     activeCategoryId = state.categories[0]?.id || null;
   }
   if (!persist()) {
     state = normalizePersistedState(previousState);
+    invalidateDerivedDataCaches();
     activeCategoryId = previousActiveCategoryId;
     persist();
     throw new Error("Import sa načítal, ale nový stav sa nepodarilo bezpečne uložiť.");
@@ -14764,9 +15586,11 @@ function persist() {
         console.warn("Nepodarilo sa ponechať browserovú poistku stavu.", browserStorageError);
       }
       queueFolderStorageWrite(serializedState);
+      invalidateDerivedDataCaches();
       return true;
     }
     localStorage.setItem(STORAGE_KEY, serializedState);
+    invalidateDerivedDataCaches();
     return true;
   } catch (error) {
     const folderStorageHint = supportsFolderStorage()
@@ -16281,13 +17105,13 @@ function placeholderImage() {
 function categoryAncestorIds(category) {
   const ids = [];
   const visited = new Set();
-  const categories = Array.isArray(state?.categories) ? state.categories : [];
+  const categoriesById = ensureDerivedDataCache().categoriesById;
   let currentId = String(category?.parentCategoryId || "").trim();
 
   while (currentId && !visited.has(currentId)) {
     ids.push(currentId);
     visited.add(currentId);
-    const parent = categories.find((item) => item.id === currentId);
+    const parent = categoriesById.get(currentId);
     currentId = String(parent?.parentCategoryId || "").trim();
   }
 
@@ -17158,6 +17982,7 @@ async function loadStateFromFolderStorage({ requestAccess = false } = {}) {
     throw new Error("Súbor s dátami je zatiaľ prázdny.");
   }
   state = normalizePersistedState(JSON.parse(raw));
+  invalidateDerivedDataCaches();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeStateSnapshot()));
   } catch (error) {
@@ -18155,12 +18980,14 @@ async function importStateFromSupabase() {
 
   saveImportBackupSnapshot(previousState);
   state = nextState;
+  invalidateDerivedDataCaches();
   if (!state.categories.some((item) => item.id === activeCategoryId)) {
     activeCategoryId = state.categories[0]?.id || null;
   }
 
   if (!persist()) {
     state = normalizePersistedState(previousState);
+    invalidateDerivedDataCaches();
     activeCategoryId = previousActiveCategoryId;
     persist();
     throw new Error("Cloud dáta sa načítali, ale nový lokálny stav sa nepodarilo bezpečne uložiť.");
@@ -19592,6 +20419,8 @@ async function loadHomeWeatherSnapshot(forceReload = false) {
       .then((snapshot) => {
         homeWeatherSnapshot = snapshot;
         applyMobileWeatherTheme(snapshot);
+        renderInsights();
+        syncOverviewHighlights();
         return snapshot;
       })
       .catch(() => null)
@@ -19616,6 +20445,8 @@ async function loadHomeWeatherTrend(forceReload = false) {
       })
       .then((trend) => {
         homeWeatherTrend = trend;
+        renderInsights();
+        syncOverviewHighlights();
         return trend;
       })
       .catch(() => null)

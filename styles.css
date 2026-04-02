@@ -3770,6 +3770,76 @@ select {
   position: relative;
 }
 
+.journal-walk__map-shell--deferred {
+  gap: 0;
+}
+
+.journal-walk__map-launch {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid rgba(122, 103, 74, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 251, 244, 0.98), rgba(246, 240, 230, 0.94));
+  color: #36472c;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 16px rgba(58, 47, 31, 0.05);
+  text-align: left;
+}
+
+.journal-walk__map-launch-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  background: rgba(231, 243, 214, 0.96);
+  color: #547131;
+  font-size: 1.1rem;
+}
+
+.journal-walk__map-launch-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.journal-walk__map-launch-copy strong {
+  color: #29371f;
+  font-size: 0.96rem;
+  line-height: 1.15;
+}
+
+.journal-walk__map-launch-copy span:last-child {
+  color: rgba(74, 89, 58, 0.9);
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.journal-walk__map-collapse {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 460;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(122, 103, 74, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 251, 244, 0.94);
+  color: #445734;
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 16px rgba(58, 47, 31, 0.05);
+}
+
 .journal-walk__map-expand {
   position: absolute;
   top: 12px;
@@ -35430,4 +35500,366 @@ body.app-mobile-shell .detail-modal--editor .choice-chip--toggle-inline input:fo
     0 12px 24px rgba(111, 156, 46, 0.24),
     0 0 0 1px rgba(202, 239, 143, 0.52) inset,
     inset 0 1px 0 rgba(255, 255, 255, 0.56) !important;
+}
+
+/* Mobile deep stabilization pass:
+   remove the heaviest glass/blur layers from long editors and settings,
+   keep the feel clean, but lighter for real phone interaction. */
+body.app-mobile-shell .detail-modal--settings .settings-sheet,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--worklog .worklog-section,
+body.app-mobile-shell .detail-modal--batch .worklog-section,
+body.app-mobile-shell .journal-overlay-shell,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .detail-modal--editor .detail-copy,
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--worklog .worklog-section,
+body.app-mobile-shell .detail-modal--batch .worklog-section,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .detail-modal--editor .detail-copy,
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet {
+  background:
+    linear-gradient(180deg, rgba(252, 248, 241, 0.96), rgba(245, 239, 228, 0.94)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 10px 22px rgba(49, 37, 23, 0.07) !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-grid,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--worklog .worklog-section,
+body.app-mobile-shell .detail-modal--batch .worklog-section,
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .journal-overlay-card {
+  contain: layout paint style !important;
+  content-visibility: auto;
+  contain-intrinsic-size: 280px !important;
+}
+
+body.app-mobile-shell .detail-modal input,
+body.app-mobile-shell .detail-modal textarea,
+body.app-mobile-shell .detail-modal select,
+body.app-mobile-shell .detail-modal .button,
+body.app-mobile-shell .detail-modal .choice-chip span,
+body.app-mobile-shell .journal-overlay-shell input,
+body.app-mobile-shell .journal-overlay-shell textarea,
+body.app-mobile-shell .journal-overlay-shell select,
+body.app-mobile-shell .journal-overlay-shell .button,
+body.app-mobile-shell .journal-overlay-shell .choice-chip span {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-hero,
+body.app-mobile-shell .detail-modal--settings .settings-hero__pill,
+body.app-mobile-shell .detail-modal--settings .settings-panel__storage-meta,
+body.app-mobile-shell .detail-modal--settings .settings-panel__account-meta,
+body.app-mobile-shell .detail-modal--settings .settings-panel__status,
+body.app-mobile-shell .detail-modal--settings .settings-panel__help {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Real phone runtime mode:
+   keep desktop preview rich, but make actual phone lighter and more direct. */
+body.app-mobile-runtime .insight-strip__stack {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-runtime .insight-strip__stack .insight-strip__slide {
+  display: grid !important;
+}
+
+body.app-mobile-runtime .hero__overlay::before,
+body.app-mobile-runtime .hero__overlay::after,
+body.app-mobile-runtime .main-menu-weather-mini__art,
+body.app-mobile-runtime .weather-inline-card .main-menu-weather-mini__art,
+body.app-mobile-runtime .photo-quick-sheet__weather-card .main-menu-weather-mini__art {
+  display: none !important;
+}
+
+body.app-mobile-runtime .main-menu-weather-mini__inner,
+body.app-mobile-runtime .add-entry-form__weather--head .main-menu-weather-mini__inner,
+body.app-mobile-runtime .photo-quick-sheet__weather-card .main-menu-weather-mini__inner {
+  grid-template-columns: 1fr !important;
+}
+
+body.app-mobile-runtime .main-menu-weather-mini__card,
+body.app-mobile-runtime .home-card,
+body.app-mobile-runtime .progress-card,
+body.app-mobile-runtime .season-card,
+body.app-mobile-runtime .insight-strip__slide,
+body.app-mobile-runtime .catalog-card,
+body.app-mobile-runtime .menu-group,
+body.app-mobile-runtime .subcatalog,
+body.app-mobile-runtime .weather-inline-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 8px 16px rgba(43, 34, 22, 0.05) !important;
+}
+
+body.app-mobile-runtime .workspace-main > .panel,
+body.app-mobile-runtime .workspace-side > .progress-overview,
+body.app-mobile-runtime .workspace-side > .season-card,
+body.app-mobile-runtime .workspace-side > .insight-strip,
+body.app-mobile-runtime .menu-group,
+body.app-mobile-runtime .subcatalog {
+  contain: layout paint style !important;
+  content-visibility: auto;
+  contain-intrinsic-size: 320px !important;
+}
+
+body.app-mobile-runtime .catalog-card::before,
+body.app-mobile-runtime .catalog-card::after,
+body.app-mobile-runtime .menu-group::before,
+body.app-mobile-runtime .menu-group::after,
+body.app-mobile-runtime .subcatalog::before,
+body.app-mobile-runtime .subcatalog::after {
+  display: none !important;
+}
+
+/* Mobile night contrast lock:
+   noc musi mat vzdy svetly text, aj ked neskorsie cloudy/mist pravidla pouziju tmavy kontrast. */
+body.app-mobile-shell[data-mobile-weather-period="night"] {
+  --mobile-weather-floating-title: #f7fbff !important;
+  --mobile-weather-floating-body: rgba(236, 243, 251, 0.98) !important;
+  --mobile-weather-floating-muted: rgba(214, 226, 239, 0.92) !important;
+  --mobile-weather-floating-eyebrow: rgba(222, 232, 243, 0.86) !important;
+  --mobile-weather-floating-shadow: 0 1px 18px rgba(8, 16, 30, 0.26) !important;
+}
+
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-card,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .season-card,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .insight-strip__slide,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-overview {
+  color: var(--mobile-weather-floating-body) !important;
+  text-shadow: var(--mobile-weather-floating-shadow) !important;
+}
+
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .season-card__head h2,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .season-card__head h3,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .season-grid--sidebar > .season-card > h3,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-card h3,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-card__status,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .insight-strip__slide h4,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .overview-group__head h4 {
+  color: var(--mobile-weather-floating-title) !important;
+  text-shadow: var(--mobile-weather-floating-shadow) !important;
+}
+
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .insight-strip__eyebrow,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-card__meta,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-card__hint,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-card__submetric,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-card__tip strong,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .progress-card__tip span,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .overview-group__count,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .insight-strip__slide p {
+  color: var(--mobile-weather-floating-body) !important;
+  text-shadow: var(--mobile-weather-floating-shadow) !important;
+}
+
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .season-card__head::after,
+body.app-mobile-shell[data-mobile-weather-period="night"] .workspace-side .overview-group + .overview-group {
+  border-color: color-mix(in srgb, var(--mobile-weather-floating-muted) 26%, transparent) !important;
+}
+
+/* Mobile journal scroll lock cleanup:
+   dennik ma mat jeden jasny scroll kontajner a body lock nesmie blokovat pan gesture. */
+body.app-detail-locked {
+  touch-action: auto !important;
+}
+
+body.app-mobile-shell .journal-overlay-root {
+  overflow: hidden !important;
+  touch-action: pan-y pinch-zoom !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell {
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  min-height: 100dvh !important;
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell__body {
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior-y: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y pinch-zoom !important;
+  scrollbar-width: none !important;
+}
+
+/* Real phone lite mode:
+   when the app runs on an actual phone, prefer smooth scrolling over glass/animation richness. */
+body.app-mobile-performance-lite .detail-modal::backdrop {
+  background: rgba(18, 16, 12, 0.14) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-performance-lite .catalog-card,
+body.app-mobile-performance-lite .journal-item,
+body.app-mobile-performance-lite .journal-overlay-card,
+body.app-mobile-performance-lite .settings-panel,
+body.app-mobile-performance-lite .detail-copy,
+body.app-mobile-performance-lite .memory-strip__hero,
+body.app-mobile-performance-lite .progress-card,
+body.app-mobile-performance-lite .season-card,
+body.app-mobile-performance-lite .weather-week-card,
+body.app-mobile-performance-lite .weather-day-card,
+body.app-mobile-performance-lite .button,
+body.app-mobile-performance-lite .choice-chip span,
+body.app-mobile-performance-lite .journal-item__action,
+body.app-mobile-performance-lite .tag {
+  animation: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-performance-lite .catalog-card,
+body.app-mobile-performance-lite .journal-item,
+body.app-mobile-performance-lite .journal-overlay-card,
+body.app-mobile-performance-lite .settings-panel,
+body.app-mobile-performance-lite .detail-copy,
+body.app-mobile-performance-lite .memory-strip__hero,
+body.app-mobile-performance-lite .progress-card,
+body.app-mobile-performance-lite .season-card,
+body.app-mobile-performance-lite .weather-week-card,
+body.app-mobile-performance-lite .weather-day-card {
+  contain: layout paint style !important;
+  content-visibility: auto;
+  contain-intrinsic-size: 240px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 8px 16px rgba(39, 31, 20, 0.05) !important;
+}
+
+body.app-mobile-performance-lite .catalog-card::before,
+body.app-mobile-performance-lite .catalog-card::after,
+body.app-mobile-performance-lite .memory-strip__hero::before,
+body.app-mobile-performance-lite .memory-strip__hero::after,
+body.app-mobile-performance-lite .settings-panel::before,
+body.app-mobile-performance-lite .settings-panel::after,
+body.app-mobile-performance-lite .detail-copy::before,
+body.app-mobile-performance-lite .detail-copy::after {
+  display: none !important;
+}
+
+body.app-mobile-performance-lite .catalog-card__image::before,
+body.app-mobile-performance-lite .catalog-card__image::after,
+body.app-mobile-performance-lite .catalog-card__shade,
+body.app-mobile-performance-lite .journal-item__image::before,
+body.app-mobile-performance-lite .journal-item__image::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-performance-lite .catalog-card:hover,
+body.app-mobile-performance-lite .catalog-card:focus-visible,
+body.app-mobile-performance-lite .journal-item:hover,
+body.app-mobile-performance-lite .journal-item:focus-visible,
+body.app-mobile-performance-lite .journal-item__action:hover,
+body.app-mobile-performance-lite .journal-item__action:focus-visible,
+body.app-mobile-performance-lite .button:hover,
+body.app-mobile-performance-lite .button:focus-visible {
+  transform: none !important;
+}
+
+body.app-mobile-performance-lite .workspace-main > .panel,
+body.app-mobile-performance-lite .workspace-side > .progress-overview,
+body.app-mobile-performance-lite .workspace-side > .season-card,
+body.app-mobile-performance-lite .workspace-side > .insight-strip {
+  contain: layout paint style !important;
+  content-visibility: auto;
+  contain-intrinsic-size: 320px !important;
+}
+
+body.app-mobile-performance-lite .journal-item__video-shell {
+  width: min(100%, 360px);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(122, 103, 74, 0.14);
+  background: linear-gradient(180deg, rgba(26, 26, 24, 0.98), rgba(17, 17, 16, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 16px rgba(16, 12, 8, 0.2);
+}
+
+body.app-mobile-performance-lite .journal-item__video-launch {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f7f4ed;
+  text-align: left;
+}
+
+body.app-mobile-performance-lite .journal-item__video-launch-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #83b347, #61892f);
+  color: #12200b;
+  font-weight: 900;
+}
+
+body.app-mobile-performance-lite .journal-item__video-launch-copy {
+  display: grid;
+  gap: 3px;
+}
+
+body.app-mobile-performance-lite .journal-item__video-launch-copy strong {
+  font-size: 0.98rem;
+}
+
+body.app-mobile-performance-lite .journal-item__video-launch-copy span {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: rgba(240, 236, 227, 0.82);
+}
+
+body.app-mobile-performance-lite .journal-item__video-shell-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+body.app-mobile-performance-lite .journal-item__video-collapse {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f5f1e8;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-weight: 700;
+}
+
+body.app-mobile-performance-lite .journal-item__video-shell video {
+  width: 100%;
+  display: block;
+  border-radius: 14px;
+  background: #111111;
 }
