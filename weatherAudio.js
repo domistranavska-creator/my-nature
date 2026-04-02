@@ -1279,8 +1279,8 @@
       this.debug = loadDebugPreference();
       this.activated = false;
       this.lowPerformanceMobile = isRealMobileRuntimeAudioMode();
-      this.preferDirectAudio = this.lowPerformanceMobile
-        || (typeof window !== "undefined" && /^file:/i.test(String(window.location?.protocol || "")));
+      this.preferDirectAudio = typeof window !== "undefined"
+        && /^file:/i.test(String(window.location?.protocol || ""));
       this.audioContext = null;
       this.masterGain = null;
       this.groupNodes = {};

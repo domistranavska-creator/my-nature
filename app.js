@@ -5556,6 +5556,9 @@ function setMobileWeatherSoundEnabled(enabled, { persist = true } = {}) {
       console.warn("Zvuk počasia sa nepodarilo uložiť.", error);
     }
   }
+  if (mobileWeatherSoundEnabled) {
+    window.weatherAudioEngine?.handleUserActivation?.();
+  }
   window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
   window.weatherAudioEngine?.setMasterVolume?.(mobileWeatherSoundVolume);
   if (!mobileWeatherSoundEnabled) {
@@ -16927,14 +16930,15 @@ function shouldUseMobileDeferredVarietyImages() {
 }
 
 function deferredCardImageRootMargin() {
+  if (isRealMobileRuntimeMode()) return "32px 0px";
   return shouldUseMobileDeferredVarietyImages() ? "120px 0px" : "280px 0px";
 }
 
 function shouldDeferVarietyCardImageSource(source = "") {
   const normalized = String(source || "").trim();
-  return shouldUseMobileDeferredVarietyImages()
-    && isProcessableImageDataUrl(normalized)
-    && normalized.length > 18000;
+  if (!shouldUseMobileDeferredVarietyImages() || !normalized || isPlaceholderImage(normalized)) return false;
+  if (isRealMobileRuntimeMode()) return true;
+  return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
 }
 
 function renderVarietyCardImageTag(item, altText) {
@@ -17271,9 +17275,9 @@ function categoryCardImage(category) {
 
 function shouldDeferCategoryCardImageSource(source = "") {
   const normalized = String(source || "").trim();
-  return shouldUseMobileDeferredVarietyImages()
-    && isProcessableImageDataUrl(normalized)
-    && normalized.length > 18000;
+  if (!shouldUseMobileDeferredVarietyImages() || !normalized || isPlaceholderImage(normalized)) return false;
+  if (isRealMobileRuntimeMode()) return true;
+  return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
 }
 
 function renderCategoryCardImageTag(category, altText) {
