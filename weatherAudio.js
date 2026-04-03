@@ -121,6 +121,18 @@
     return isRealMobileRuntimeAudioMode() ? 140 : 0;
   }
 
+  function mobileSilentLoopHoldMs() {
+    return isRealMobileRuntimeAudioMode() ? 12000 : 0;
+  }
+
+  function resolveLoopPreloadMode(lowPerformanceMobile, config) {
+    if (!lowPerformanceMobile) return "auto";
+    if (!config) return "metadata";
+    return ["time", "weather", "texture"].includes(String(config.group || ""))
+      ? "auto"
+      : "metadata";
+  }
+
   function layerDef(options) {
     return {
       group: "weather",
@@ -1318,17 +1330,11 @@
     }
 
     bindUserActivation() {
-      if (typeof window === "undefined") return;
-      ["pointerdown", "touchstart", "mousedown", "keydown"].forEach((eventName) => {
-        window.addEventListener(eventName, this.handleUserActivation, { passive: true });
-      });
+      // Zvuk sa odomyka iba po vedomom kliknuti na jeho ovladanie.
     }
 
     unbindUserActivation() {
-      if (typeof window === "undefined") return;
-      ["pointerdown", "touchstart", "mousedown", "keydown"].forEach((eventName) => {
-        window.removeEventListener(eventName, this.handleUserActivation);
-      });
+      // Globalne auto-activation listenery uz nepouzivame.
     }
 
     setDebug(enabled) {
@@ -1434,6 +1440,7 @@
     }
 
     preloadAudioAssets(layerKeys = []) {
+      if (!this.activated) return;
       const keys = this.lowPerformanceMobile
         ? asArray(layerKeys).slice(0, 2)
         : asArray(layerKeys);
@@ -1467,12 +1474,19 @@
       if (!config || !config.fileList.length) return null;
       if (this.loopLayers.has(layerKey)) return this.loopLayers.get(layerKey);
       const audio = new Audio(pickRandom(config.fileList));
-      audio.preload = this.lowPerformanceMobile ? "metadata" : "auto";
+      audio.preload = resolveLoopPreloadMode(this.lowPerformanceMobile, config);
       audio.loop = true;
       audio.volume = 0;
       audio.muted = false;
       audio.defaultMuted = false;
       audio.playsInline = true;
+      if (audio.preload === "auto") {
+        try {
+          audio.load();
+        } catch (error) {
+          // Ignore eager preload failures and let the browser recover lazily.
+        }
+      }
       const layerState = {
         key: layerKey,
         config,
@@ -1480,6 +1494,7 @@
         currentGain: 0,
         targetGain: 0,
         fadeRate: this.fadeRateFromSeconds(config.crossfadeDuration),
+        silentSinceTs: 0,
         started: false,
         mediaSource: null,
         gainNode: null
@@ -1533,11 +1548,8 @@
       this.enabled = Boolean(enabled);
       if (!this.enabled) {
         this.clear();
-      } else {
-        this.handleUserActivation();
-        if (this.lastInput) {
-          this.apply(this.lastInput);
-        }
+      } else if (this.activated && this.lastInput) {
+        this.apply(this.lastInput);
       }
       this.notifyStateChange("enabled");
       return this.getState();
@@ -1589,10 +1601,15 @@
         this.clear();
         return null;
       }
-      if (!this.activated) {
-        this.handleUserActivation();
-      }
       const normalized = this.normalizeInputToState(input);
+      if (!this.activated) {
+        this.state = normalized;
+        this.evaluation = this.evaluateRules(normalized);
+        this.lastActiveMix = this.computeActiveLayers(normalized, this.evaluation);
+        this.stopDetailTimers();
+        this.notifyStateChange("pending-activation");
+        return this.evaluation;
+      }
       return this.transitionToState(normalized, { sourceInput: input });
     }
 
@@ -2134,7 +2151,7 @@
           if (nextState.windIntensity >= 0.40) return 0;
           return base * clamp((season === "summer" ? 0.26 : 0.10) + (calm * 0.22) + (nextState.temperatureBand === "hot" ? 0.12 : nextState.temperatureBand === "warm" ? 0.08 : 0) - (nextState.windIntensity * 0.22), 0, 0.70);
         case "evening_warm_insects":
-          if (nextState.timeOfDay !== "evening" || nextState.temperatureBand === "cold" || isWinter) return 0;
+          if (nextState.timeOfDay !== "evening" || nextState.temperatureBand === "cold" || isWinter || season === "spring") return 0;
           if (["overcast", "fog", "drizzle", "rain", "heavy_rain", "storm_far", "storm_near", "hail", "snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "frost"].includes(nextState.weather)) return 0;
           if (nextState.windIntensity >= 0.26) return 0;
           return base * clamp((isWarmBand ? 0.38 : season === "summer" ? 0.26 : 0.12) + (calm * 0.18), 0, 0.72);
@@ -2197,6 +2214,7 @@
     }
 
     applyLayerMix(activeMix, evaluation) {
+      if (!this.activated) return;
       this.initAudioEngine();
       this.preloadAudioAssets(activeMix.activeLayerKeys);
       const activeLayerKeySet = new Set(Object.keys(activeMix.activeLayers));
@@ -2340,6 +2358,7 @@
         }
 
         if (this.enabled && this.activated && next > 0.002) {
+          layer.silentSinceTs = 0;
           if (layer.audio.paused) {
             const playPromise = layer.audio.play();
             if (playPromise && typeof playPromise.catch === "function") {
@@ -2347,7 +2366,19 @@
             }
           }
         } else if (!layer.audio.paused && next <= 0.002 && layer.targetGain <= 0.002) {
-          layer.audio.pause();
+          const holdMs = (this.enabled && this.activated) ? mobileSilentLoopHoldMs() : 0;
+          if (holdMs > 0) {
+            if (!layer.silentSinceTs) layer.silentSinceTs = Date.now();
+            if ((Date.now() - layer.silentSinceTs) >= holdMs) {
+              layer.audio.pause();
+              layer.silentSinceTs = 0;
+            } else {
+              keepRunning = true;
+            }
+          } else {
+            layer.audio.pause();
+            layer.silentSinceTs = 0;
+          }
         }
 
         if (Math.abs(layer.targetGain - next) > 0.002 || (this.enabled && this.activated && next > 0.002)) {

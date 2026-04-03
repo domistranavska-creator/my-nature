@@ -3,6 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    document.documentElement.classList.add("app-booting");
+    window.setTimeout(() => {
+      document.documentElement.classList.remove("app-booting");
+      document.documentElement.classList.add("app-ready");
+    }, 4000);
+  </script>
+  <style>
+    html:not(.app-ready) body,
+    html.app-booting body {
+      opacity: 0;
+      visibility: hidden;
+    }
+    html.app-ready body {
+      opacity: 1;
+      visibility: visible;
+    }
+  </style>
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#f2eee3">
   <meta name="application-name" content="Môj prírodný svet">
@@ -11,17 +29,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Môj prírodný svet">
   <title>Môj prírodný svet</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2026-03-29-1920">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2026-03-29-1920">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2026-03-29-1920">
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  >
-  <link rel="stylesheet" href="styles.css?v=2026-04-02-2235">
-  <link rel="stylesheet" href="weatherBackground.css?v=2026-03-29-0013">
+  <link rel="manifest" href="manifest.webmanifest?v=2026-04-03-0075">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2026-04-03-0075">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2026-04-03-0075">
+  <link rel="stylesheet" href="styles.css?v=2026-04-03-0075">
+  <link rel="stylesheet" href="weatherBackground.css?v=2026-04-03-0075">
 </head>
 <body>
   <div class="page-shell">
@@ -50,13 +62,8 @@
                 <div class="toolbar-add-menu__panel">
                   <button class="button button--ghost toolbar-add-menu__action" id="open-add-card" type="button">Pridať kartu</button>
                   <button class="button button--ghost toolbar-add-menu__action" id="open-add-category" type="button">Pridať kategóriu</button>
-                  <details class="toolbar-add-submenu" id="toolbar-batch-menu" hidden>
-                    <summary class="button button--ghost toolbar-add-menu__action toolbar-add-menu__action--batch">Hromadné akcie</summary>
-                    <div class="toolbar-add-submenu__panel">
-                      <button class="button button--ghost toolbar-add-menu__action toolbar-add-menu__action--batch" id="open-batch-sowing" type="button">Hromadný výsev</button>
-                      <button class="button button--ghost toolbar-add-menu__action toolbar-add-menu__action--batch" id="open-batch-move" type="button">Hromadný presun kariet</button>
-                    </div>
-                  </details>
+                  <button class="button button--ghost toolbar-add-menu__action toolbar-add-menu__action--batch" id="open-batch-sowing" type="button" hidden>Hromadný výsev</button>
+                  <button class="button button--ghost toolbar-add-menu__action toolbar-add-menu__action--batch" id="open-batch-move" type="button" hidden>Hromadný presun kariet</button>
                 </div>
               </details>
               <button class="button button--ghost button--toolbar-utility" id="toggle-worklog-panel" type="button">Plán práce</button>
@@ -108,7 +115,6 @@
 
             <article class="season-card season-card--memories">
               <div class="season-card__head">
-                <h3>Spomienky</h3>
                 <button class="button button--ghost mini-list__more mini-list__more--inline" type="button" id="open-all-journal-from-memories">Zobraziť všetky zápisy</button>
               </div>
               <div id="memory-strip" class="memory-strip"></div>
@@ -148,16 +154,11 @@
     <button class="image-lightbox__nav image-lightbox__nav--next" id="image-lightbox-next" type="button" aria-label="Ďalšia fotka">&#8250;</button>
   </dialog>
 
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=2026-03-29-0015"></script>
-  <script src="weatherBackground.js?v=2026-03-29-2238"></script>
-  <script src="weatherAudio.js?v=2026-04-03-0018"></script>
-  <script src="app.js?v=2026-04-03-0018"></script>
-  <script src="pwa.js?v=2026-03-29-1920"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="supabase-config.js?v=2026-03-29-0015"></script>
+  <script defer src="weatherBackground.js?v=2026-04-03-0075"></script>
+  <script defer src="weatherAudio.js?v=2026-04-03-0075"></script>
+  <script defer src="app.js?v=2026-04-03-0075"></script>
+  <script defer src="pwa.js?v=2026-04-03-0075"></script>
 </body>
 </html>

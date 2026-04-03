@@ -697,7 +697,7 @@
   function animationFrameIntervalMs() {
     if (!isMobileWeatherShell()) return 0;
     if (isLowPerformanceMobileWeatherMode()) {
-      if (state.activeSceneKey === "hail" || state.activePhenomenon === "storm") return 64;
+      if (state.activeSceneKey === "hail" || state.activePhenomenon === "storm") return 48;
       if (
         state.activePhenomenon === "rain"
         || state.activePhenomenon === "snow"
@@ -705,9 +705,9 @@
         || state.activeCloudPreset === "overcast"
         || state.activeCloudPreset === "cloudy"
       ) {
-        return 56;
+        return 40;
       }
-      return 48;
+      return 36;
     }
     if (state.activeSceneKey === "hail" || state.activePhenomenon === "storm") return 36;
     if (
@@ -770,6 +770,33 @@
     return clamp(navRect.top - Math.max(0, Number(padding) || 0), 0, fallback);
   }
 
+  function precipitationVisibleTopY() {
+    if (!isMobileWeatherShell()) return 0;
+    const maxVisibleTop = Math.max(0, (state.cssHeight || 0) - 120);
+    const fallback = clamp(
+      Math.max(88, (Number(state.headerHeight) || 0) * 0.58),
+      0,
+      maxVisibleTop
+    );
+    if (typeof document === "undefined") return fallback;
+    const rootRect = state.root?.getBoundingClientRect?.();
+    if (!rootRect || !Number.isFinite(rootRect.top)) return fallback;
+
+    const slot = document.getElementById("mobile-toolbar-weather-slot");
+    const slotRect = slot?.getBoundingClientRect?.();
+    if (slotRect && Number.isFinite(slotRect.bottom)) {
+      return clamp(slotRect.bottom - rootRect.top + 8, 0, maxVisibleTop);
+    }
+
+    const toolbar = document.querySelector(".utility-bar");
+    const toolbarRect = toolbar?.getBoundingClientRect?.();
+    if (toolbarRect && Number.isFinite(toolbarRect.bottom)) {
+      return clamp(toolbarRect.bottom - rootRect.top + 26, 0, maxVisibleTop);
+    }
+
+    return fallback;
+  }
+
   function isLowPerformanceMobileWeatherMode() {
     if (!isMobileWeatherShell()) return false;
     const narrowScreen = Math.min(
@@ -783,7 +810,15 @@
   }
 
   function shouldUseStaticMobileWeatherScene() {
-    return isLowPerformanceMobileWeatherMode();
+    if (!isLowPerformanceMobileWeatherMode()) return false;
+    const animatedPrecipitationScene = (
+      state.activePhenomenon === "rain"
+      || state.activePhenomenon === "storm"
+      || state.activePhenomenon === "snow"
+      || state.activePhenomenon === "sleet"
+      || state.activeSceneKey === "hail"
+    );
+    return !animatedPrecipitationScene;
   }
 
   function mobileParticleBudgetFactor() {
@@ -4594,6 +4629,18 @@
     state.fxCtx.clearRect(0, 0, w, h);
     // Predna cloud overlay vrstva posobila v rohoch ako staticky texturovy flak.
     // Oblacnost uz ostava v zadnej shader vrstve, takze precipitation canvas nechame cisty.
+    const precipClipTop = precipitationVisibleTopY();
+    const clipPrecipitationTop = precipClipTop > 0 && precipClipTop < (h - 24);
+    if (clipPrecipitationTop) {
+      state.precipCtx.save();
+      state.precipCtx.beginPath();
+      state.precipCtx.rect(0, precipClipTop, w, Math.max(1, h - precipClipTop));
+      state.precipCtx.clip();
+      state.fxCtx.save();
+      state.fxCtx.beginPath();
+      state.fxCtx.rect(0, precipClipTop, w, Math.max(1, h - precipClipTop));
+      state.fxCtx.clip();
+    }
 
     if (state.rainFar.length) drawRainLayer(state.rainFar, [220, 232, 247], false, time);
     if (state.rainMid.length) drawRainLayer(state.rainMid, [230, 240, 252], false, time);
@@ -4610,6 +4657,10 @@
       drawWeatherFloor(time);
       drawSnowGroundAccumulation(time);
       drawHailGroundAccumulation(time);
+    }
+    if (clipPrecipitationTop) {
+      state.precipCtx.restore();
+      state.fxCtx.restore();
     }
     drawLightningBolt();
     if (!lowPerformanceMobile) drawSplashes();

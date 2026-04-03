@@ -1,21 +1,21 @@
-const MOJA_ZAHRADA_STATIC_CACHE = "moja-zahrada-static-v2026-04-03-0018";
-const MOJA_ZAHRADA_RUNTIME_CACHE = "moja-zahrada-runtime-v2026-04-03-0018";
+const MOJA_ZAHRADA_STATIC_CACHE = "moja-zahrada-static-v2026-04-03-0075";
+const MOJA_ZAHRADA_RUNTIME_CACHE = "moja-zahrada-runtime-v2026-04-03-0075";
 const MOJA_ZAHRADA_APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=2026-04-02-2235",
-  "./weatherBackground.css?v=2026-03-29-0013",
-  "./app.js?v=2026-04-03-0018",
-  "./weatherBackground.js?v=2026-03-29-2238",
-  "./weatherAudio.js?v=2026-04-03-0018",
+  "./styles.css?v=2026-04-03-0075",
+  "./weatherBackground.css?v=2026-04-03-0075",
+  "./app.js?v=2026-04-03-0075",
+  "./weatherBackground.js?v=2026-04-03-0075",
+  "./weatherAudio.js?v=2026-04-03-0075",
   "./supabase-config.js?v=2026-03-29-0015",
-  "./pwa.js?v=2026-03-29-1905",
-  "./manifest.webmanifest?v=2026-03-29-1920",
+  "./pwa.js?v=2026-04-03-0075",
+  "./manifest.webmanifest?v=2026-04-03-0075",
   "./icon-192.png",
   "./icon-512.png",
   "./icon-maskable-512.png",
-  "./apple-touch-icon.png",
-  "./favicon.svg?v=2026-03-29-1920"
+  "./apple-touch-icon.png?v=2026-04-03-0075",
+  "./favicon.svg?v=2026-04-03-0075"
 ];
 
 self.addEventListener("install", (event) => {

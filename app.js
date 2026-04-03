@@ -41,15 +41,27 @@ const QUICK_CAPTURE_PREVIEW_MAX_DIMENSION = 1440;
 const QUICK_CAPTURE_PREVIEW_QUALITY = 0.82;
 const CATEGORY_IMAGE_MAX_DIMENSION = 1280;
 const CATEGORY_IMAGE_QUALITY = 0.8;
+const LIST_IMAGE_PREVIEW_MAX_DIMENSION = 420;
+const JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION = 520;
 const SUPABASE_IMAGE_BUCKET = "mojazahrada-images";
 const SUPABASE_VIDEO_FILE_LIMIT_BYTES = 100 * 1024 * 1024;
 const GARDEN_WEATHER_PLACE = "Zákopčie, Slovensko";
 const WEATHER_AUTO_REFRESH_MS = 1000 * 60 * 15;
+const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+const LEAFLET_CSS_INTEGRITY = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+const LEAFLET_JS_INTEGRITY = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+const SUPABASE_SIGNED_IMAGE_CACHE_MS = 1000 * 60 * 30;
 const UNDO_KEY = "moja-zahrada-undo-v1";
 const RESET_BACKUP_KEY = "moja-zahrada-reset-backup-v1";
 const IMAGE_BACKGROUND_MIGRATION_KEY = "moja-zahrada-white-bg-v1";
 const FALLBACK_CATEGORY_ID = "cat-nezaradene";
 const ROOT_CATEGORY_IDS = ["root-zahrada", "root-priroda", "root-uroda", "root-ine"];
+const cardPlaceholderImageCache = new Map();
+const categoryPlaceholderImageCache = new Map();
+const supabaseResolvedImageUrlCache = new Map();
+const derivedPreviewImageCache = new Map();
+const derivedPreviewImagePromiseCache = new Map();
 const MOBILE_PREVIEW_DEVICES = Object.freeze({
   "galaxy-a54-5g": Object.freeze({
     id: "galaxy-a54-5g",
@@ -139,14 +151,6 @@ const ICONS = {
   stars4: "\u2605\u2605\u2605\u2605\u2606",
   stars5: "\u2605\u2605\u2605\u2605\u2605"
 };
-const PLACE_OPTIONS = [
-  { value: "pole", label: "Pole" },
-  { value: "sklenik", label: "Skleník" },
-  { value: "kvetinac", label: "Kvetináč" },
-  { value: "interier", label: "Interiér" },
-  { value: "parapet", label: "Parapet" }
-];
-
 const STRUCTURE_CATEGORIES = [
   { id: "root-zahrada", name: "Záhrada", nodeType: "parent", group: "Hlavné svety", parentCategoryId: "", notes: "", recommendedSowingWindow: "", sowedAt: "", order: 0, color: "#5f8d39", image: "" },
   { id: "root-priroda", name: "Príroda", nodeType: "parent", group: "Hlavné svety", parentCategoryId: "", notes: "", recommendedSowingWindow: "", sowedAt: "", order: 1, color: "#4f8a68", image: "" },
@@ -566,6 +570,69 @@ function journalHeaderWeather(entry = {}) {
   });
 }
 
+function markAppBootReady() {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.remove("app-booting");
+  document.documentElement.classList.add("app-ready");
+}
+
+function installBootRefreshMask() {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  if (window.__mojaZahradaBootRefreshMaskInstalled) return;
+  window.__mojaZahradaBootRefreshMaskInstalled = true;
+  window.addEventListener("beforeunload", () => {
+    document.documentElement.classList.add("app-booting");
+    document.documentElement.classList.remove("app-ready");
+  });
+}
+
+function ensureLeafletLoaded() {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    return Promise.resolve(null);
+  }
+  if (window.L) return Promise.resolve(window.L);
+  if (leafletRuntimeLoadPromise) return leafletRuntimeLoadPromise;
+
+  const ensureCss = () => {
+    if (document.head?.querySelector('link[data-runtime-leaflet="true"]')) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = LEAFLET_CSS_URL;
+    link.crossOrigin = "";
+    link.integrity = LEAFLET_CSS_INTEGRITY;
+    link.setAttribute("data-runtime-leaflet", "true");
+    document.head?.appendChild(link);
+  };
+
+  leafletRuntimeLoadPromise = new Promise((resolve, reject) => {
+    ensureCss();
+    const existingScript = document.querySelector('script[data-runtime-leaflet="true"]');
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(window.L || null), { once: true });
+      existingScript.addEventListener("error", reject, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = LEAFLET_JS_URL;
+    script.crossOrigin = "";
+    script.integrity = LEAFLET_JS_INTEGRITY;
+    script.defer = true;
+    script.setAttribute("data-runtime-leaflet", "true");
+    script.addEventListener("load", () => resolve(window.L || null), { once: true });
+    script.addEventListener("error", () => {
+      leafletRuntimeLoadPromise = null;
+      reject(new Error("Leaflet sa teraz nepodarilo načítať."));
+    }, { once: true });
+    document.head?.appendChild(script);
+  }).catch((error) => {
+    console.warn("Mapa sa teraz nepodarila pripraviť.", error);
+    return null;
+  });
+
+  return leafletRuntimeLoadPromise;
+}
+
 function walkMapPoints(walkValue) {
   const walk = normalizeJournalWalk({ walk: walkValue }) || null;
   return Array.isArray(walk?.gpsPoints) ? walk.gpsPoints.filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude)) : [];
@@ -649,8 +716,17 @@ function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCo
 }
 
 function hydrateWalkMaps(root = document) {
-  if (!root || typeof root.querySelectorAll !== "function" || typeof window === "undefined" || !window.L) return;
-  root.querySelectorAll("[data-walk-map]").forEach((mapEl) => {
+  if (!root || typeof root.querySelectorAll !== "function" || typeof window === "undefined") return;
+  const mapElements = [...root.querySelectorAll("[data-walk-map]")];
+  if (!mapElements.length) return;
+  if (!window.L) {
+    ensureLeafletLoaded().then((leaflet) => {
+      if (!leaflet) return;
+      hydrateWalkMaps(root);
+    }).catch(() => {});
+    return;
+  }
+  mapElements.forEach((mapEl) => {
     if (mapEl.dataset.walkMapReady === "true") return;
     const normalizedPoints = walkMapPointsFromElement(mapEl);
     const photoCount = Math.max(0, Number(mapEl.getAttribute("data-walk-map-photo-count") || 0) || 0);
@@ -846,7 +922,7 @@ function normalizeJournalEntry(entry = {}, varieties = []) {
     linkedCategoryId,
     linkedVarietyId,
     linkedEntityName: String(entry.linkedEntityName || "").trim(),
-    place: String(entry.place || "").trim(),
+    place: "",
     mood: String(entry.mood || "").trim(),
     weather: normalizeWeatherSnapshot(entry.weather),
     walk: normalizeJournalWalk(entry, normalizeWeatherSnapshot(entry.weather)),
@@ -944,6 +1020,7 @@ let mainMenuWeatherAudioDebugTimer = 0;
 let mainMenuWeatherAudioDebugEventsBound = false;
 let mainMenuWeatherAudioControlsBound = false;
 let embeddedMobilePreviewMetricsRaf = 0;
+let leafletRuntimeLoadPromise = null;
 const walkMapInstances = new WeakMap();
 const desktopMobilePreviewState = new WeakMap();
 const MOBILE_APP_SHELL_MAX_WIDTH = 760;
@@ -956,10 +1033,14 @@ function shouldShowWeatherDebugUi() {
   if (typeof window === "undefined") return false;
   try {
     const url = new URL(window.location.href);
-    return url.searchParams.get(MOBILE_WEATHER_DEBUG_PARAM) === "1";
+    if (url.searchParams.get(MOBILE_WEATHER_DEBUG_PARAM) === "1") {
+      return true;
+    }
   } catch (error) {
     return false;
   }
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  return !isMobileShell;
 }
 
 function getActiveMobilePreviewDeviceProfile() {
@@ -1262,6 +1343,34 @@ function handleEmbeddedMobilePreviewCommand(event) {
     return;
   }
 
+  if (command === "set-weather-debug") {
+    saveMobileWeatherThemeDebugOverride(payload.value);
+    applyMobileWeatherTheme();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "set-weather-cloud") {
+    saveMobileWeatherThemeCloudOverride(payload.value);
+    applyMobileWeatherTheme();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "set-weather-phase") {
+    saveMobileWeatherThemePhaseOverride(payload.value);
+    applyMobileWeatherTheme();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
+  if (command === "set-weather-season") {
+    saveMobileWeatherThemeSeasonOverride(payload.value);
+    applyMobileWeatherTheme();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
   if (command === "set-weather-precip") {
     saveMobileWeatherThemePrecipOverride(payload.value);
     applyMobileWeatherTheme();
@@ -1283,9 +1392,15 @@ function handleEmbeddedMobilePreviewCommand(event) {
     return;
   }
 
+  if (command === "set-weather-scene-only") {
+    saveMobileWeatherSceneOnlyPreference(Boolean(payload.enabled));
+    applyMobileWeatherSceneMode();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+    return;
+  }
+
   if (command === "set-audio-enabled") {
-    window.weatherAudioEngine?.handleUserActivation?.();
-    setMobileWeatherSoundEnabled(Boolean(payload.enabled));
+    setMobileWeatherSoundEnabled(Boolean(payload.enabled), { activate: Boolean(payload.enabled) });
     scheduleEmbeddedMobilePreviewMetricsPush();
     return;
   }
@@ -1367,6 +1482,28 @@ function postDesktopMobilePreviewCommand(stage = null, command = "", payload = {
   } catch (error) {
     return false;
   }
+}
+
+function applyDesktopMobilePreviewWeatherControl(stage = null, {
+  command = "",
+  payload = {},
+  previewAction = null,
+  syncScene = false
+} = {}) {
+  const previewWindow = getDesktopMobilePreviewFrameWindow(stage);
+  if (previewWindow && typeof previewAction === "function") {
+    try {
+      const handled = previewAction(previewWindow);
+      if (handled) {
+        previewWindow.scheduleEmbeddedMobilePreviewMetricsPush?.();
+        return true;
+      }
+    } catch (error) {
+      // Keď iframe ešte nabieha, pokračujeme bezpečným fallbackom.
+    }
+  }
+  if (postDesktopMobilePreviewCommand(stage, command, payload)) return true;
+  return syncDesktopMobilePreviewEmbeddedWeather(stage, { syncScene });
 }
 
 function syncDesktopMobilePreviewEmbeddedWeather(stage, { syncScene = false } = {}) {
@@ -1668,8 +1805,20 @@ function handleDesktopMobilePreviewHostClick(event) {
 
   if (button.matches("[data-mobile-weather-debug]")) {
     event.preventDefault();
-    saveMobileWeatherThemeDebugOverride(String(button.getAttribute("data-mobile-weather-debug") || "auto").trim() || "auto");
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    const nextValue = String(button.getAttribute("data-mobile-weather-debug") || "auto").trim() || "auto";
+    saveMobileWeatherThemeDebugOverride(nextValue);
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-debug",
+      payload: { value: nextValue },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemeDebugOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemeDebugOverride(nextValue);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     syncDesktopMobilePreviewHostTools(stage);
     scheduleDesktopMobilePreviewToolsRefresh(stage);
     return;
@@ -1677,8 +1826,20 @@ function handleDesktopMobilePreviewHostClick(event) {
 
   if (button.matches("[data-mobile-weather-cloud]")) {
     event.preventDefault();
-    saveMobileWeatherThemeCloudOverride(String(button.getAttribute("data-mobile-weather-cloud") || "").trim());
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    const nextValue = String(button.getAttribute("data-mobile-weather-cloud") || "").trim();
+    saveMobileWeatherThemeCloudOverride(nextValue);
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-cloud",
+      payload: { value: nextValue },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemeCloudOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemeCloudOverride(nextValue);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     syncDesktopMobilePreviewHostTools(stage);
     scheduleDesktopMobilePreviewToolsRefresh(stage);
     return;
@@ -1686,8 +1847,20 @@ function handleDesktopMobilePreviewHostClick(event) {
 
   if (button.matches("[data-mobile-weather-phase]")) {
     event.preventDefault();
-    saveMobileWeatherThemePhaseOverride(String(button.getAttribute("data-mobile-weather-phase") || "").trim());
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    const nextValue = String(button.getAttribute("data-mobile-weather-phase") || "").trim();
+    saveMobileWeatherThemePhaseOverride(nextValue);
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-phase",
+      payload: { value: nextValue },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemePhaseOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemePhaseOverride(nextValue);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     syncDesktopMobilePreviewHostTools(stage);
     scheduleDesktopMobilePreviewToolsRefresh(stage);
     return;
@@ -1695,8 +1868,20 @@ function handleDesktopMobilePreviewHostClick(event) {
 
   if (button.matches("[data-mobile-weather-season]")) {
     event.preventDefault();
-    saveMobileWeatherThemeSeasonOverride(String(button.getAttribute("data-mobile-weather-season") || "").trim());
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    const nextValue = String(button.getAttribute("data-mobile-weather-season") || "").trim();
+    saveMobileWeatherThemeSeasonOverride(nextValue);
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-season",
+      payload: { value: nextValue },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemeSeasonOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemeSeasonOverride(nextValue);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     syncDesktopMobilePreviewHostTools(stage);
     scheduleDesktopMobilePreviewToolsRefresh(stage);
     return;
@@ -1705,7 +1890,18 @@ function handleDesktopMobilePreviewHostClick(event) {
   if (button.matches("[data-mobile-weather-precip-auto]")) {
     event.preventDefault();
     saveMobileWeatherThemePrecipOverride(null);
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-precip",
+      payload: { value: null },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemePrecipOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemePrecipOverride(null);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     syncDesktopMobilePreviewHostTools(stage);
     scheduleDesktopMobilePreviewToolsRefresh(stage);
     return;
@@ -1714,7 +1910,18 @@ function handleDesktopMobilePreviewHostClick(event) {
   if (button.matches("[data-mobile-weather-wind-auto]")) {
     event.preventDefault();
     saveMobileWeatherThemeWindOverride(null);
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-wind",
+      payload: { value: null },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemeWindOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemeWindOverride(null);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     syncDesktopMobilePreviewHostTools(stage);
     scheduleDesktopMobilePreviewToolsRefresh(stage);
     return;
@@ -1723,7 +1930,18 @@ function handleDesktopMobilePreviewHostClick(event) {
   if (button.matches("[data-mobile-weather-temp-auto]")) {
     event.preventDefault();
     saveMobileWeatherThemeTemperatureOverride(null);
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-temp",
+      payload: { value: null },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemeTemperatureOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemeTemperatureOverride(null);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     syncDesktopMobilePreviewHostTools(stage);
     scheduleDesktopMobilePreviewToolsRefresh(stage);
     return;
@@ -1731,8 +1949,21 @@ function handleDesktopMobilePreviewHostClick(event) {
 
   if (button.matches("[data-mobile-weather-scene-toggle]")) {
     event.preventDefault();
-    saveMobileWeatherSceneOnlyPreference(!loadMobileWeatherSceneOnlyPreference());
-    syncDesktopMobilePreviewEmbeddedWeather(stage, { syncScene: true });
+    const nextValue = !loadMobileWeatherSceneOnlyPreference();
+    saveMobileWeatherSceneOnlyPreference(nextValue);
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-scene-only",
+      payload: { enabled: nextValue },
+      syncScene: true,
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherSceneOnlyPreference !== "function" || typeof previewWindow.applyMobileWeatherSceneMode !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherSceneOnlyPreference(nextValue);
+        previewWindow.applyMobileWeatherSceneMode();
+        return true;
+      }
+    });
     syncDesktopMobilePreviewHostTools(stage);
     scheduleDesktopMobilePreviewToolsRefresh(stage);
     return;
@@ -1742,11 +1973,21 @@ function handleDesktopMobilePreviewHostClick(event) {
     event.preventDefault();
     const previewWindow = getDesktopMobilePreviewFrameWindow(stage);
     const { enabled } = readStoredMobileWeatherSoundState();
-    if (previewWindow?.weatherAudioEngine?.handleUserActivation) {
+    const previewAudioState = previewWindow?.weatherAudioEngine?.getState?.() || null;
+    const waitingForGesture = Boolean(
+      enabled
+      && previewAudioState?.supported !== false
+      && previewAudioState?.ready
+      && previewAudioState?.activated === false
+    );
+    if (waitingForGesture && previewWindow?.weatherAudioEngine?.handleUserActivation) {
       previewWindow.weatherAudioEngine.handleUserActivation();
+      syncDesktopMobilePreviewHostTools(stage);
+      scheduleDesktopMobilePreviewToolsRefresh(stage);
+      return;
     }
     if (typeof previewWindow?.setMobileWeatherSoundEnabled === "function") {
-      previewWindow.setMobileWeatherSoundEnabled(!enabled);
+      previewWindow.setMobileWeatherSoundEnabled(!enabled, { activate: !enabled });
     } else {
       try {
         localStorage.setItem(MOBILE_WEATHER_SOUND_KEY, !enabled ? "1" : "0");
@@ -1770,8 +2011,18 @@ function handleDesktopMobilePreviewHostInput(event) {
   if (target.matches("[data-mobile-weather-precip-range]")) {
     const nextAmount = Math.max(0, Math.min(12, Math.round((Number(target.value) || 0) * 10) / 10));
     saveMobileWeatherThemePrecipOverride(nextAmount);
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
-    postDesktopMobilePreviewCommand(stage, "set-weather-precip", { value: nextAmount });
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-precip",
+      payload: { value: nextAmount },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemePrecipOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemePrecipOverride(nextAmount);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     const label = toolsRoot.querySelector("[data-mobile-preview-precip-label]");
     if (label) {
       label.textContent = `${nextAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(nextAmount)}`;
@@ -1782,8 +2033,18 @@ function handleDesktopMobilePreviewHostInput(event) {
   if (target.matches("[data-mobile-weather-wind-range]")) {
     const nextSpeed = Math.max(0, Math.min(70, Math.round(Number(target.value) || 0)));
     saveMobileWeatherThemeWindOverride(nextSpeed);
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
-    postDesktopMobilePreviewCommand(stage, "set-weather-wind", { value: nextSpeed });
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-wind",
+      payload: { value: nextSpeed },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemeWindOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemeWindOverride(nextSpeed);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     const label = toolsRoot.querySelector("[data-mobile-preview-wind-label]");
     if (label) {
       label.textContent = `${nextSpeed} km/h · ${mobileWeatherWindLabel(nextSpeed)}`;
@@ -1794,8 +2055,18 @@ function handleDesktopMobilePreviewHostInput(event) {
   if (target.matches("[data-mobile-weather-temp-range]")) {
     const nextTemp = Math.max(-15, Math.min(38, Math.round(Number(target.value) || 0)));
     saveMobileWeatherThemeTemperatureOverride(nextTemp);
-    syncDesktopMobilePreviewEmbeddedWeather(stage);
-    postDesktopMobilePreviewCommand(stage, "set-weather-temp", { value: nextTemp });
+    applyDesktopMobilePreviewWeatherControl(stage, {
+      command: "set-weather-temp",
+      payload: { value: nextTemp },
+      previewAction: (previewWindow) => {
+        if (typeof previewWindow.saveMobileWeatherThemeTemperatureOverride !== "function" || typeof previewWindow.applyMobileWeatherTheme !== "function") {
+          return false;
+        }
+        previewWindow.saveMobileWeatherThemeTemperatureOverride(nextTemp);
+        previewWindow.applyMobileWeatherTheme();
+        return true;
+      }
+    });
     const label = toolsRoot.querySelector("[data-mobile-preview-temp-label]");
     if (label) {
       label.textContent = `${nextTemp} °C · ${mobileWeatherTemperatureBandLabel(nextTemp)}`;
@@ -1983,6 +2254,7 @@ function setMobilePreviewEnabled(enabled) {
 
 function scheduleGlobalViewportMaintenance({ resize = false, scroll = false } = {}) {
   if (typeof window === "undefined") return;
+  if (resize && shouldSkipMobileHeightOnlyResizeMaintenance()) return;
   if (
     scroll
     && !resize
@@ -2016,6 +2288,20 @@ function scheduleGlobalViewportMaintenance({ resize = false, scroll = false } = 
       scheduleEmbeddedMobilePreviewMetricsPush();
     }
   });
+}
+
+function shouldSkipMobileHeightOnlyResizeMaintenance() {
+  const nextWidth = Math.max(0, Math.round(Number(window.innerWidth) || 0));
+  const nextHeight = Math.max(0, Math.round(Number(window.innerHeight) || 0));
+  const widthChanged = Math.abs(nextWidth - lastViewportMaintenanceWidth) >= 2;
+  const heightChanged = Math.abs(nextHeight - lastViewportMaintenanceHeight) >= 2;
+
+  lastViewportMaintenanceWidth = nextWidth;
+  lastViewportMaintenanceHeight = nextHeight;
+
+  if (!isRealMobileRuntimeMode()) return false;
+  if (!heightChanged || widthChanged) return false;
+  return true;
 }
 
 function lockBodyScroll(owner = "") {
@@ -2417,11 +2703,86 @@ function pushOverlayHistory(kind = "") {
   activeOverlayHistoryKind = normalizedKind;
 }
 
+function isMobileCameraPickerOpen() {
+  const host = document.getElementById("mobile-camera-picker-host");
+  return Boolean(host && !host.hidden && host.classList.contains("is-open"));
+}
+
 function inferVisibleOverlayHistoryKind() {
   if (imageLightboxEl?.open) return "lightbox";
   if (journalOverlayRoot()) return "journal";
   if (detailModal?.open) return "detail";
+  if (isMobileCameraPickerOpen()) return "mobile-camera";
+  if (toolbarAddMenuEl?.open) return "toolbar-add";
   return "";
+}
+
+function buildAppNavigationHistoryState(baseState = {}) {
+  const nextState = baseState && typeof baseState === "object" ? { ...baseState } : {};
+  nextState.__mzView = isFocusedView ? "category" : "menu";
+  nextState.__mzCategoryId = isFocusedView ? String(activeCategoryId || "").trim() : "";
+  nextState.__mzMenuCategories = !isFocusedView && mainMenuCategoriesPreviewVisible ? 1 : 0;
+  return nextState;
+}
+
+function sameAppNavigationHistoryState(historyState = null) {
+  const currentState = historyState && typeof historyState === "object" ? historyState : {};
+  const currentView = String(currentState.__mzView || "menu").trim() || "menu";
+  const currentCategoryId = String(currentState.__mzCategoryId || "").trim();
+  const currentMenuCategories = Boolean(currentState.__mzMenuCategories);
+  const nextView = isFocusedView ? "category" : "menu";
+  const nextCategoryId = isFocusedView ? String(activeCategoryId || "").trim() : "";
+  const nextMenuCategories = !isFocusedView && mainMenuCategoriesPreviewVisible;
+  return currentView === nextView
+    && currentCategoryId === nextCategoryId
+    && currentMenuCategories === nextMenuCategories;
+}
+
+function syncAppNavigationHistoryState({ mode = "replace" } = {}) {
+  if (typeof window === "undefined" || !window.history?.replaceState) return;
+  const currentState = window.history.state && typeof window.history.state === "object"
+    ? window.history.state
+    : {};
+  const nextState = buildAppNavigationHistoryState(currentState);
+  if (mode === "push" && window.history?.pushState) {
+    if (sameAppNavigationHistoryState(currentState)) {
+      window.history.replaceState(nextState, "");
+      return;
+    }
+    window.history.pushState(nextState, "");
+    return;
+  }
+  window.history.replaceState(nextState, "");
+}
+
+function applyAppNavigationHistoryState(historyState = null, { scrollToTop = true } = {}) {
+  const nextState = historyState && typeof historyState === "object" ? historyState : {};
+  const nextView = String(nextState.__mzView || "menu").trim() === "category" ? "category" : "menu";
+  const nextCategoryId = String(nextState.__mzCategoryId || "").trim();
+  const hasValidCategory = Boolean(nextCategoryId && state.categories.some((item) => item.id === nextCategoryId));
+
+  if (nextView === "category" && hasValidCategory) {
+    activeCategoryId = nextCategoryId;
+    mainMenuCategoriesPreviewVisible = false;
+    isFocusedView = true;
+    renderFocusedCategoryNavigation();
+  } else {
+    mainMenuCategoriesPreviewVisible = Boolean(nextState.__mzMenuCategories);
+    isFocusedView = false;
+    renderMainMenu();
+    renderMainMenuNavigation();
+  }
+
+  syncAppNavigationHistoryState({ mode: "replace" });
+
+  if (!scrollToTop) return;
+  scrollNavigationViewportTop();
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(scrollNavigationViewportTop);
+    if (!isFocusedView && mainMenuCategoriesPreviewVisible) {
+      window.requestAnimationFrame(scrollMainMenuCategoriesPreviewIntoView);
+    }
+  }
 }
 
 function clearOverlayHistory(kind = "", { fromHistory = false } = {}) {
@@ -2464,7 +2825,6 @@ const addCategoryQuickEl = document.getElementById("open-add-category");
 const worklogPanelToggleEl = document.getElementById("toggle-worklog-panel");
 const journalPanelToggleEl = document.getElementById("toggle-journal-panel");
 const addCardQuickEl = document.getElementById("open-add-card");
-const batchMenuQuickEl = document.getElementById("toolbar-batch-menu");
 const batchSowingQuickEl = document.getElementById("open-batch-sowing");
 const batchMoveQuickEl = document.getElementById("open-batch-move");
 const menuPanelEl = document.getElementById("menu-panel");
@@ -2485,13 +2845,21 @@ const journalQuickOriginalParentEl = journalPanelToggleEl?.parentElement || null
 let lastDeleted = loadUndoState();
 const imageLightboxState = { images: [], index: 0, label: "Fotka" };
 let deferredCategoryCardImageObserver = null;
+let deferredJournalImageObserver = null;
 let deferredVarietyCardImageObserver = null;
+let mainMenuCategoriesPreviewVisible = false;
 let toolbarSearchQuery = "";
 let toolbarSearchLastResults = [];
 let toolbarAddMenuOverlayHostEl = null;
 let mobileViewportMaintenanceRaf = 0;
 let mobileViewportMaintenanceNeedsResize = false;
 let mobileViewportMaintenanceNeedsScroll = false;
+let lastViewportMaintenanceWidth = typeof window !== "undefined"
+  ? Math.max(0, Math.round(Number(window.innerWidth) || 0))
+  : 0;
+let lastViewportMaintenanceHeight = typeof window !== "undefined"
+  ? Math.max(0, Math.round(Number(window.innerHeight) || 0))
+  : 0;
 let mobileCameraPickerTargetInputEl = null;
 let mobileCameraPickerTargetOptions = null;
 
@@ -2617,6 +2985,7 @@ function ensureDerivedDataCache() {
 }
 
 wireStaticEvents();
+installBootRefreshMask();
 render();
 syncResponsiveAppShellClass();
 window.addEventListener("resize", () => {
@@ -2630,11 +2999,11 @@ hydrateStateFromFolderStorage().catch((error) => {
   console.warn("Dočasné diskové úložisko sa nepodarilo načítať.", error);
 });
 
-function closeToolbarAddMenu() {
-  if (batchMenuQuickEl?.open) {
-    batchMenuQuickEl.open = false;
-  }
+function closeToolbarAddMenu({ skipHistory = true } = {}) {
   if (toolbarAddMenuEl?.open) {
+    if (skipHistory) {
+      toolbarAddMenuEl.dataset.skipHistoryClose = "true";
+    }
     toolbarAddMenuEl.open = false;
   }
   restoreToolbarAddMenuOverlay();
@@ -2690,14 +3059,41 @@ function syncToolbarAddMenuOverlayState() {
   mountToolbarAddMenuOverlay();
 }
 
-function openMainMenuView() {
+function scrollMainMenuCategoriesPreviewIntoView() {
+  const target = mainMenuEl?.querySelector("[data-main-menu-categories-section]");
+  if (!(target instanceof HTMLElement)) return;
+  target.scrollIntoView({ block: "start", behavior: navigationScrollBehavior() });
+}
+
+function toggleToolbarAddMenuFromMobileNav() {
+  if (!toolbarAddMenuEl) return;
+  if (toolbarAddMenuEl.open) {
+    closeToolbarAddMenu({ skipHistory: false });
+    return;
+  }
+  toolbarAddMenuEl.open = true;
+  syncToolbarAddMenuOverlayState();
+  positionToolbarAddMenuOverlay();
+}
+
+function openMainMenuView(options = {}) {
+  const revealCategories = Boolean(options && options.revealCategories);
+  mainMenuCategoriesPreviewVisible = revealCategories;
+  renderMainMenu();
   isFocusedView = false;
   renderMainMenuNavigation();
+  syncAppNavigationHistoryState({ mode: "push" });
   const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
   if (isMobileShell) {
     scrollNavigationViewportTop();
     if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
       window.requestAnimationFrame(scrollNavigationViewportTop);
+      if (revealCategories) {
+        window.requestAnimationFrame(scrollMainMenuCategoriesPreviewIntoView);
+      }
+    }
+    if (revealCategories && typeof window !== "undefined") {
+      window.setTimeout(scrollMainMenuCategoriesPreviewIntoView, 90);
     }
     return;
   }
@@ -2734,7 +3130,7 @@ function normalizedJournalList() {
           linkedCategoryId: normalizeIdList(entry?.linkedCategoryIds?.length ? entry.linkedCategoryIds : entry?.linkedCategoryId)[0] || String(entry?.linkedCategoryId || "").trim(),
           linkedVarietyId: String(entry?.linkedVarietyId || "").trim(),
           linkedEntityName: String(entry?.linkedEntityName || "").trim(),
-          place: String(entry?.place || "").trim(),
+          place: "",
           mood: String(entry?.mood || "").trim(),
           weather: normalizeWeatherSnapshot(entry?.weather),
           walk: normalizeJournalWalk(entry, normalizeWeatherSnapshot(entry?.weather))
@@ -2794,6 +3190,8 @@ function ensureJournalOverlayRoot() {
 }
 
 function journalOverlayFrame(title, bodyHtml, actionsHtml = "", topbarHtml = "") {
+  const safeTitle = String(title || "").trim();
+  const showTitle = safeTitle.length > 0;
   const topbarSlot = topbarHtml
     ? `<div class="journal-overlay-shell__topline-main">${topbarHtml}</div>`
     : "";
@@ -2804,10 +3202,12 @@ function journalOverlayFrame(title, bodyHtml, actionsHtml = "", topbarHtml = "")
         ${topbarSlot}
       </div>
       <button type="button" id="journal-overlay-close" class="journal-overlay-shell__close" aria-label="Zavrieť denník">x</button>
-      <div class="journal-overlay-frame__head">
-        <div class="journal-overlay-frame__title-block">
-          <h3 id="journal-overlay-title">${escapeHtml(title)}</h3>
-        </div>
+      <div class="journal-overlay-frame__head${showTitle ? "" : " journal-overlay-frame__head--action-only"}">
+        ${showTitle ? `
+          <div class="journal-overlay-frame__title-block">
+            <h3 id="journal-overlay-title">${escapeHtml(safeTitle)}</h3>
+          </div>
+        ` : ""}
         <div class="journal-overlay-frame__actions">${actionsHtml}</div>
         <div id="journal-overlay-header-weather" class="add-entry-form__weather--head journal-overlay-header-weather" hidden></div>
       </div>
@@ -2868,7 +3268,7 @@ function renderJournalOverlayCard(entry) {
         <div class="journal-overlay-card__gallery ${images.length === 1 ? "journal-overlay-card__gallery--single" : ""}">
           ${images.slice(0, 4).map((image, index) => `
             <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(safeId)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(safeTitle)}">
-              <img src="${escapeAttribute(image)}" alt="${escapeAttribute(safeTitle)}">
+              ${renderJournalImageTag(image, safeTitle, { entryId: safeId, index })}
             </button>
           `).join("")}
           ${images.length > 4 ? `<span class="journal-item__more">+${images.length - 4}</span>` : ""}
@@ -2928,6 +3328,7 @@ function bindJournalOverlayCardActions(container) {
   if (!container) return;
 
   bindThingLinks(container);
+  syncDeferredJournalImages(container, { eagerCount: 2 });
 
   container.querySelectorAll("[data-open-journal-image]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3035,13 +3436,13 @@ function renderJournalComposerImagePreview(existingImages, pendingUrls, existing
   const items = [
     ...existingImages.map((image, index) => `
       <div class="journal-form__image journal-form__image--pending">
-        <img src="${escapeAttribute(image)}" alt="Uložená fotka ${index + 1}">
+        <img src="${escapeAttribute(image)}" alt="Uložená fotka ${index + 1}" loading="lazy" decoding="async" fetchpriority="low">
         <button class="journal-form__image-remove" type="button" data-remove-existing-image="${index}" aria-label="Odstrániť fotku">x</button>
       </div>
     `),
     ...pendingUrls.map((image, index) => `
       <div class="journal-form__image journal-form__image--pending">
-        <img src="${escapeAttribute(image)}" alt="Nová fotka ${index + 1}">
+        <img src="${escapeAttribute(image)}" alt="Nová fotka ${index + 1}" loading="lazy" decoding="async" fetchpriority="low">
         <button class="journal-form__image-remove" type="button" data-remove-new-image="${index}" aria-label="Odstrániť fotku">x</button>
       </div>
     `)
@@ -3098,7 +3499,6 @@ function openJournalQuickActions(activeType = "") {
               data-open-journal-type="${escapeAttribute(item.type)}"
               aria-pressed="${isActive ? "true" : "false"}"
               aria-label="${escapeAttribute(item.label)}"
-              title="${escapeAttribute(item.label)}"
             >
               <span class="entry-mode-switch__button-content">
                 <span class="entry-mode-switch__button-icon" aria-hidden="true">${escapeHtml(iconForType(item.type))}</span>
@@ -3150,7 +3550,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const defaultEntryMode = editingEntry && (
     (editingEntry.entryType && editingEntry.entryType !== "note")
     || (editingEntry.tags || []).length
-    || editingEntry.place
     || (editingEntry.linkedCategoryIds || []).length
     || editingEntry.linkedCategoryId
     || editingEntry.linkedVarietyId
@@ -3184,17 +3583,24 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const journalComposerActions = isMobileJournalShell
     ? `
         <div class="journal-overlay-mobile-actions">
-          <button class="button" id="journal-overlay-submit" type="submit" form="journal-overlay-form">${editingEntry ? "Uložiť zmeny" : "Uložiť zápis"}</button>
-          ${journalModeSwitchMarkup}
+          <div class="journal-overlay-mobile-actions__primary">
+            <button class="button" id="journal-overlay-submit" type="submit" form="journal-overlay-form">${editingEntry ? "Uložiť zmeny" : "Uložiť zápis"}</button>
+          </div>
+          <div class="journal-overlay-mobile-actions__modes">
+            ${journalModeSwitchMarkup}
+          </div>
         </div>
       `
     : `
       <button class="button button--ghost" type="button" id="journal-overlay-cancel">Späť</button>
       <button class="button" id="journal-overlay-submit" type="submit" form="journal-overlay-form">${editingEntry ? "Uložiť zmeny" : "Uložiť zápis"}</button>
     `;
+  const initialJournalFrameTitle = isMobileJournalShell && !editingEntry
+    ? ""
+    : (editingEntry ? "Upraviť zápis" : "Pridať zápis");
 
   root.innerHTML = journalOverlayFrame(
-    editingEntry ? "Upraviť zápis" : "Pridať zápis",
+    initialJournalFrameTitle,
     `
       <form id="journal-overlay-form" class="journal-form add-entry-form" style="display:grid;gap:14px;">
         ${journalModeToggleMarkup}
@@ -3214,14 +3620,30 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           <input name="mood" type="hidden" value="${escapeAttribute(editingEntry?.mood || "")}">
         </div>
         ${renderJournalWalkFields(editingEntry?.walk || null)}
-        <label class="upload-field upload-field--compact">
-          <span class="upload-field__label">Fotky k zápisu</span>
-          <input name="imageFiles" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple>
-        </label>
-        <label class="upload-field upload-field--compact">
-          <span class="upload-field__label">Video k zápisu</span>
-          <input name="videoFile" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}">
-        </label>
+        ${renderMediaUploadField({
+          label: "Fotky k zápisu",
+          inputName: "imageFiles",
+          accept: IMAGE_FILE_ACCEPT,
+          multiple: true,
+          captureAction: "capture-photo",
+          captureLabel: "Odfotiť",
+          pickAction: "pick-photo",
+          pickLabel: "Vybrať fotky",
+          fieldClassName: "upload-field--journal-media upload-field--journal-media-image",
+          ariaLabel: "Pridať fotky k zápisu"
+        })}
+        ${renderMediaUploadField({
+          label: "Video k zápisu",
+          inputName: "videoFile",
+          accept: VIDEO_FILE_ACCEPT,
+          multiple: false,
+          captureAction: "capture-video",
+          captureLabel: "Natočiť",
+          pickAction: "pick-video",
+          pickLabel: "Vybrať video",
+          fieldClassName: "upload-field--journal-media upload-field--journal-media-video",
+          ariaLabel: "Pridať video k zápisu"
+        })}
         <div id="journal-overlay-video-status" class="journal-upload-status" hidden>
           <div class="journal-upload-status__topline">
             <div class="journal-upload-status__title-wrap">
@@ -3241,8 +3663,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           <div class="entry-advanced__content">
             <input name="tags" type="text" placeholder="Tagy oddelené čiarkou" value="${escapeAttribute((editingEntry?.tags || []).join(", "))}">
             <div class="journal-tag-picker" data-journal-tag-picker hidden></div>
-            <input id="journal-overlay-place" name="place" type="text" placeholder="${escapeAttribute(journalEntryTypeUi(editingEntry?.entryType || "note").place)}" value="${escapeAttribute(editingEntry?.place || "")}">
-            <div class="journal-tag-picker" data-journal-place-picker hidden></div>
             ${renderRelationDisclosure({
               summaryLabel: "Súvisí s kategóriami a kartou",
               categoryLabel: "Kategórie",
@@ -3274,7 +3694,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const videoInput = formEl?.elements.videoFile;
   const titleInput = formEl?.elements.title;
   const textInput = formEl?.elements.text;
-  const placeInput = formEl?.elements.place;
   const imagePreviewEl = root.querySelector("#journal-overlay-image-preview");
   const videoStatusEl = root.querySelector("#journal-overlay-video-status");
   const videoStatusTitleEl = root.querySelector("#journal-overlay-video-status-title");
@@ -3282,6 +3701,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const videoStatusBarEl = root.querySelector("#journal-overlay-video-status-bar");
   const videoStatusDetailEl = root.querySelector("#journal-overlay-video-status-detail");
 
+  bindEditorImageUploadShortcuts(root);
   enableMobileMediaPickerForInput(imageInput, { multiple: true });
   enableMobileMediaPickerForInput(videoInput);
   const moodPickerEl = root.querySelector("#add-entry-mood-picker");
@@ -3396,7 +3816,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   });
   root.querySelector("#journal-overlay-back")?.addEventListener("click", () => {
     cleanupJournalComposer();
-    closeJournalOverlay();
+    openJournalOverlayList();
   });
   root.querySelector("#journal-overlay-cancel")?.addEventListener("click", () => {
     cleanupJournalComposer();
@@ -3492,8 +3912,15 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const renderWalkGpsLiveMap = () => {
     if (!walkGpsMapWrapEl) return;
     const points = walkGpsPoints.filter((point) => Number.isFinite(Number(point.latitude)) && Number.isFinite(Number(point.longitude)));
-    const hasMap = points.length >= 1 && typeof window !== "undefined" && window.L;
+    const hasPoints = points.length >= 1;
+    const hasMap = hasPoints && typeof window !== "undefined" && window.L;
     walkGpsMapWrapEl.hidden = !hasMap;
+    if (hasPoints && typeof window !== "undefined" && !window.L) {
+      ensureLeafletLoaded().then((leaflet) => {
+        if (!leaflet) return;
+        renderWalkGpsState();
+      }).catch(() => {});
+    }
     if (!hasMap) {
       if (walkGpsLiveMap) {
         walkGpsLiveMap.remove();
@@ -3947,7 +4374,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     if (submitButton) submitButton.textContent = submitLabelMap[selectedType] || (editingEntry ? "Uložiť zmeny" : "Uložiť zápis");
     if (titleInput) titleInput.placeholder = ui.title;
     if (textInput) textInput.placeholder = ui.text;
-    if (placeInput) placeInput.placeholder = ui.place;
     root.querySelectorAll("[data-open-journal-type]").forEach((button) => {
       const isActive = String(button.getAttribute("data-open-journal-type") || "").trim() === selectedType;
       button.classList.toggle("is-active", isActive);
@@ -4019,7 +4445,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
 
   setupCategoryTreePickers(formEl);
   setupJournalTagInput(formEl);
-  setupJournalPlaceInput(formEl);
   linkedCategoryInputs.forEach((input) => {
     input.addEventListener("change", () => {
       renderLinkedVarietyOptions();
@@ -4246,7 +4671,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
         linkedCategoryId,
         linkedVarietyId,
         mood: String(form.get("mood") || "").trim(),
-        place: String(form.get("place") || "").trim(),
         weather: weatherSnapshot,
         walk,
         video,
@@ -4401,8 +4825,10 @@ function openFocusedCategoryNavigation(categoryId = "", { scrollToTop = true } =
   const normalizedId = String(categoryId || "").trim();
   if (!normalizedId) return;
   activeCategoryId = normalizedId;
+  mainMenuCategoriesPreviewVisible = false;
   isFocusedView = true;
   renderFocusedCategoryNavigation();
+  syncAppNavigationHistoryState({ mode: "push" });
   if (scrollToTop) {
     scrollNavigationViewportTop();
     if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
@@ -4417,6 +4843,73 @@ function renderMainMenuNavigation() {
   reconcileBodyScrollState();
   syncMainMenuTouchScrollState();
   scheduleEmbeddedMobilePreviewMetricsPush();
+}
+
+function bindMainMenuDelegatedActions() {
+  if (!mainMenuEl || mainMenuEl.dataset.delegatedBound === "true") return;
+  mainMenuEl.dataset.delegatedBound = "true";
+
+  mainMenuEl.addEventListener("click", (event) => {
+    const editCategoryTrigger = event.target.closest("[data-edit-main-category]");
+    if (editCategoryTrigger) {
+      event.preventDefault();
+      event.stopPropagation();
+      openCategoryManager(editCategoryTrigger.dataset.editMainCategory || "");
+      return;
+    }
+
+    const openMainCategoryTrigger = event.target.closest("[data-open-main-category]");
+    if (openMainCategoryTrigger) {
+      event.preventDefault();
+      openFocusedCategoryNavigation(openMainCategoryTrigger.dataset.openMainCategory || "");
+    }
+  });
+}
+
+function bindCatalogDelegatedActions() {
+  if (!catalogEl || catalogEl.dataset.delegatedBound === "true") return;
+  catalogEl.dataset.delegatedBound = "true";
+
+  catalogEl.addEventListener("click", (event) => {
+    if (event.target.closest("[data-stop-card-open]")) {
+      event.stopPropagation();
+      return;
+    }
+
+    const mainMenuTrigger = event.target.closest("[data-open-main-menu-filter]");
+    if (mainMenuTrigger) {
+      event.preventDefault();
+      openMainMenuView();
+      return;
+    }
+
+    const categoryTrigger = event.target.closest("[data-open-category]");
+    if (categoryTrigger) {
+      event.preventDefault();
+      openFocusedCategoryNavigation(categoryTrigger.dataset.openCategory || "");
+      return;
+    }
+
+    const varietyTrigger = event.target.closest("[data-open-variety]");
+    if (varietyTrigger) {
+      event.preventDefault();
+      openStoredCardEditor(varietyTrigger.dataset.openVariety || "");
+    }
+  });
+
+  catalogEl.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.target.closest("[data-stop-card-open]")) {
+      event.stopPropagation();
+      return;
+    }
+
+    const varietyTrigger = event.target.closest("[data-open-variety][role='button']");
+    if (varietyTrigger) {
+      event.preventDefault();
+      openStoredCardEditor(varietyTrigger.dataset.openVariety || "");
+    }
+  });
 }
 
 function toolbarSearchMatches(query = "") {
@@ -4644,6 +5137,8 @@ function wireStaticEvents() {
   const settingsPanelToggleEl = ensureSettingsToolbarButton();
   const mobilePreviewToggleEl = ensureMobilePreviewButton();
   const mobileWeatherSoundToggleEl = ensureMobileWeatherSoundButton();
+  bindMainMenuDelegatedActions();
+  bindCatalogDelegatedActions();
 
   if (document.body?.dataset.mobilePreviewHostBound !== "true") {
     document.body.dataset.mobilePreviewHostBound = "true";
@@ -4676,11 +5171,12 @@ function wireStaticEvents() {
     mobileWeatherSoundToggleEl.dataset.bound = "true";
     mobileWeatherSoundToggleEl.addEventListener("click", (event) => {
       event.preventDefault();
-      const nextEnabled = !mobileWeatherSoundEnabled;
-      if (nextEnabled) {
-        window.weatherAudioEngine?.handleUserActivation?.();
+      if (activatePendingMobileWeatherSound()) {
+        setMobileWeatherSoundPanelOpen(false);
+        return;
       }
-      setMobileWeatherSoundEnabled(nextEnabled);
+      const nextEnabled = !mobileWeatherSoundEnabled;
+      setMobileWeatherSoundEnabled(nextEnabled, { activate: nextEnabled });
       setMobileWeatherSoundPanelOpen(false);
     });
     window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
@@ -4696,6 +5192,19 @@ function wireStaticEvents() {
     toolbarAddMenuEl.addEventListener("toggle", () => {
       syncToolbarAddMenuOverlayState();
       positionToolbarAddMenuOverlay();
+      if (toolbarAddMenuEl.open) {
+        pushOverlayHistory("toolbar-add");
+        return;
+      }
+      const skipHistoryClose = toolbarAddMenuEl.dataset.skipHistoryClose === "true";
+      delete toolbarAddMenuEl.dataset.skipHistoryClose;
+      if (!overlayHistoryNavigating && !skipHistoryClose) {
+        clearOverlayHistory("toolbar-add");
+        return;
+      }
+      if (activeOverlayHistoryKind === "toolbar-add") {
+        activeOverlayHistoryKind = inferVisibleOverlayHistoryKind();
+      }
     });
   }
 
@@ -4764,7 +5273,8 @@ function wireStaticEvents() {
     if (!toolbarAddMenuEl?.open) return;
     if (event.target.closest("#toolbar-add-menu")) return;
     if (event.target.closest("#toolbar-add-menu-overlay-host")) return;
-    closeToolbarAddMenu();
+    if (event.target.closest('[data-mobile-bottom-nav="add"]')) return;
+    closeToolbarAddMenu({ skipHistory: false });
   });
 
   document.addEventListener("click", (event) => {
@@ -4808,11 +5318,15 @@ function wireStaticEvents() {
 
   if (detailModalBackEl) {
     detailModalBackEl.addEventListener("click", () => {
+      if (activeOverlayHistoryKind === "detail" && typeof window !== "undefined" && window.history?.back) {
+        window.history.back();
+        return;
+      }
       if (detailModal?.open && typeof detailModal.close === "function") detailModal.close();
     });
   }
 
-  window.addEventListener("popstate", () => {
+  window.addEventListener("popstate", (event) => {
     if (activeOverlayHistoryKind === "lightbox" && imageLightboxEl?.open) {
       overlayHistoryNavigating = true;
       closeImageLightbox();
@@ -4836,21 +5350,40 @@ function wireStaticEvents() {
       window.setTimeout(() => {
         overlayHistoryNavigating = false;
       }, 0);
+      return;
     }
+    if (activeOverlayHistoryKind === "mobile-camera" && isMobileCameraPickerOpen()) {
+      overlayHistoryNavigating = true;
+      closeMobileCameraPicker({ fromHistory: true });
+      window.setTimeout(() => {
+        overlayHistoryNavigating = false;
+      }, 0);
+      return;
+    }
+    if (activeOverlayHistoryKind === "toolbar-add" && toolbarAddMenuEl?.open) {
+      overlayHistoryNavigating = true;
+      closeToolbarAddMenu({ skipHistory: true });
+      window.setTimeout(() => {
+        overlayHistoryNavigating = false;
+      }, 0);
+      return;
+    }
+    applyAppNavigationHistoryState(event.state, { scrollToTop: true });
   });
 
   document.addEventListener("click", (event) => {
-    const trigger = event.target.closest("[data-date-trigger]");
-    if (!trigger) return;
-    const input = document.getElementById(trigger.dataset.dateTrigger);
-    if (!input) return;
-    event.preventDefault();
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
+    const editorBackTrigger = event.target instanceof Element ? event.target.closest("[data-detail-editor-back]") : null;
+    if (editorBackTrigger) {
+      event.preventDefault();
+      detailModalBackEl?.click();
       return;
     }
-    input.focus();
-    input.click();
+    const trigger = event.target instanceof Element ? event.target.closest("[data-date-trigger]") : null;
+    if (!trigger) return;
+    const input = document.getElementById(trigger.dataset.dateTrigger);
+    if (!(input instanceof HTMLInputElement)) return;
+    event.preventDefault();
+    openDateInputPicker(input);
   });
 
   if (imageLightboxCloseEl) {
@@ -5001,14 +5534,16 @@ function render() {
   reconcileBodyScrollState();
   syncMainMenuTouchScrollState();
   scheduleEmbeddedMobilePreviewMetricsPush();
+  syncAppNavigationHistoryState({ mode: "replace" });
+  markAppBootReady();
 }
 
 function renderMainMenu() {
   const grouped = groupedCategories();
   const roots = grouped.map(({ root }) => root);
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
-  const isEmbeddedMobilePreview = typeof document !== "undefined" && document.body.classList.contains("app-mobile-preview-embedded");
-  const showMobileWeatherDebugPanel = isMobileShell && !isEmbeddedMobilePreview && shouldShowWeatherDebugUi();
+  const showMainMenuCategories = !isMobileShell || mainMenuCategoriesPreviewVisible;
+  const showMobileWeatherDebugPanel = false;
   const activeWeatherThemeDebug = loadMobileWeatherThemeDebugOverride();
   const activeWeatherThemeDebugId = activeWeatherThemeDebug?.id || "auto";
   const activeWeatherThemeCloudOverride = loadMobileWeatherThemeCloudOverride();
@@ -5183,32 +5718,15 @@ function renderMainMenu() {
         </details>
         ${weatherAudioDebugMarkup}
       ` : ""}
-      <div class="catalog-grid catalog-grid--main-menu">
-        ${roots.map(renderMainMenuCategoryCard).join("")}
-      </div>
+      ${showMainMenuCategories ? `
+        <div class="catalog-grid catalog-grid--main-menu" data-main-menu-categories-section>
+          ${roots.map(renderMainMenuCategoryCard).join("")}
+        </div>
+      ` : ""}
     </section>
   `;
 
   syncDeferredCategoryCardImages(mainMenuEl);
-
-  mainMenuEl.querySelectorAll("[data-open-main-category]").forEach((item) => {
-    item.addEventListener("click", (event) => {
-      openFocusedCategoryNavigation(item.dataset.openMainCategory || "");
-    });
-    item.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openFocusedCategoryNavigation(item.dataset.openMainCategory || "");
-      }
-    });
-  });
-
-  mainMenuEl.querySelectorAll("[data-edit-main-category]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      openCategoryManager(button.dataset.editMainCategory);
-    });
-  });
 
   const hasMobileWeatherDebugControls = Boolean(
     mainMenuEl.querySelector("[data-mobile-weather-debug], [data-mobile-weather-cloud], [data-mobile-weather-phase], [data-mobile-weather-season], [data-mobile-weather-wind-range], [data-mobile-weather-precip-range], [data-mobile-weather-temp-range], [data-mobile-weather-scene-toggle], [data-mobile-weather-audio-panel], [data-mobile-weather-audio-inline]")
@@ -5442,6 +5960,9 @@ function ensureSettingsToolbarButton() {
     if (button.parentElement !== targetParent) {
       targetParent.appendChild(button);
     }
+    button.setAttribute("aria-label", "Nastavenia");
+    button.setAttribute("title", "Nastavenia");
+    button.dataset.toolbarEmoji = "\u2699\uFE0F";
     return button;
   }
 
@@ -5450,6 +5971,9 @@ function ensureSettingsToolbarButton() {
   button.id = "open-settings-panel";
   button.type = "button";
   button.textContent = "Nastavenia";
+  button.setAttribute("aria-label", "Nastavenia");
+  button.setAttribute("title", "Nastavenia");
+  button.dataset.toolbarEmoji = "\u2699\uFE0F";
   targetParent.appendChild(button);
   return button;
 }
@@ -5491,9 +6015,17 @@ function ensureMobileWeatherSoundButton() {
   const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
   const targetParent = isMobileShell && mobilePrimaryGroup ? mobilePrimaryGroup : toolbarSlot;
   let button = document.getElementById("toggle-weather-sound");
+  const settingsButton = document.getElementById("open-settings-panel");
   if (button) {
+    const shouldInsertBeforeSettings = isMobileShell && settingsButton?.parentElement === targetParent;
     if (button.parentElement !== targetParent) {
-      targetParent.appendChild(button);
+      if (shouldInsertBeforeSettings) {
+        targetParent.insertBefore(button, settingsButton);
+      } else {
+        targetParent.appendChild(button);
+      }
+    } else if (shouldInsertBeforeSettings && button.nextElementSibling !== settingsButton) {
+      targetParent.insertBefore(button, settingsButton);
     }
     button.hidden = !isMobileShell;
     syncMobileWeatherSoundButton();
@@ -5505,7 +6037,11 @@ function ensureMobileWeatherSoundButton() {
   button.id = "toggle-weather-sound";
   button.type = "button";
   button.hidden = !isMobileShell;
-  targetParent.appendChild(button);
+  if (isMobileShell && settingsButton?.parentElement === targetParent) {
+    targetParent.insertBefore(button, settingsButton);
+  } else {
+    targetParent.appendChild(button);
+  }
   syncMobileWeatherSoundButton();
   return button;
 }
@@ -5522,13 +6058,13 @@ function syncMobileWeatherSoundButton() {
     mobileWeatherSoundEnabled
     && supported
     && audioState?.ready
-    && audioState?.running === false
+    && audioState?.activated === false
   );
   const soundLabel = mobileWeatherSoundEnabled ? "Zvuk počasia zapnutý" : "Zvuk počasia vypnutý";
   const hint = !supported
     ? "Zvuk nie je v tomto prehliadači podporovaný."
     : waitingForGesture
-      ? "Zvuk sa po prvom dotyku alebo kliknutí spustí."
+      ? "Zvuk sa spustí až po kliknutí na toto tlačidlo."
       : mobileWeatherSoundEnabled
         ? "Ťuknutím zvuk vypneš."
         : "Ťuknutím zvuk zapneš.";
@@ -5539,6 +6075,27 @@ function syncMobileWeatherSoundButton() {
   button.setAttribute("title", `${soundLabel}. ${hint}`.trim());
   button.dataset.soundState = mobileWeatherSoundEnabled ? "on" : "off";
   button.dataset.audioReady = waitingForGesture ? "pending" : "ready";
+  button.dataset.toolbarEmoji = mobileWeatherSoundEnabled ? "\uD83D\uDD0A" : "\uD83D\uDD07";
+}
+
+function isMobileWeatherSoundWaitingForGesture(audioState = null) {
+  const resolvedAudioState = audioState || window.weatherAudioEngine?.getState?.() || null;
+  return Boolean(
+    mobileWeatherSoundEnabled
+    && resolvedAudioState?.supported !== false
+    && resolvedAudioState?.ready
+    && resolvedAudioState?.activated === false
+  );
+}
+
+function activatePendingMobileWeatherSound() {
+  if (!isMobileWeatherSoundWaitingForGesture()) return false;
+  window.weatherAudioEngine?.handleUserActivation?.();
+  syncMobileWeatherSoundButton();
+  updateMainMenuWeatherAudioDebugPanel();
+  syncMainMenuWeatherAudioControls();
+  scheduleEmbeddedMobilePreviewMetricsPush();
+  return true;
 }
 
 function setMobileWeatherSoundPanelOpen(open) {
@@ -5547,7 +6104,7 @@ function setMobileWeatherSoundPanelOpen(open) {
   syncMainMenuWeatherAudioControls();
 }
 
-function setMobileWeatherSoundEnabled(enabled, { persist = true } = {}) {
+function setMobileWeatherSoundEnabled(enabled, { persist = true, activate = false } = {}) {
   mobileWeatherSoundEnabled = Boolean(enabled);
   if (persist) {
     try {
@@ -5556,15 +6113,15 @@ function setMobileWeatherSoundEnabled(enabled, { persist = true } = {}) {
       console.warn("Zvuk počasia sa nepodarilo uložiť.", error);
     }
   }
-  if (mobileWeatherSoundEnabled) {
-    window.weatherAudioEngine?.handleUserActivation?.();
-  }
   window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
   window.weatherAudioEngine?.setMasterVolume?.(mobileWeatherSoundVolume);
   if (!mobileWeatherSoundEnabled) {
     window.weatherAudioEngine?.clear?.();
   }
   applyMobileWeatherTheme();
+  if (mobileWeatherSoundEnabled && activate) {
+    window.weatherAudioEngine?.handleUserActivation?.();
+  }
   syncMobileWeatherSoundButton();
   updateMainMenuWeatherAudioDebugPanel();
   syncMainMenuWeatherAudioControls();
@@ -5596,20 +6153,24 @@ function syncResponsiveToolbarButtonPlacement() {
 function mobileBottomNavMarkup() {
   return `
     <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="menu">
-      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--menu" aria-hidden="true"></span>
-      <span class="mobile-bottom-nav__label">Menu</span>
-    </button>
-    <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="tasks">
-      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--tasks" aria-hidden="true"></span>
-      <span class="mobile-bottom-nav__label">Úlohy</span>
-    </button>
-    <button class="mobile-bottom-nav__button mobile-bottom-nav__button--camera" type="button" data-mobile-bottom-nav="camera">
-      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--camera" aria-hidden="true"></span>
-      <span class="mobile-bottom-nav__label">Foťák</span>
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--home" aria-hidden="true">🏠</span>
+      <span class="mobile-bottom-nav__label">Domov</span>
     </button>
     <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="journal">
-      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--journal" aria-hidden="true"></span>
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--diary" aria-hidden="true">📒</span>
       <span class="mobile-bottom-nav__label">Denník</span>
+    </button>
+    <button class="mobile-bottom-nav__button mobile-bottom-nav__button--camera" type="button" data-mobile-bottom-nav="add" aria-label="Pridať">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--camera" aria-hidden="true">+</span>
+      <span class="mobile-bottom-nav__label mobile-bottom-nav__label--hidden">Pridať</span>
+    </button>
+    <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="categories">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--categories" aria-hidden="true">🌿</span>
+      <span class="mobile-bottom-nav__label">Kategórie</span>
+    </button>
+    <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="camera">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--photo" aria-hidden="true">📷</span>
+      <span class="mobile-bottom-nav__label">Foťák</span>
     </button>
   `;
 }
@@ -5637,7 +6198,9 @@ function runMobileBottomNavAction(action = "") {
   const normalizedAction = String(action || "").trim();
   if (!normalizedAction) return;
 
-  closeToolbarAddMenu();
+  if (normalizedAction !== "add") {
+    closeToolbarAddMenu();
+  }
   closeMobileOverlaySurfacesForNavigation();
 
   const applyAction = () => {
@@ -5645,8 +6208,8 @@ function runMobileBottomNavAction(action = "") {
       openMainMenuView();
       return;
     }
-    if (normalizedAction === "tasks") {
-      openTaskManager();
+    if (normalizedAction === "add") {
+      toggleToolbarAddMenuFromMobileNav();
       return;
     }
     if (normalizedAction === "camera") {
@@ -5655,6 +6218,28 @@ function runMobileBottomNavAction(action = "") {
     }
     if (normalizedAction === "journal") {
       forceOpenJournalManager();
+      return;
+    }
+    if (normalizedAction === "categories") {
+      openMainMenuView({ revealCategories: true });
+      return;
+    }
+    if (normalizedAction === "search") {
+      openMainMenuView();
+      window.setTimeout(() => {
+        ensureToolbarSearch();
+        const wrap = document.getElementById("toolbar-search");
+        const input = document.getElementById("toolbar-search-input");
+        if (wrap) wrap.classList.add("is-open");
+        if (input instanceof HTMLInputElement) {
+          input.focus({ preventScroll: false });
+        }
+      }, 0);
+      return;
+    }
+    if (normalizedAction === "tasks") {
+      openTaskManager();
+      return;
     }
   };
 
@@ -5786,16 +6371,6 @@ function syncMobileBottomNavPlacement() {
   syncMobileOverlayBottomNavPlacement();
 }
 
-function lastSuggestedJournalPlace() {
-  const latestPlaceEntry = normalizedJournalList().find((entry) => String(entry?.place || "").trim());
-  if (latestPlaceEntry?.place) {
-    return String(latestPlaceEntry.place || "").trim();
-  }
-  const weatherPreferences = loadWeatherPreferences();
-  const shortWeatherPlace = String(weatherPreferences?.placeLabel || "").split(",")[0].trim();
-  return shortWeatherPlace || "";
-}
-
 function shouldUseRuntimeMobileMediaPicker() {
   if (typeof document === "undefined" || typeof window === "undefined") return false;
   if (!document.body?.classList.contains("app-mobile-shell")) return false;
@@ -5830,17 +6405,9 @@ function deriveMobileMediaPickerOptionsForInput(input, overrides = {}) {
         ? "Pridať fotky"
         : "Pridať fotku";
 
-  const subtitle = videoAllowed && imageAllowed
-    ? "Vyber, či chceš fotiť, zobrať niečo z mobilu alebo pridať video."
-    : videoAllowed
-      ? "Vyber, či chceš natočiť nové video alebo použiť video z mobilu."
-      : multiple
-        ? "Vyber, či chceš fotiť alebo zobrať fotky priamo z mobilu."
-        : "Vyber, či chceš odfotiť nový záber alebo vziať fotku z mobilu.";
-
   return {
     title,
-    subtitle,
+    subtitle: "",
     actions,
     multiple,
     imageAllowed,
@@ -5852,14 +6419,17 @@ function configureMobileCameraPickerHost(host, options = {}) {
   if (!host) return;
   const normalized = {
     title: String(options.title || "Pridať médiá").trim() || "Pridať médiá",
-    subtitle: String(options.subtitle || "Vyber, čo chceš pridať.").trim() || "Vyber, čo chceš pridať.",
+    subtitle: typeof options.subtitle === "string" ? String(options.subtitle).trim() : "",
     actions: Array.isArray(options.actions) ? options.actions : []
   };
 
   const titleEl = host.querySelector("[data-mobile-camera-title]");
   const subtitleEl = host.querySelector("[data-mobile-camera-subtitle]");
   if (titleEl) titleEl.textContent = normalized.title;
-  if (subtitleEl) subtitleEl.textContent = normalized.subtitle;
+  if (subtitleEl) {
+    subtitleEl.textContent = normalized.subtitle;
+    subtitleEl.hidden = !normalized.subtitle;
+  }
 
   const actionsById = new Map(normalized.actions.map((item) => [String(item.id || "").trim(), item]));
   host.querySelectorAll("[data-mobile-camera-action]").forEach((button) => {
@@ -5918,6 +6488,46 @@ function enableMobileMediaPickerForInput(input, options = {}) {
   }, true);
 }
 
+function closeMobileCameraPicker({ fromHistory = false, skipHistory = true } = {}) {
+  const host = document.getElementById("mobile-camera-picker-host");
+  if (!host) return;
+  host.hidden = true;
+  host.setAttribute("aria-hidden", "true");
+  host.classList.remove("is-open");
+  mobileCameraPickerTargetInputEl = null;
+  mobileCameraPickerTargetOptions = null;
+  if (fromHistory) {
+    if (activeOverlayHistoryKind === "mobile-camera") {
+      activeOverlayHistoryKind = inferVisibleOverlayHistoryKind();
+    }
+    return;
+  }
+  if (skipHistory) {
+    if (activeOverlayHistoryKind === "mobile-camera") {
+      activeOverlayHistoryKind = inferVisibleOverlayHistoryKind();
+    }
+    return;
+  }
+  clearOverlayHistory("mobile-camera");
+}
+
+function handleGenericMobileMediaFile(file) {
+  if (!(file instanceof File) || !file.size) return;
+  const fileType = String(file.type || "").trim().toLowerCase();
+  const fileName = String(file.name || "").trim().toLowerCase();
+  const isVideo = fileType.startsWith("video/")
+    || /\.(mp4|mov|m4v|webm|avi|mkv|3gp)$/i.test(fileName);
+
+  if (isVideo) {
+    openJournalComposer("", "note", { videoFile: file });
+    return;
+  }
+
+  openQuickPhotoEntryFlow(file).catch((error) => {
+    console.error("Rýchly fotozápis sa teraz nepodarilo otvoriť.", error);
+  });
+}
+
 function ensureMobileCameraPicker() {
   if (typeof document === "undefined") return null;
   let host = document.getElementById("mobile-camera-picker-host");
@@ -5931,7 +6541,7 @@ function ensureMobileCameraPicker() {
       <div class="mobile-camera-picker__sheet" role="dialog" aria-modal="true" aria-label="Pridať médiá">
         <div class="mobile-camera-picker__head">
           <strong data-mobile-camera-title>Pridať médiá</strong>
-          <span data-mobile-camera-subtitle>Vyber, či chceš fotiť, zobrať niečo z mobilu alebo pridať video.</span>
+          <span data-mobile-camera-subtitle hidden></span>
         </div>
         <div class="mobile-camera-picker__actions">
           <button class="mobile-camera-picker__button" type="button" data-mobile-camera-action="capture-photo">Odfotiť</button>
@@ -5945,6 +6555,8 @@ function ensureMobileCameraPicker() {
       <input id="mobile-camera-gallery-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" hidden>
       <input id="mobile-video-capture-input" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" capture="environment" hidden>
       <input id="mobile-video-gallery-input" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" hidden>
+      <input id="mobile-media-capture-input" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" capture="environment" hidden>
+      <input id="mobile-media-gallery-input" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" hidden>
     `;
     document.body.appendChild(host);
   }
@@ -5955,13 +6567,6 @@ function ensureMobileCameraPicker() {
 
   if (host.dataset.bound !== "true") {
     host.dataset.bound = "true";
-    const closePicker = () => {
-      host.hidden = true;
-      host.setAttribute("aria-hidden", "true");
-      host.classList.remove("is-open");
-      mobileCameraPickerTargetInputEl = null;
-      mobileCameraPickerTargetOptions = null;
-    };
     const openInput = (selector) => {
       const input = host.querySelector(selector);
       if (input instanceof HTMLInputElement) {
@@ -5973,24 +6578,25 @@ function ensureMobileCameraPicker() {
       if (!target) return;
       if (target.closest("[data-mobile-camera-close]")) {
         event.preventDefault();
-        closePicker();
+        closeMobileCameraPicker({ skipHistory: false });
         return;
       }
       const actionButton = target.closest("[data-mobile-camera-action]");
       if (!(actionButton instanceof HTMLButtonElement)) return;
       event.preventDefault();
       const action = String(actionButton.getAttribute("data-mobile-camera-action") || "").trim();
+      const isCompactMode = host.dataset.compactMode === "true";
       if (mobileCameraPickerTargetInputEl instanceof HTMLInputElement) {
         triggerMobileMediaInputAction(mobileCameraPickerTargetInputEl, action, mobileCameraPickerTargetOptions || {});
-        closePicker();
+        closeMobileCameraPicker();
         return;
       }
       if (action === "capture-photo") {
-        openInput("#mobile-camera-capture-input");
+        openInput(isCompactMode ? "#mobile-media-capture-input" : "#mobile-camera-capture-input");
         return;
       }
       if (action === "pick-photo") {
-        openInput("#mobile-camera-gallery-input");
+        openInput(isCompactMode ? "#mobile-media-gallery-input" : "#mobile-camera-gallery-input");
         return;
       }
       if (action === "capture-video") {
@@ -6006,8 +6612,12 @@ function ensureMobileCameraPicker() {
       input?.addEventListener("change", () => {
         const file = Array.from(input.files || []).find((item) => item instanceof File && item.size) || null;
         input.value = "";
-        closePicker();
+        closeMobileCameraPicker();
         if (!file) return;
+        if (kind === "generic") {
+          handleGenericMobileMediaFile(file);
+          return;
+        }
         if (kind === "video") {
           openJournalComposer("", "note", { videoFile: file });
           return;
@@ -6021,6 +6631,8 @@ function ensureMobileCameraPicker() {
     bindFileInput("#mobile-camera-gallery-input", "image");
     bindFileInput("#mobile-video-capture-input", "video");
     bindFileInput("#mobile-video-gallery-input", "video");
+    bindFileInput("#mobile-media-capture-input", "generic");
+    bindFileInput("#mobile-media-gallery-input", "generic");
   }
 
   return host;
@@ -6031,10 +6643,12 @@ function openMobileMediaPickerForInput(input, options = {}) {
   if (!host) return;
   mobileCameraPickerTargetInputEl = input instanceof HTMLInputElement ? input : null;
   mobileCameraPickerTargetOptions = options && typeof options === "object" ? options : {};
+  host.dataset.compactMode = "false";
   configureMobileCameraPickerHost(host, deriveMobileMediaPickerOptionsForInput(input, options));
   host.hidden = false;
   host.setAttribute("aria-hidden", "false");
   host.classList.add("is-open");
+  pushOverlayHistory("mobile-camera");
 }
 
 function openMobileCameraPicker() {
@@ -6042,19 +6656,19 @@ function openMobileCameraPicker() {
   if (!host) return;
   mobileCameraPickerTargetInputEl = null;
   mobileCameraPickerTargetOptions = null;
+  host.dataset.compactMode = "true";
   configureMobileCameraPickerHost(host, {
     title: "Pridať médiá",
-    subtitle: "Vyber, či chceš fotiť, zobrať niečo z mobilu alebo pridať video.",
+    subtitle: "",
     actions: [
-      { id: "capture-photo", label: "Odfotiť" },
-      { id: "pick-photo", label: "Vybrať fotku" },
-      { id: "capture-video", label: "Natočiť video" },
-      { id: "pick-video", label: "Vybrať video" }
+      { id: "capture-photo", label: "Odfotiť alebo natočiť video" },
+      { id: "pick-photo", label: "Vybrať z telefónu" }
     ]
   });
   host.hidden = false;
   host.setAttribute("aria-hidden", "false");
   host.classList.add("is-open");
+  pushOverlayHistory("mobile-camera");
 }
 
 async function openQuickPhotoEntryFlow(photoFile) {
@@ -6070,7 +6684,6 @@ async function openQuickPhotoEntryFlow(photoFile) {
     previewUrl = URL.createObjectURL(photoFile);
   }
   const shouldRevokePreviewUrl = String(previewUrl || "").startsWith("blob:");
-  const suggestedPlace = lastSuggestedJournalPlace();
   const defaultEntryType = "note";
   let currentWeatherSnapshot = homeWeatherSnapshot || null;
 
@@ -6083,7 +6696,7 @@ async function openQuickPhotoEntryFlow(photoFile) {
           <div class="photo-quick-sheet__headline-copy">
             <p class="eyebrow">Rýchly fotozápis</p>
             <h3>Pridať moment</h3>
-            <p>Fotka je pripravená. Doplň len krátku poznámku, typ a miesto.</p>
+            <p>Fotka je pripravená. Doplň len krátku poznámku a typ.</p>
           </div>
           <div class="detail-copy__actions">
             <button class="button" type="submit" form="quick-photo-entry-form">Uložiť</button>
@@ -6105,11 +6718,6 @@ async function openQuickPhotoEntryFlow(photoFile) {
               <span>Poznámka</span>
               <textarea name="text" rows="3" placeholder="Krátko, čo sa stalo alebo čo si si všimla..."></textarea>
             </label>
-            <label class="field-block field-block--full photo-quick-sheet__field">
-              <span>Miesto</span>
-              <input name="place" type="text" placeholder="Miesto zápisu" value="${escapeAttribute(suggestedPlace)}">
-              <div class="journal-tag-picker" data-journal-place-picker hidden></div>
-            </label>
           </div>
         </form>
       </div>
@@ -6117,7 +6725,6 @@ async function openQuickPhotoEntryFlow(photoFile) {
   `;
 
   const formEl = document.getElementById("quick-photo-entry-form");
-  const placeInput = formEl?.elements.place;
   const weatherMountEl = document.getElementById("quick-photo-weather");
   const textInput = formEl?.elements.text;
 
@@ -6137,14 +6744,13 @@ async function openQuickPhotoEntryFlow(photoFile) {
       return;
     }
     weatherMountEl.hidden = false;
-    const shortPlace = String(snapshot.placeLabel || "").split(",")[0].trim() || snapshot.placeLabel || "Počasie";
     const observed = String(snapshot.observedAt || "").trim();
     weatherMountEl.innerHTML = `
       <div class="photo-quick-sheet__weather-card">
         <span class="photo-quick-sheet__weather-icon" aria-hidden="true">${escapeHtml(weatherIconSymbol(snapshot))}</span>
         <div class="photo-quick-sheet__weather-copy">
           <strong>${escapeHtml([snapshot.temperature, snapshot.condition].filter(Boolean).join(" • ") || "Počasie sa doplnilo automaticky")}</strong>
-          <span>${escapeHtml([shortPlace, observed].filter(Boolean).join(" • "))}</span>
+          ${observed ? `<span>${escapeHtml(observed)}</span>` : ""}
         </div>
       </div>
     `;
@@ -6154,8 +6760,6 @@ async function openQuickPhotoEntryFlow(photoFile) {
     currentWeatherSnapshot = homeWeatherSnapshot || await loadHomeWeatherSnapshot().catch(() => null);
     renderWeatherSummary(currentWeatherSnapshot);
   };
-
-  setupJournalPlaceInput(formEl);
 
   if (textInput) {
     textInput.focus();
@@ -6186,7 +6790,6 @@ async function openQuickPhotoEntryFlow(photoFile) {
       linkedCategoryId,
       linkedVarietyId: "",
       mood: "",
-      place: String(form.get("place") || "").trim(),
       weather: weatherSnapshot
     }, state.varieties);
 
@@ -6336,18 +6939,15 @@ function renderCatalog() {
   const neverGrownCount = scopedPlantVarieties.filter((item) => item.neverGrown).length;
   const hybridCount = scopedPlantVarieties.filter((item) => inferBreedingType(item) === "hybrid").length;
   const openPollinatedCount = scopedPlantVarieties.filter((item) => inferBreedingType(item) === "open").length;
-  const activePlaceTags = PLACE_OPTIONS
-    .map((option) => ({
-      ...option,
-      count: scopedPlantVarieties.filter((item) => normalizePlaceList(item.places?.length ? item.places : item.place).includes(option.value)).length
-    }))
-    .filter((option) => option.count);
   const inheritedNotes = categoryDisplayNotes(category.id);
   const inheritedSowingWindow = categoryDisplaySowingWindow(category.id);
   const categoryLineage = new Set([category.id, ...categoryAncestorIds(category)]);
   const showBreedingChips = categoryLineage.has("root-zahrada");
+  const useCompactCategorySummary = !inheritedNotes && !inheritedSowingWindow;
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
   const breadcrumb = categoryBreadcrumb(category.id);
-  const previousCategoryId = breadcrumb.length > 1 ? breadcrumb[breadcrumb.length - 2].id : null;
+  const previousCategory = breadcrumb.length > 1 ? breadcrumb[breadcrumb.length - 2] : null;
+  const previousCategoryId = previousCategory?.id || "";
   const childLabel = category.nodeType === "parent" ? "Kategórie v tejto sekcii" : "Podradené kategórie";
   const childEmpty = category.nodeType === "parent"
     ? "V tejto sekcii ešte nie sú ďalšie kategórie. Klikni na Pridať podradenú kategóriu."
@@ -6372,24 +6972,40 @@ function renderCatalog() {
         </section>
       </details>
     `;
+  const categoryNavMarkup = isMobileShell
+    ? `
+        <div class="category-shell__nav category-shell__nav--compact category-shell__nav--mobile-back">
+          <button
+            class="back-button category-shell__back"
+            type="button"
+            ${previousCategoryId ? `data-open-category="${escapeAttribute(previousCategoryId)}"` : "data-open-main-menu-filter"}
+            aria-label="${escapeAttribute(previousCategoryId ? `Späť do ${previousCategory?.name || "nadradenej kategórie"}` : "Späť do hlavného menu")}"
+          >
+            Späť
+          </button>
+        </div>
+      `
+    : `
+        <div class="category-shell__nav category-shell__nav--compact">
+          <div class="breadcrumb breadcrumb--compact">
+            <button class="breadcrumb__item breadcrumb__item--menu is-ancestor" type="button" data-open-main-menu-filter>
+              Hlavné menu
+            </button>
+            ${breadcrumb.map((item, index) => `
+            <button class="breadcrumb__item ${index < breadcrumb.length - 1 ? "is-ancestor" : ""} ${index === breadcrumb.length - 1 ? "is-current" : ""}" type="button" data-open-category="${item.id}">
+              ${escapeHtml(item.name)}
+            </button>
+          `).join("")}
+          </div>
+        </div>
+      `;
 
   catalogEl.innerHTML = `
         <div class="category-shell">
-          <div class="category-shell__nav category-shell__nav--compact">
-            <div class="breadcrumb breadcrumb--compact">
-              <button class="breadcrumb__item breadcrumb__item--menu is-ancestor" type="button" data-open-main-menu-filter>
-                Hlavné menu
-              </button>
-              ${breadcrumb.map((item, index) => `
-              <button class="breadcrumb__item ${index < breadcrumb.length - 1 ? "is-ancestor" : ""} ${index === breadcrumb.length - 1 ? "is-current" : ""}" type="button" data-open-category="${item.id}">
-                ${escapeHtml(item.name)}
-              </button>
-            `).join("")}
-            </div>
-        </div>
+          ${categoryNavMarkup}
         ${isFocusedView ? `
-        <section class="category-panel category-panel--summary category-panel--${category.nodeType === "parent" ? "section" : "kind"}">
-        <div class="category-panel__hero">
+        <section class="category-panel category-panel--summary category-panel--${category.nodeType === "parent" ? "section" : "kind"}${useCompactCategorySummary ? " category-panel--summary-compact" : ""}">
+        <div class="category-panel__hero${useCompactCategorySummary ? " category-panel__hero--compact" : ""}">
           <div class="category-panel__intro">
             <div class="category-panel__intro-copy">
               <div class="category-panel__title-row">
@@ -6408,7 +7024,6 @@ function renderCatalog() {
         ${neverGrownCount ? `<button class="tag tag--button tag--button-never-grown" type="button" id="open-category-never-grown">${neverGrownCount} ešte som nepestovala</button>` : ""}
         ${showBreedingChips && hybridCount ? `<button class="tag tag--button tag--button-hybrid" type="button" id="open-category-hybrid">${hybridCount} F1</button>` : ""}
         ${showBreedingChips && openPollinatedCount ? `<button class="tag tag--button tag--button-open" type="button" id="open-category-open-pollinated">${openPollinatedCount} nehybridná</button>` : ""}
-        ${activePlaceTags.map((option) => `<button class="tag tag--button tag--button-place" type="button" data-open-category-place="${option.value}">${option.count} ${escapeHtml(option.label)}</button>`).join("")}
       </div>
     </section>
         ` : ""}
@@ -6451,6 +7066,18 @@ function renderCatalog() {
           )
         );
       compactBreadcrumb.scrollTo({ left: targetLeft });
+    });
+  }
+
+  const categoryBackButton = catalogEl.querySelector(".category-shell__back");
+  if (categoryBackButton) {
+    categoryBackButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (previousCategoryId) {
+        openFocusedCategoryNavigation(previousCategoryId);
+        return;
+      }
+      openMainMenuView();
     });
   }
 
@@ -6544,63 +7171,6 @@ function renderCatalog() {
     });
   }
 
-  catalogEl.querySelectorAll("[data-open-category-place]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const placeValue = button.dataset.openCategoryPlace;
-      const placeOption = PLACE_OPTIONS.find((item) => item.value === placeValue);
-      if (!placeOption) return;
-      openVarietyOverviewModal({
-        title: `${placeOption.label} v kategórii ${category.name}`,
-        items: scopedPlantVarieties.filter((item) => normalizePlaceList(item.places?.length ? item.places : item.place).includes(placeValue)),
-        emptyMessage: `V tejto kategórii zatiaľ nemáš nič označené ako ${placeOption.label.toLowerCase()}.`,
-        detailBuilder: (item) => `${categoryName(item.categoryId)}${inferBreedingType(item) === "hybrid" ? " • F1" : ""}`
-      });
-    });
-  });
-
-  catalogEl.querySelectorAll("[data-open-category]").forEach((button) => {
-    button.addEventListener("click", () => {
-      openFocusedCategoryNavigation(button.dataset.openCategory || "");
-    });
-  });
-
-  catalogEl.querySelectorAll('.catalog-card--child[data-open-category][role="button"]').forEach((card) => {
-    card.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      openFocusedCategoryNavigation(card.dataset.openCategory || "");
-    });
-  });
-
-  catalogEl.querySelectorAll("[data-open-main-menu-filter]").forEach((button) => {
-    button.addEventListener("click", openMainMenuView);
-  });
-
-  catalogEl.querySelectorAll("[data-open-variety]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      openStoredCardEditor(button.dataset.openVariety);
-    });
-  });
-
-  catalogEl.querySelectorAll(".catalog-card--clickable[data-open-variety]").forEach((card) => {
-    card.addEventListener("click", () => openStoredCardEditor(card.dataset.openVariety));
-    card.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openStoredCardEditor(card.dataset.openVariety);
-      }
-    });
-  });
-
-  catalogEl.querySelectorAll("[data-stop-card-open]").forEach((item) => {
-    item.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
-    item.addEventListener("keydown", (event) => {
-      event.stopPropagation();
-    });
-  });
 }
 
 function renderHomeDashboard() {
@@ -6611,6 +7181,9 @@ function renderHomeDashboard() {
   const thingRecords = buildThingRecords().slice(0, 6);
   const problemEntries = entries.filter((entry) => entry.entryType === "problem").slice(0, 2);
   const weatherSnapshot = homeWeatherSnapshot || latestEntry?.weather || seasonalMemory?.weather || null;
+  const weatherPreferences = loadWeatherPreferences();
+  const weatherCardPlace = String(weatherSnapshot?.placeLabel || weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).split(",")[0].trim() || "Záhrada";
+  const weatherCardTitle = `${weatherCardPlace} dnes`;
   const latestPhotoImages = latestPhotos.map((item) => item.image);
 
   catalogEl.innerHTML = `
@@ -6644,7 +7217,7 @@ function renderHomeDashboard() {
           <div class="home-card__head">
             <div>
               <p class="eyebrow">Počasie</p>
-              <h3>${escapeHtml(weatherSnapshot ? "Zákopčie dnes" : "Zákopčie dnes")}</h3>
+              <h3 data-home-weather-title>${escapeHtml(weatherCardTitle)}</h3>
             </div>
           </div>
           <div class="home-weather-box" data-home-weather-body>
@@ -6691,7 +7264,7 @@ function renderHomeDashboard() {
           ${latestPhotos.length
             ? latestPhotos.slice(0, 6).map((item, index) => `
               <button class="home-gallery__item" type="button" data-open-home-gallery-index="${index}" aria-label="Otvoriť fotku ${escapeAttribute(item.entryTitle)}">
-                <img src="${escapeAttribute(item.image)}" alt="${escapeAttribute(item.entryTitle)}">
+                <img src="${escapeAttribute(item.image)}" alt="${escapeAttribute(item.entryTitle)}" loading="lazy" decoding="async" fetchpriority="low">
                 <span class="home-gallery__label">${escapeHtml(item.entryTitle)}</span>
               </button>
             `).join("")
@@ -6703,7 +7276,7 @@ function renderHomeDashboard() {
         <div class="home-section__header">
           <div>
             <p class="eyebrow">Témy</p>
-            <h3>Rastliny, odrody, miesta, tagy a problémy v jednom prepojenom pohľade</h3>
+            <h3>Rastliny, odrody, tagy a problémy v jednom prepojenom pohľade</h3>
           </div>
           ${thingRecords.length ? `<button class="button button--ghost mini-list__more mini-list__more--inline" type="button" data-open-all-things>Všetky témy</button>` : ""}
         </div>
@@ -7427,8 +8000,11 @@ function syncMainMenuWeatherAudioControls() {
     ? window.weatherAudioEngine.getState()
     : null;
   const supported = audioState?.supported !== false;
+  const waitingForGesture = isMobileWeatherSoundWaitingForGesture(audioState);
   const statusLabel = !supported
     ? "Bez podpory"
+    : waitingForGesture
+      ? "Čaká"
     : !mobileWeatherSoundEnabled
       ? "Vypnutý"
       : "Zapnutý";
@@ -7440,7 +8016,11 @@ function syncMainMenuWeatherAudioControls() {
     element.className = `weather-audio-inline__status ${statusClass}`;
     if (element instanceof HTMLButtonElement) {
       element.setAttribute("aria-pressed", mobileWeatherSoundEnabled ? "true" : "false");
-      element.setAttribute("title", mobileWeatherSoundEnabled ? "Ťuknutím zvuk vypneš" : "Ťuknutím zvuk zapneš");
+      element.setAttribute("title", waitingForGesture
+        ? "Ťuknutím zvuk naozaj spustíš."
+        : mobileWeatherSoundEnabled
+          ? "Ťuknutím zvuk vypneš"
+          : "Ťuknutím zvuk zapneš");
     }
   });
   mainMenuEl.querySelectorAll("[data-mobile-weather-audio-inline]").forEach((element) => {
@@ -7482,8 +8062,9 @@ function bindMainMenuWeatherAudioControlEvents() {
       : null;
     if (!(toggleButton instanceof HTMLButtonElement) || !mainMenuEl.contains(toggleButton)) return;
     event.preventDefault();
-    window.weatherAudioEngine?.handleUserActivation?.();
-    setMobileWeatherSoundEnabled(!mobileWeatherSoundEnabled);
+    if (activatePendingMobileWeatherSound()) return;
+    const nextEnabled = !mobileWeatherSoundEnabled;
+    setMobileWeatherSoundEnabled(nextEnabled, { activate: nextEnabled });
   });
   mainMenuEl.addEventListener("input", (event) => {
     const target = event.target;
@@ -8933,8 +9514,6 @@ function journalThemeKindLabel(kind = "") {
   switch (String(kind || "").trim()) {
     case "tag":
       return "Tag";
-    case "place":
-      return "Miesto";
     case "phenomenon":
       return "Jav";
     case "weather":
@@ -9078,28 +9657,23 @@ function journalEntryTypeUi(value = "") {
   const map = {
     note: {
       title: "Názov zápisu",
-      text: "Čo sa stalo, čo si si všimla, čo si našla alebo čo bolo dôležité...",
-      place: "Miesto, napr. Záhon pri plote, Les za domom"
+      text: "Čo sa stalo, čo si si všimla, čo si našla alebo čo bolo dôležité..."
     },
     walk: {
       title: "Názov prechádzky",
-      text: "Voliteľná poznámka k prechádzke, čo si videla alebo čo si si chcela zapamätať...",
-      place: "Trasa alebo miesto prechádzky"
+      text: "Voliteľná poznámka k prechádzke, čo si videla alebo čo si si chcela zapamätať..."
     },
     weather: {
       title: "Počasie alebo jav",
-      text: "Napíš, čo sa dialo: mráz, vietor, dážď, sucho, prvý čmeliak, kvitnutie...",
-      place: "Kde sa to prejavilo najviac"
+      text: "Napíš, čo sa dialo: mráz, vietor, dážď, sucho, prvý čmeliak, kvitnutie..."
     },
     work: {
       title: "Čo si robila",
-      text: "Akú prácu si spravila, čo sa podarilo, čo ešte treba dorobiť...",
-      place: "Kde si pracovala"
+      text: "Akú prácu si spravila, čo sa podarilo, čo ešte treba dorobiť..."
     },
     problem: {
       title: "Aký problém sa objavil",
-      text: "Čo sa pokazilo alebo objavilo, ako to vyzerá a čo s tým treba urobiť...",
-      place: "Kde sa problém objavil"
+      text: "Čo sa pokazilo alebo objavilo, ako to vyzerá a čo s tým treba urobiť..."
     }
   };
   return map[normalizedValue] || map.note;
@@ -9160,48 +9734,6 @@ function renderJournalPhenomenaPicker(records = [], currentValue = "") {
           `).join("")}
         </div>
       ` : `<p class="journal-tag-picker__empty">${queryKey ? "Nenašiel sa podobný uložený jav." : "Zatiaľ tu ešte nemáš žiadne uložené javy."}</p>`}
-    </div>
-  `;
-}
-
-function renderJournalPlacePicker(records = [], currentValue = "") {
-  if (!records.length) return "";
-  const rawValue = String(currentValue || "").trim();
-  const selectedKey = slugify(rawValue);
-  const queryKey = selectedKey;
-  const selectedRecord = records.find((item) => item.key === selectedKey) || null;
-  const suggestionRecords = records
-    .filter((item) => item.key !== selectedKey && (!queryKey || item.key.includes(queryKey)))
-    .slice(0, queryKey ? 8 : 10);
-
-  return `
-    <div class="journal-tag-picker__head">
-      <span class="journal-tag-picker__label">${queryKey ? "Nájdené miesta" : "Použité miesta"}</span>
-      <span class="journal-tag-picker__meta">${queryKey ? `Hľadáš: ${escapeHtml(rawValue)}` : "Klikni a miesto sa doplní do zápisu"}</span>
-    </div>
-    ${selectedRecord ? `
-      <div class="journal-tag-picker__section">
-        <span class="journal-tag-picker__section-label">Aktuálne miesto</span>
-        <div class="journal-tag-picker__chips">
-          <button class="tag tag--journal-meta tag--interactive journal-tag-picker__chip is-selected" type="button" data-journal-place-clear>
-            <span>${escapeHtml(selectedRecord.label)}</span>
-            <span class="journal-tag-picker__chip-remove" aria-hidden="true">×</span>
-          </button>
-        </div>
-      </div>
-    ` : ""}
-    <div class="journal-tag-picker__section">
-      <span class="journal-tag-picker__section-label">${queryKey ? "Návrhy miest" : "Najčastejšie"}</span>
-      ${suggestionRecords.length ? `
-        <div class="journal-tag-picker__chips">
-          ${suggestionRecords.map((item) => `
-            <button class="tag tag--journal-meta tag--interactive journal-tag-picker__chip" type="button" data-journal-place-pick="${escapeAttribute(item.label)}">
-              <span>${escapeHtml(item.label)}</span>
-              <span class="journal-tag-picker__chip-count">${item.count}</span>
-            </button>
-          `).join("")}
-        </div>
-      ` : `<p class="journal-tag-picker__empty">${queryKey ? "Nenašlo sa podobné uložené miesto." : "Zatiaľ tu ešte nemáš žiadne uložené miesto."}</p>`}
     </div>
   `;
 }
@@ -9373,21 +9905,6 @@ function journalLinkChips(entry) {
     }
   });
 
-  if (entry.place) {
-    const key = slugify(entry.place);
-    if (key) {
-      chips.push({
-        label: `Miesto: ${entry.place}`,
-        themeKey: `place:${key}`
-      });
-    }
-  }
-
-  if (entry.weather?.placeLabel) {
-    const shortPlace = String(entry.weather.placeLabel || "").split(",")[0].trim() || entry.weather.placeLabel;
-    chips.push({ label: shortPlace });
-  }
-
   return chips;
 }
 
@@ -9401,8 +9918,8 @@ function journalFilterableChips(entry) {
 
 function journalDisplayChips(entry, { compact = false } = {}) {
   const allowedPrefixes = compact
-    ? ["Typ:", "Miesto:", "Kategória:", "Odroda:"]
-    : ["Typ:", "Miesto:", "Tag:", "Kategória:", "Odroda:"];
+    ? ["Typ:", "Kategória:", "Odroda:"]
+    : ["Typ:", "Tag:", "Kategória:", "Odroda:"];
 
   return journalLinkChips(normalizeJournalEntry(entry, state.varieties)).filter((chip) => {
     const label = String(chip?.label || "").trim();
@@ -9426,9 +9943,8 @@ function journalTagRecords(entries = normalizedJournalList()) {
   const tagMap = new Map();
   const priorityOrder = {
     "entry-type": 0,
-    place: 1,
-    category: 2,
-    tag: 3
+    category: 1,
+    tag: 2
   };
 
   entries.forEach((entry) => {
@@ -9462,7 +9978,6 @@ function journalTagRecords(entries = normalizedJournalList()) {
 function journalFilterSections(tagRecords = []) {
   const groups = [
     { kind: "entry-type", label: "Typ" },
-    { kind: "place", label: "Miesto" },
     { kind: "category", label: "Kategórie" },
     { kind: "tag", label: "Tagy" }
   ];
@@ -9640,26 +10155,6 @@ function journalPhenomenaRecords(entries = normalizedJournalList()) {
   return [...phenomenonMap.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "sk", { sensitivity: "base" }));
 }
 
-function journalPlaceRecords(entries = normalizedJournalList()) {
-  const placeMap = new Map();
-  entries.forEach((entry) => {
-    const label = String(entry?.place || "").trim();
-    const key = slugify(label);
-    if (!label || !key) return;
-    const existing = placeMap.get(key);
-    if (existing) {
-      existing.count += 1;
-      return;
-    }
-    placeMap.set(key, {
-      key,
-      label,
-      count: 1
-    });
-  });
-  return [...placeMap.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "sk", { sensitivity: "base" }));
-}
-
 function setupJournalPhenomenaInput(formEl) {
   if (!formEl) return;
   const phenomenaInput = formEl.elements.phenomena;
@@ -9716,45 +10211,6 @@ function setupJournalPhenomenaInput(formEl) {
   phenomenaInput.addEventListener("input", renderPhenomenaSuggestions);
   phenomenaInput.addEventListener("focus", renderPhenomenaSuggestions);
   renderPhenomenaSuggestions();
-}
-
-function setupJournalPlaceInput(formEl) {
-  if (!formEl) return;
-  const placeInput = formEl.elements.place;
-  const suggestionMount = formEl.querySelector("[data-journal-place-picker]");
-  if (!placeInput || !suggestionMount) return;
-
-  const setPlaceValue = (label = "") => {
-    placeInput.value = String(label || "").trim();
-    placeInput.dispatchEvent(new Event("input", { bubbles: true }));
-  };
-
-  const renderPlaceSuggestions = () => {
-    const records = journalPlaceRecords();
-    if (!records.length) {
-      suggestionMount.hidden = true;
-      suggestionMount.innerHTML = "";
-      return;
-    }
-    suggestionMount.hidden = false;
-    suggestionMount.innerHTML = renderJournalPlacePicker(records, String(placeInput.value || ""));
-    suggestionMount.querySelectorAll("[data-journal-place-pick]").forEach((button) => {
-      button.addEventListener("click", () => {
-        setPlaceValue(String(button.getAttribute("data-journal-place-pick") || "").trim());
-        placeInput.focus();
-      });
-    });
-    suggestionMount.querySelectorAll("[data-journal-place-clear]").forEach((button) => {
-      button.addEventListener("click", () => {
-        setPlaceValue("");
-        placeInput.focus();
-      });
-    });
-  };
-
-  placeInput.addEventListener("input", renderPlaceSuggestions);
-  placeInput.addEventListener("focus", renderPlaceSuggestions);
-  renderPlaceSuggestions();
 }
 
 function taskLinkChips(task) {
@@ -10026,7 +10482,6 @@ function renderVarietyCard(variety) {
     variety.avoidNextYear ? '<span class="tag tag--avoid">neodporúčam</span>' : "",
     variety.neverGrown ? '<span class="tag tag--never-grown">ešte som nepestovala</span>' : "",
     inferBreedingType(variety) === "hybrid" ? '<span class="tag tag--hybrid">F1</span>' : "",
-    normalizePlaceList(variety.places?.length ? variety.places : variety.place).length ? `<span class="tag">${escapeHtml(placeLabel(variety.places?.length ? variety.places : variety.place))}</span>` : "",
     ...statusValues
       .filter((status) => !(status === "sown" && variety.sowedAt))
       .map((status) => `<span class="tag">${escapeHtml(statusLabel(status))}</span>`),
@@ -10096,8 +10551,7 @@ function renderUniversalCard(item, category, previewText) {
       : ""
   ].filter(Boolean);
   const selectedDetails = [
-    item.recordedAt ? `${cardDateLabel(cardType(item))}: ${formatDate(item.recordedAt)}.` : "",
-    isBirdCard && item.birdPlace ? `Miesto: ${item.birdPlace}.` : ""
+    item.recordedAt ? `${cardDateLabel(cardType(item))}: ${formatDate(item.recordedAt)}.` : ""
   ].filter(Boolean);
   const summaryTagsHtml = summaryTags.length ? summaryTags.join("") : "";
   const quickSectionHtml = summaryTags.length
@@ -10272,6 +10726,7 @@ function renderJournal() {
         ? journalEntries.map((entry) => renderJournalManagerCard(entry, "data-delete-journal")).join("")
         : '<div class="empty-state">Denník sa nepodarilo načítať.</div>';
     }
+    syncDeferredJournalImages(journalListEl, { eagerCount: 2 });
   }
 
   if (journalSidebarEl) {
@@ -10408,7 +10863,7 @@ function renderMemories() {
         ` : ""}
         <div class="memory-strip__hero" aria-label="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}">
           <span class="memory-strip__backdrop" style="background-image:url('${escapeAttribute(memoryItems[memoryCarouselIndex].image)}')"></span>
-          <img src="${escapeAttribute(memoryItems[memoryCarouselIndex].image)}" alt="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}">
+          <img src="${escapeAttribute(memoryItems[memoryCarouselIndex].image)}" alt="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}" loading="lazy" decoding="async" fetchpriority="low">
           <span class="memory-strip__count">${memoryCarouselIndex + 1}/${memoryItems.length}</span>
           ${memoryItems[memoryCarouselIndex].entryText
             ? `<span class="memory-strip__note">${escapeHtml(trimText(memoryItems[memoryCarouselIndex].entryText, 160))}</span>`
@@ -11110,6 +11565,7 @@ function renderJournalManagerList(journalList, journalCount, rerender) {
   }
 
   bindThingLinks(journalList);
+  syncDeferredJournalImages(journalList, { eagerCount: 2 });
 
   journalList.querySelectorAll("[data-delete-worklog-journal]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -11342,7 +11798,6 @@ function openAddEntryFlow(editingEntryId = "") {
     : null;
   const defaultEntryMode = editingEntry && (
     (editingEntry.tags || []).length
-    || editingEntry.place
     || (editingEntry.linkedCategoryIds || []).length
     || editingEntry.linkedCategoryId
     || editingEntry.linkedVarietyId
@@ -11398,7 +11853,6 @@ function openAddEntryFlow(editingEntryId = "") {
               <div class="entry-advanced__content">
                 <input name="tags" type="text" placeholder="Tagy oddelené čiarkou" value="${escapeAttribute((editingEntry?.tags || []).join(", "))}">
                 <div class="journal-tag-picker" data-journal-tag-picker hidden></div>
-                <input name="place" type="text" placeholder="Miesto, napr. Záhon pri plote, Les za domom" value="${escapeAttribute(editingEntry?.place || "")}">
                 ${renderRelationDisclosure({
                   summaryLabel: "Súvisí s kategóriami a kartou",
                   categoryLabel: "Kategórie",
@@ -11699,7 +12153,6 @@ function openAddEntryFlow(editingEntryId = "") {
       linkedCategoryId,
       linkedVarietyId,
       mood: String(form.get("mood") || "").trim(),
-      place: String(form.get("place") || "").trim(),
       weather: normalizeWeatherSnapshot({
         condition: form.get("weatherCondition"),
         temperature: form.get("weatherTemperature"),
@@ -11748,7 +12201,7 @@ function openThingBrowser() {
       <div class="detail-copy detail-copy--wide">
         <p class="eyebrow">Témy</p>
         <h3>Všetky témy</h3>
-        <p>Témy sa skladajú z toho, čo už v appke existuje: kategórie, odrody, tagy, miesta, problémy aj denníkové zápisy.</p>
+        <p>Témy sa skladajú z toho, čo už v appke existuje: kategórie, odrody, tagy, problémy aj denníkové zápisy.</p>
         <div class="home-entity-grid">
           ${records.map((item) => `
             <button class="home-entity-card" type="button" data-open-browser-thing="${escapeAttribute(item.key)}">
@@ -11861,6 +12314,7 @@ function openThingOverview(thingKey) {
   }
   bindThingLinks(detailContent);
   bindTaskActions(detailContent);
+  syncDeferredJournalImages(detailContent, { eagerCount: 1 });
 
   detailContent.querySelectorAll("[data-open-journal-image]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -12248,9 +12702,13 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   const existing = varietyId ? state.varieties.find((item) => item.id === varietyId) : null;
   const currentEntryKind = existing ? entryKind(existing) : forcedEntryKind;
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const showCardTypePicker = !existing && currentEntryKind === "detail";
   const showMobileAddTypeBar = !existing && currentEntryKind === "detail" && isMobileShell;
+  const inlineCreateAction = !existing && isMobileShell;
+  const useCompactCategoryLabels = isMobileShell && currentEntryKind === "detail";
+  const submitLabel = existing ? "Uložiť" : currentEntryKind === "detail" ? "Pridať odrodu" : currentEntryKind === "quick" ? "Pridať rýchly záznam" : "Pridať galériu";
+  detailModal.classList.toggle("detail-modal--editor-topline", showMobileAddTypeBar);
   const categoryId = forcedCategoryId || existing?.categoryId || activeCategoryId;
-  const selectedPlaces = normalizePlaceList(existing?.places?.length ? existing.places : existing?.place);
   const selectedStatuses = varietyStatusValues(existing);
   let draftImages = normalizeVarietyImages(existing);
   let activeImageIndex = 0;
@@ -12266,41 +12724,42 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
         <div class="detail-image__count" id="gallery-count"></div>
       </div>
       <div class="detail-copy detail-copy--wide detail-copy--editor">
-        <div class="detail-copy__headline">
-          <h3>${existing ? escapeHtml(entryDisplayName(existing)) : currentEntryKind === "detail" ? "Pridať odrodu" : currentEntryKind === "quick" ? "Pridať rýchly záznam" : "Pridať galériu"}</h3>
-          <div class="detail-copy__actions">
-            <button class="button" type="submit" form="variety-form">${existing ? "Uložiť" : currentEntryKind === "detail" ? "Pridať odrodu" : currentEntryKind === "quick" ? "Pridať rýchly záznam" : "Pridať galériu"}</button>
+        ${existing || !inlineCreateAction ? `
+          <div class="detail-copy__headline${existing ? "" : " detail-copy__headline--action-only"}">
+            ${existing ? `<h3>${escapeHtml(entryDisplayName(existing))}</h3>` : ""}
+            <div class="detail-copy__actions">
+              <button class="button" type="submit" form="variety-form">${submitLabel}</button>
+            </div>
           </div>
-        </div>
-        ${currentEntryKind === "detail" && !showMobileAddTypeBar ? `
+        ` : ""}
+        ${showCardTypePicker && !showMobileAddTypeBar ? `
           <div class="entry-mode-switch entry-mode-switch--cards" id="card-type-switch">
             ${cardTypeOptionsMarkup("variety")}
           </div>
         ` : ""}
         <form class="detail-form detail-form--editor" id="variety-form">
+          ${inlineCreateAction ? `
+            <div class="detail-form__lead-action">
+              <button class="button" type="submit">${submitLabel}</button>
+            </div>
+          ` : ""}
           <div class="detail-grid">
             ${currentEntryKind === "detail" ? `
               <div class="detail-top-row field-block--full">
-                <label class="field-block">
+                <label class="field-block detail-top-row__name">
                   <span>Názov odrody</span>
                   <input name="name" type="text" value="${escapeAttribute(existing?.name || "")}" placeholder="Názov odrody" required>
                 </label>
-                <div class="field-block field-block--f1-inline">
+                <div class="detail-top-row__f1" aria-label="Typ šľachtenia">
                   <label class="choice-chip choice-chip--toggle-inline">
                     <input type="checkbox" name="breedingHybrid" value="hybrid" ${inferBreedingType(existing) === "hybrid" ? "checked" : ""}>
                     <span>F1</span>
                   </label>
                 </div>
-                <label class="field-block">
+                <label class="field-block detail-top-row__category">
                   <span>Kategória</span>
-                  <select name="categoryId" required>${categoryOptions(categoryId)}</select>
+                  <select name="categoryId" required>${categoryOptions(categoryId, { compactLabels: useCompactCategoryLabels })}</select>
                 </label>
-              </div>
-              <div class="field-block field-block--full">
-                <span>Kde sa pestuje</span>
-                <div class="choice-group choice-group--places">
-                  ${placeChoiceOptions(selectedPlaces)}
-                </div>
               </div>
               <div class="field-block field-block--full">
                 <span>Stav</span>
@@ -12313,18 +12772,18 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
                   ], selectedStatuses)}
                 </div>
                 <div class="status-date-row">
-                  <label class="status-date-row__field status-date-row__field--date" id="status-date-field-sown">
+                  <div class="status-date-row__field status-date-row__field--date" id="status-date-field-sown">
                     <span>Vysiate kedy</span>
                     ${renderDateInput({ id: "variety-sowed-at", name: "sowedAt", value: existing?.sowedAt || "" })}
-                  </label>
-                  <label class="status-date-row__field status-date-row__field--date" id="status-date-field-transplanted">
+                  </div>
+                  <div class="status-date-row__field status-date-row__field--date" id="status-date-field-transplanted">
                     <span>Vysadené kedy</span>
                     ${renderDateInput({ id: "variety-transplanted-at", name: "transplantedAt", value: existing?.transplantedAt || "" })}
-                  </label>
-                  <label class="status-date-row__field status-date-row__field--date" id="status-date-field-harvested">
+                  </div>
+                  <div class="status-date-row__field status-date-row__field--date" id="status-date-field-harvested">
                     <span>Zberané kedy</span>
                     ${renderDateInput({ id: "variety-harvested-at", name: "harvestedAt", value: existing?.harvestedAt || "" })}
-                  </label>
+                  </div>
                 </div>
               </div>
               <div class="field-block"><span>Ranking</span>${renderRatingPicker(existing?.rating || 0)}</div>
@@ -12352,19 +12811,17 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
             ` : `
               <label class="field-block"><span>${currentEntryKind === "quick" ? "Názov záznamu" : "Názov galérie"}</span><input name="name" type="text" value="${escapeAttribute(existing?.name || "")}" placeholder="${currentEntryKind === "quick" ? "Napríklad žltá skalnička pri plote" : "Napríklad Lúčne kvety"}"></label>
               <label class="field-block"><span>Kategória</span><select name="categoryId" required>${categoryOptions(categoryId)}</select></label>
-              <label class="field-block field-block--full">
+              <div class="field-block field-block--full">
                 <span>${currentEntryKind === "quick" ? "Dátum záznamu" : "Dátum albumu"}</span>
                 ${renderDateInput({ id: "variety-sowed-at", name: "sowedAt", value: existing?.sowedAt || "" })}
-              </label>
+              </div>
             `}
           </div>
           <label class="field-block field-block--full">
             <span>${currentEntryKind === "detail" ? "Poznámky a postrehy" : "Poznámka"}</span>
             <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="${currentEntryKind === "detail" ? "Poznámky: chuť, rodivosť, čo jej sadlo, či ju chceš znova..." : currentEntryKind === "quick" ? "Krátky popis, kde rastie alebo čo si chceš zapamätať..." : "Voliteľný popis galérie..."}">${escapeHtml(existing?.notes || "")}</textarea>
           </label>
-          <label class="upload-field upload-field--compact">
-            <input name="imageFile" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple>
-          </label>
+          ${renderEditorImageUploadField({ multiple: true })}
           <div class="editor-gallery" id="variety-gallery-editor"></div>
           ${existing ? `
             <div class="danger-zone">
@@ -12392,6 +12849,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   const ratingInput = ratingPicker?.querySelector('input[name="rating"]') || null;
 
   enableMobileMediaPickerForInput(imageInput, { multiple: true });
+  bindEditorImageUploadShortcuts(detailContent);
 
   const syncStatusDateField = () => {
     const selectedStatusSet = new Set(statusInputs.filter((input) => input.checked).map((input) => String(input.value || "").trim()));
@@ -12452,7 +12910,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     gallery.innerHTML = draftImages.map((image, index) => `
           <article class="editor-gallery__mini ${index === 0 ? "is-primary" : ""} ${index === activeImageIndex ? "is-active" : ""}" draggable="true" data-drag-image="${index}" data-drop-image="${index}">
             <button class="editor-gallery__select" type="button" data-image-select="${index}" aria-label="Zobraziť fotku ${index + 1}">
-              <img class="editor-gallery__thumb" src="${escapeAttribute(image)}" alt="Fotka ${index + 1}">
+              <img class="editor-gallery__thumb" src="${escapeAttribute(image)}" alt="Fotka ${index + 1}" loading="lazy" decoding="async" fetchpriority="low">
               ${index === 0 ? '<span class="editor-gallery__main-badge">hlavná</span>' : ""}
             </button>
             <button class="editor-gallery__remove" type="button" data-image-delete="${index}" aria-label="Vymazať fotku">×</button>
@@ -12574,7 +13032,6 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   document.getElementById("variety-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const places = normalizePlaceList(form.getAll("places"));
     const rawStatusValues = normalizeStatusList(form.getAll("statusValues"));
     const currentViewCategoryId = activeCategoryId;
     const sowedAt = currentEntryKind === "detail" && rawStatusValues.includes("sown") ? String(form.get("sowedAt") || "") : "";
@@ -12604,8 +13061,8 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
       harvestedAt,
       statusValues,
       status: currentEntryKind === "detail" ? primaryStatusValue(statusValues) : "",
-      place: currentEntryKind === "detail" ? places[0] || "" : "",
-      places: currentEntryKind === "detail" ? places : [],
+      place: "",
+      places: [],
       rating: currentEntryKind === "detail" ? Number(form.get("rating") || 0) : 0,
       top: currentEntryKind === "detail" ? form.get("top") === "on" : false,
       notGrowingThisYear: currentEntryKind === "detail" ? form.get("notGrowingThisYear") === "on" : false,
@@ -12713,10 +13170,10 @@ function openBatchSowingManager(categoryId = activeCategoryId) {
                 ${sourceCategories.map((item) => `<option value="${item.id}" ${item.id === currentSourceCategoryId ? "selected" : ""}>${escapeHtml(formattedCategoryOptionLabel(item))}</option>`).join("")}
               </select>
             </label>
-            <label class="field-block batch-sowing-manager__filter batch-sowing-manager__filter--date">
+            <div class="field-block batch-sowing-manager__filter batch-sowing-manager__filter--date">
               <span>Dátum výsevu</span>
               ${renderDateInput({ id: "batch-sowed-at", name: "sowedAt", value: todayISO(), required: true })}
-            </label>
+            </div>
             <label class="field-block batch-sowing-manager__filter batch-sowing-manager__filter--category">
               <span>Filtrovať kategóriu</span>
               <select id="batch-category-filter"></select>
@@ -13250,7 +13707,7 @@ function worklogSummaryText(taskCount = state.customTasks.length, journalCount =
 }
 
 function resetDetailModalClasses() {
-  detailModal.classList.remove("detail-modal--worklog", "detail-modal--overview", "detail-modal--batch", "detail-modal--weather", "detail-modal--editor", "detail-modal--settings");
+  detailModal.classList.remove("detail-modal--worklog", "detail-modal--overview", "detail-modal--batch", "detail-modal--weather", "detail-modal--editor", "detail-modal--settings", "detail-modal--editor-topline");
 }
 
 function orderedCategories() {
@@ -13455,6 +13912,7 @@ function cardTypeOptionsMarkup(selectedType, { withIcons = false } = {}) {
       type="button"
       data-card-type="${escapeAttribute(option.value)}"
       aria-pressed="${option.value === selectedType ? "true" : "false"}"
+      aria-label="${escapeAttribute(option.label)}"
     >
       ${withIcons ? `
         <span class="entry-mode-switch__button-content">
@@ -13469,11 +13927,69 @@ function cardTypeOptionsMarkup(selectedType, { withIcons = false } = {}) {
 function mobileAddCardTypeBarMarkup(selectedType) {
   return `
     <div class="detail-editor-mobile-switch">
+      <button class="back-button detail-editor-mobile-switch__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
       <div class="entry-mode-switch entry-mode-switch--topbar" data-card-type-switch="mobile-topbar">
         ${cardTypeOptionsMarkup(selectedType, { withIcons: true })}
       </div>
     </div>
   `;
+}
+
+function renderMediaUploadField({
+  label = "",
+  inputName = "imageFile",
+  accept = IMAGE_FILE_ACCEPT,
+  multiple = true,
+  captureAction = "capture-photo",
+  captureLabel = "Odfotiť",
+  pickAction = "pick-photo",
+  pickLabel = multiple ? "Vybrať súbory" : "Vybrať súbor",
+  fieldClassName = "upload-field--editor-media",
+  ariaLabel = "Pridať médiá"
+} = {}) {
+  return `
+    <div class="upload-field upload-field--compact ${escapeAttribute(fieldClassName)}" data-upload-shortcuts-root>
+      ${label ? `<span class="upload-field__label">${escapeHtml(label)}</span>` : ""}
+      <div class="upload-field__mobile-actions" aria-label="${escapeAttribute(ariaLabel)}">
+        <button class="button button--ghost upload-field__mobile-button" type="button" data-upload-shortcut="${escapeAttribute(captureAction)}">${escapeHtml(captureLabel)}</button>
+        <button class="button button--ghost upload-field__mobile-button" type="button" data-upload-shortcut="${escapeAttribute(pickAction)}">${escapeHtml(pickLabel)}</button>
+      </div>
+      <input name="${escapeAttribute(inputName)}" type="file" accept="${escapeAttribute(accept)}" ${multiple ? "multiple" : ""}>
+    </div>
+  `;
+}
+
+function renderEditorImageUploadField({ multiple = true } = {}) {
+  return renderMediaUploadField({
+    multiple,
+    inputName: "imageFile",
+    accept: IMAGE_FILE_ACCEPT,
+    captureAction: "capture-photo",
+    captureLabel: "Odfotiť",
+    pickAction: "pick-photo",
+    pickLabel: multiple ? "Vybrať súbory" : "Vybrať súbor",
+    fieldClassName: "upload-field--editor-media",
+    ariaLabel: "Pridať fotky ku karte"
+  });
+}
+
+function bindEditorImageUploadShortcuts(scope = document) {
+  if (!scope?.querySelectorAll) return;
+  scope.querySelectorAll("[data-upload-shortcuts-root] [data-upload-shortcut]").forEach((button) => {
+    if (!(button instanceof HTMLButtonElement) || button.dataset.uploadShortcutBound === "true") return;
+    button.dataset.uploadShortcutBound = "true";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const field = button.closest("[data-upload-shortcuts-root]");
+      const input = field?.querySelector('input[type="file"]');
+      if (!(input instanceof HTMLInputElement)) return;
+      triggerMobileMediaInputAction(
+        input,
+        String(button.dataset.uploadShortcut || "pick-photo").trim(),
+        { multiple: input.hasAttribute("multiple") }
+      );
+    });
+  });
 }
 
 function cardCreateLabel(cardTypeValue) {
@@ -14664,9 +15180,12 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     if (selectedType === "bird") {
       selectedCategoryId = String(resolvePreferredCategoryIdForCardType("bird", selectedCategoryId) || FALLBACK_CATEGORY_ID).trim() || FALLBACK_CATEGORY_ID;
     }
+    const showCardTypePicker = !existing;
     const showMobileAddTypeBar = !existing
       && typeof document !== "undefined"
       && document.body.classList.contains("app-mobile-shell");
+    const inlineCreateAction = showMobileAddTypeBar;
+    detailModal.classList.toggle("detail-modal--editor-topline", showMobileAddTypeBar);
     const birdTitleLink = selectedType === "bird"
       ? String(existing?.birdExternalUrl || "").trim()
       : "";
@@ -14680,18 +15199,25 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
           <div class="detail-image__count" id="gallery-count"></div>
         </div>
         <div class="detail-copy detail-copy--wide detail-copy--editor">
-          <div class="detail-copy__headline">
-            <h3>${escapeHtml(existing ? entryDisplayName(existing) : cardCreateLabel(selectedType))}</h3>
-            <div class="detail-copy__actions">
-              <button class="button" type="submit" form="universal-card-form">${existing ? "Uložiť" : cardCreateLabel(selectedType)}</button>
+          ${existing || !inlineCreateAction ? `
+            <div class="detail-copy__headline${existing ? "" : " detail-copy__headline--action-only"}">
+              ${existing ? `<h3>${escapeHtml(entryDisplayName(existing))}</h3>` : ""}
+              <div class="detail-copy__actions">
+                <button class="button" type="submit" form="universal-card-form">${existing ? "Uložiť" : cardCreateLabel(selectedType)}</button>
+              </div>
             </div>
-          </div>
-          ${!showMobileAddTypeBar ? `
+          ` : ""}
+          ${showCardTypePicker && !showMobileAddTypeBar ? `
             <div class="entry-mode-switch entry-mode-switch--cards" id="card-type-switch">
               ${cardTypeOptionsMarkup(selectedType)}
             </div>
           ` : ""}
           <form class="detail-form detail-form--editor" id="universal-card-form">
+            ${inlineCreateAction ? `
+              <div class="detail-form__lead-action">
+                <button class="button" type="submit">${existing ? "Uložiť" : cardCreateLabel(selectedType)}</button>
+              </div>
+            ` : ""}
             <div class="detail-grid">
               ${selectedType === "bird" ? `
                 <div class="field-block field-block--bird-name">
@@ -14719,15 +15245,9 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
                   >eBird</a>
                 </div>
                 <div class="field-block field-block--full field-block--bird-observation">
-                  <div class="field-block__inline-pair field-block__inline-pair--bird-observation">
-                    <label class="field-block__subfield">
-                      <span class="field-block__subfield-label">${escapeHtml(cardDateLabel(selectedType))}</span>
-                      ${renderDateInput({ id: "universal-card-date", name: "recordedAt", value: existing?.recordedAt || todayISO() })}
-                    </label>
-                    <label class="field-block__subfield">
-                      <span class="field-block__subfield-label">Miesto</span>
-                      <input name="birdPlace" type="text" value="${escapeAttribute(existing?.birdPlace || "")}" placeholder="Napr. kŕmidlo, jabloň, lúka za domom">
-                    </label>
+                  <div class="field-block__subfield">
+                    <span class="field-block__subfield-label">${escapeHtml(cardDateLabel(selectedType))}</span>
+                    ${renderDateInput({ id: "universal-card-date", name: "recordedAt", value: existing?.recordedAt || todayISO() })}
                   </div>
                   <div class="field-block__subfield field-block__subfield--bird-contact">
                     <span class="field-block__subfield-label">Ako bol vták zachytený</span>
@@ -14743,7 +15263,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               ` : `
                 <label class="field-block"><span>Názov</span><input name="name" type="text" value="${escapeAttribute(existing?.name || "")}" placeholder="${escapeAttribute(cardTypeLabel(selectedType))}" required></label>
                 <label class="field-block"><span>Kategória</span><select name="categoryId" required>${categoryOptions(selectedCategoryId, { cardTypeValue: selectedType })}</select></label>
-                <label class="field-block field-block--full"><span>${escapeHtml(cardDateLabel(selectedType))}</span>${renderDateInput({ id: "universal-card-date", name: "recordedAt", value: existing?.recordedAt || todayISO() })}</label>
+                <div class="field-block field-block--full"><span>${escapeHtml(cardDateLabel(selectedType))}</span>${renderDateInput({ id: "universal-card-date", name: "recordedAt", value: existing?.recordedAt || todayISO() })}</div>
               `}
               ${renderUniversalCardSpecificFields(selectedType, existing || {})}
             </div>
@@ -14751,9 +15271,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               <span>Poznámka</span>
               <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="Krátka poznámka, čo si chceš zapamätať...">${escapeHtml(existing?.notes || "")}</textarea>
             </label>
-            <label class="upload-field upload-field--compact">
-              <input name="imageFile" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple>
-            </label>
+            ${renderEditorImageUploadField({ multiple: true })}
             <div class="editor-gallery" id="variety-gallery-editor"></div>
             ${existing ? `
               <div class="danger-zone">
@@ -14775,6 +15293,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     const categorySelectEl = formEl?.elements.categoryId;
 
     enableMobileMediaPickerForInput(imageInput, { multiple: true });
+    bindEditorImageUploadShortcuts(detailContent);
 
     const syncPreview = () => {
       if (!draftImages.length) {
@@ -14817,7 +15336,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       gallery.innerHTML = draftImages.map((image, index) => `
             <article class="editor-gallery__mini ${index === 0 ? "is-primary" : ""} ${index === activeImageIndex ? "is-active" : ""}" draggable="true" data-drag-image="${index}" data-drop-image="${index}">
               <button class="editor-gallery__select" type="button" data-image-select="${index}" aria-label="Zobraziť fotku ${index + 1}">
-                <img class="editor-gallery__thumb" src="${escapeAttribute(image)}" alt="Fotka ${index + 1}">
+                <img class="editor-gallery__thumb" src="${escapeAttribute(image)}" alt="Fotka ${index + 1}" loading="lazy" decoding="async" fetchpriority="low">
                 ${index === 0 ? '<span class="editor-gallery__main-badge">hlavná</span>' : ""}
               </button>
               <button class="editor-gallery__remove" type="button" data-image-delete="${index}" aria-label="Vymazať fotku">×</button>
@@ -15143,7 +15662,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
         isPoisonous: wildPlantTraits.includes("poisonous"),
         birdSpeciesCode,
         birdLatinName: String(form.get("birdLatinName") || "").trim(),
-        birdPlace: String(form.get("birdPlace") || "").trim(),
+        birdPlace: "",
         birdExternalUrl,
         birdSource: normalizedBirdSource,
         birdContact: String(form.get("birdContact") || "").trim(),
@@ -15681,7 +16200,7 @@ function renderJournalItem(entry, deleteAttr, editAttr = "") {
         <div class="journal-item__gallery">
           ${images.slice(0, 4).map((image, index) => `
             <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(displayTitle)}">
-              <img src="${escapeAttribute(image)}" alt="${escapeAttribute(displayTitle)}">
+              ${renderJournalImageTag(image, displayTitle, { entryId: normalizedEntry.id, index })}
             </button>
           `).join("")}
           ${images.length > 4 ? `<span class="journal-item__more">+${images.length - 4}</span>` : ""}
@@ -15735,7 +16254,7 @@ function renderJournalManagerCard(entry, deleteAttr = "data-delete-worklog-journ
       ${images[0] ? `
         <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
           <button type="button" data-open-journal-image="${escapeAttribute(rawId)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(rawTitle)}" style="width:132px;height:132px;padding:0;border:1px solid rgba(122,103,74,0.14);border-radius:18px;overflow:hidden;background:#fff;cursor:pointer;">
-            <img src="${escapeAttribute(images[0])}" alt="${escapeAttribute(rawTitle)}" style="display:block;width:100%;height:100%;object-fit:cover;object-position:center;">
+            ${renderJournalImageTag(images[0], rawTitle, { entryId: rawId, index: 0, style: "display:block;width:100%;height:100%;object-fit:cover;object-position:center;" })}
           </button>
           ${images.length > 1 ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:52px;height:52px;padding:0 12px;border-radius:16px;background:rgba(255,248,221,0.94);border:1px solid rgba(186,155,90,0.32);color:#7f6324;font-weight:800;">+${images.length - 1}</span>` : ""}
         </div>
@@ -15791,7 +16310,7 @@ function renderJournalItemSimple(entry, deleteAttr = "", editAttr = "") {
       ${images[0] ? `
         <div class="journal-item__gallery">
           <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(displayTitle)}">
-            <img src="${escapeAttribute(images[0])}" alt="${escapeAttribute(displayTitle)}">
+            ${renderJournalImageTag(images[0], displayTitle, { entryId: normalizedEntry.id, index: 0 })}
           </button>
           ${images.length > 1 ? `<span class="journal-item__more">+${images.length - 1}</span>` : ""}
         </div>
@@ -15846,7 +16365,7 @@ function renderJournalItemEmergency(entry, deleteAttr = "", editAttr = "") {
       ${images[0] ? `
         <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
           <button type="button" data-open-journal-image="${escapeAttribute(normalizedEntry.id)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(displayTitle)}" style="width:132px;height:132px;padding:0;border:1px solid rgba(122,103,74,0.14);border-radius:18px;overflow:hidden;background:#fff;cursor:pointer;">
-            <img src="${escapeAttribute(images[0])}" alt="${escapeAttribute(displayTitle)}" style="display:block;width:100%;height:100%;object-fit:cover;object-position:center;">
+            ${renderJournalImageTag(images[0], displayTitle, { entryId: normalizedEntry.id, index: 0, style: "display:block;width:100%;height:100%;object-fit:cover;object-position:center;" })}
           </button>
           ${images.length > 1 ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:52px;height:52px;padding:0 12px;border-radius:16px;background:rgba(255,248,221,0.94);border:1px solid rgba(186,155,90,0.32);color:#7f6324;font-weight:800;">+${images.length - 1}</span>` : ""}
         </div>
@@ -15960,21 +16479,18 @@ function singleChoiceChipOptions(inputName, options = [], currentValue = "") {
   `).join("");
 }
 
-function placeChoiceOptions(currentValues = []) {
-  return choiceChipOptions("places", PLACE_OPTIONS, normalizePlaceList(currentValues));
-}
-
 function categoryOptions(current, options = {}) {
   const orderedForSelect = [
     ...orderedCategories().filter((item) => item.id !== FALLBACK_CATEGORY_ID),
     ...orderedCategories().filter((item) => item.id === FALLBACK_CATEGORY_ID)
   ];
   const requestedType = String(options?.cardTypeValue || "").trim();
+  const compactLabels = Boolean(options?.compactLabels);
   const resolvedCurrent = requestedType === "bird" && current === "cat-zvierata" && state.categories.some((item) => item.id === "cat-vtaky")
     ? "cat-vtaky"
     : current;
   if (!requestedType || requestedType === "variety") {
-    return orderedForSelect.map((item) => `<option value="${item.id}" ${item.id === resolvedCurrent ? "selected" : ""}>${escapeHtml(formattedCategoryOptionLabel(item))}</option>`).join("");
+    return orderedForSelect.map((item) => `<option value="${item.id}" ${item.id === resolvedCurrent ? "selected" : ""}>${escapeHtml(formattedCategoryOptionLabel(item, { compact: compactLabels }))}</option>`).join("");
   }
 
   const compatibleCategories = orderedForSelect.filter((item) => item.id !== FALLBACK_CATEGORY_ID && isCategoryCompatibleWithCardType(requestedType, item.id));
@@ -15984,7 +16500,7 @@ function categoryOptions(current, options = {}) {
     : compatibleCategories;
   const categoriesForSelect = filteredCategories.length ? filteredCategories : orderedForSelect;
 
-  return categoriesForSelect.map((item) => `<option value="${item.id}" ${item.id === resolvedCurrent ? "selected" : ""}>${escapeHtml(formattedCategoryOptionLabel(item))}</option>`).join("");
+  return categoriesForSelect.map((item) => `<option value="${item.id}" ${item.id === resolvedCurrent ? "selected" : ""}>${escapeHtml(formattedCategoryOptionLabel(item, { compact: compactLabels }))}</option>`).join("");
 }
 
 function orderedPickerCategories() {
@@ -16655,9 +17171,10 @@ function categoryDepth(categoryId) {
   return depth;
 }
 
-function formattedCategoryOptionLabel(category) {
+function formattedCategoryOptionLabel(category, options = {}) {
   const depth = categoryDepth(category.id);
   const name = String(category.name || "").trim();
+  if (options?.compact) return name;
   if (depth === 0) return `${name} [hlavná]`;
   if (depth === 1) return `    › ${name}`;
   return `${"      ".repeat(depth - 1)}·· ${name}`;
@@ -16687,12 +17204,6 @@ function breedingTypeOptions(current) {
     ["hybrid", "Hybridná F1"],
     ["open", "Nehybridná"]
   ].map(([value, label]) => `<option value="${value}" ${value === current ? "selected" : ""}>${label}</option>`).join("");
-}
-
-function placeLabel(value) {
-  const labels = Object.fromEntries(PLACE_OPTIONS.map((item) => [item.value, item.label]));
-  const places = normalizePlaceList(value);
-  return places.map((item) => labels[item] || item).join(" + ");
 }
 
 function nodeTypeLabel(value) {
@@ -16875,16 +17386,6 @@ function isPlaceholderImage(value) {
   return !value || String(value).startsWith("data:image/svg+xml");
 }
 
-function normalizePlaceList(value) {
-  const input = Array.isArray(value)
-    ? value
-    : typeof value === "string"
-      ? value.split(",")
-      : [];
-  const valid = new Set(PLACE_OPTIONS.map((item) => item.value));
-  return [...new Set(input.map((item) => String(item || "").trim()).filter((item) => valid.has(item)))];
-}
-
 function restoreSeedAssetImage(item) {
   const id = String(item?.id || "").trim();
   const match = id.match(/^var-cat-(papriky|rajciny)-(\d+)$/);
@@ -16898,11 +17399,6 @@ function restoreSeedCategoryImage(category) {
   if (id === "cat-papriky") return "assets/papriky/10.png";
   if (id === "cat-rajciny") return "assets/rajciny/10.png";
   return "";
-}
-
-function isDirectFieldOnly(item) {
-  const places = normalizePlaceList(item?.places?.length ? item.places : item?.place);
-  return places.length === 1 && places[0] === "pole";
 }
 
 function normalizeVarietyImages(item) {
@@ -16956,13 +17452,15 @@ function resolveDeferredVarietyCardImageSource(varietyId = "") {
   return variety ? primaryVarietyImage(variety) : "";
 }
 
-function activateDeferredVarietyCardImage(img) {
+async function activateDeferredVarietyCardImage(img) {
   if (!(img instanceof HTMLImageElement)) return;
   const varietyId = String(img.getAttribute("data-lazy-variety-image") || "").trim();
   if (!varietyId) return;
   const source = resolveDeferredVarietyCardImageSource(varietyId);
   if (!source) return;
-  img.src = source;
+  const previewSource = await resolvePreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  if (!img.isConnected) return;
+  img.src = previewSource || source;
   img.removeAttribute("data-lazy-variety-image");
   if (deferredVarietyCardImageObserver) {
     try {
@@ -17000,7 +17498,6 @@ function syncDeferredVarietyCardImages(root = document) {
 
 function normalizeVarietyRecord(item) {
   const images = normalizeVarietyImages(item);
-  const places = normalizePlaceList(item?.places?.length ? item.places : item?.place);
   const statusValues = varietyStatusValues(item);
   const mushroomEdibilityValues = normalizeTagList(item?.mushroomEdibilityValues?.length ? item.mushroomEdibilityValues : item?.mushroomEdibility);
   const mushroomGatheringValues = normalizeTagList(item?.mushroomGatheringValues?.length ? item.mushroomGatheringValues : item?.mushroomGathering);
@@ -17031,14 +17528,15 @@ function normalizeVarietyRecord(item) {
     affectedCategoryIds: [],
     affectedVarietyId: "",
     relatedCategoryId: "",
-    relatedCategoryIds: [],
-    relatedVarietyId: "",
-    ...item,
-    statusValues,
-    status: primaryStatusValue(statusValues) || String(item?.status || "").trim(),
-    places,
-    place: places[0] || "",
-    sowedAt: String(item?.sowedAt || "").trim(),
+      relatedCategoryIds: [],
+      relatedVarietyId: "",
+      ...item,
+      statusValues,
+      status: primaryStatusValue(statusValues) || String(item?.status || "").trim(),
+      place: "",
+      places: [],
+      birdPlace: "",
+      sowedAt: String(item?.sowedAt || "").trim(),
     transplantedAt: String(item?.transplantedAt || "").trim(),
     harvestedAt: String(item?.harvestedAt || "").trim(),
     mushroomEdibilityValues,
@@ -17198,7 +17696,18 @@ function categoryIllustrationPreset(category) {
 function categoryPlaceholderImage(category) {
   const preset = categoryIllustrationPreset(category);
   const label = categoryIllustrationLabel(preset?.label || category?.name || "Kategória");
-  return `data:image/svg+xml,${encodeURIComponent(`
+  const cacheKey = [
+    preset?.emoji || "",
+    preset?.accent || "",
+    preset?.bgStart || "",
+    preset?.bgEnd || "",
+    preset?.halo || "",
+    label
+  ].join("|");
+  if (categoryPlaceholderImageCache.has(cacheKey)) {
+    return categoryPlaceholderImageCache.get(cacheKey);
+  }
+  const placeholder = `data:image/svg+xml,${encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
       <defs>
         <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -17222,9 +17731,14 @@ function categoryPlaceholderImage(category) {
       <text x="400" y="630" text-anchor="middle" font-family="Trebuchet MS, Arial, sans-serif" font-size="24" fill="${preset.accent}" fill-opacity="0.74">dočasný ilustračný náhľad</text>
     </svg>
   `)}`;
+  categoryPlaceholderImageCache.set(cacheKey, placeholder);
+  return placeholder;
 }
 
 function cardPlaceholderImage(cardTypeValue = "variety") {
+  if (cardPlaceholderImageCache.has(cardTypeValue)) {
+    return cardPlaceholderImageCache.get(cardTypeValue);
+  }
   const presets = {
     variety: { emoji: ICONS.cardVariety, accent: "#7ca64b", bg: "#edf6e4", glow: "#d7eabf", label: "Odroda" },
     mushroom: { emoji: ICONS.cardMushroom, accent: "#a16d56", bg: "#f6ece7", glow: "#ecd9cf", label: "Huba alebo hríb" },
@@ -17235,7 +17749,7 @@ function cardPlaceholderImage(cardTypeValue = "variety") {
     "processing-recipe": { emoji: ICONS.cardRecipe, accent: "#c18d2f", bg: "#fbf1d8", glow: "#f0dfac", label: "Spracovanie" }
   };
   const preset = presets[cardTypeValue] || presets.variety;
-  return `data:image/svg+xml,${encodeURIComponent(`
+  const placeholder = `data:image/svg+xml,${encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
       <defs>
         <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -17264,6 +17778,8 @@ function cardPlaceholderImage(cardTypeValue = "variety") {
       <text x="400" y="616" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="${preset.accent}" fill-opacity="0.72">dočasný ilustračný náhľad</text>
     </svg>
   `)}`;
+  cardPlaceholderImageCache.set(cardTypeValue, placeholder);
+  return placeholder;
 }
 
 function categoryCardImage(category) {
@@ -17295,13 +17811,15 @@ function resolveDeferredCategoryCardImageSource(categoryId = "") {
   return category ? categoryCardImage(category) : "";
 }
 
-function activateDeferredCategoryCardImage(img) {
+async function activateDeferredCategoryCardImage(img) {
   if (!(img instanceof HTMLImageElement)) return;
   const categoryId = String(img.getAttribute("data-lazy-category-image") || "").trim();
   if (!categoryId) return;
   const source = resolveDeferredCategoryCardImageSource(categoryId);
   if (!source) return;
-  img.src = source;
+  const previewSource = await resolvePreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  if (!img.isConnected) return;
+  img.src = previewSource || source;
   img.removeAttribute("data-lazy-category-image");
   if (deferredCategoryCardImageObserver) {
     try {
@@ -17337,6 +17855,103 @@ function syncDeferredCategoryCardImages(root = document) {
   pendingImages.forEach((img) => activateDeferredCategoryCardImage(img));
 }
 
+function shouldDeferJournalImageSource(source = "") {
+  const normalized = String(source || "").trim();
+  if (!shouldUseMobileDeferredVarietyImages() || !normalized || isPlaceholderImage(normalized)) return false;
+  if (isRealMobileRuntimeMode()) return true;
+  return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
+}
+
+function deferredJournalImageRootMargin() {
+  if (isRealMobileRuntimeMode()) return "96px 0px";
+  return deferredCardImageRootMargin();
+}
+
+function renderJournalImageTag(source, altText, { entryId = "", index = 0, className = "", style = "" } = {}) {
+  const normalizedSource = String(source || "").trim();
+  if (!normalizedSource) return "";
+  const classAttribute = className ? ` class="${escapeAttribute(className)}"` : "";
+  const styleAttribute = style ? ` style="${escapeAttribute(style)}"` : "";
+  if (!shouldDeferJournalImageSource(normalizedSource)) {
+    return `<img src="${escapeAttribute(normalizedSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${classAttribute}${styleAttribute}>`;
+  }
+  return `<img src="${escapeAttribute(placeholderImage())}" data-lazy-journal-image-entry="${escapeAttribute(entryId)}" data-lazy-journal-image-index="${escapeAttribute(String(index))}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${classAttribute}${styleAttribute}>`;
+}
+
+function resolveDeferredJournalImageSource(entryId = "", imageIndex = 0) {
+  const normalizedEntryId = String(entryId || "").trim();
+  if (!normalizedEntryId) return "";
+  const entry = state.journal.find((item) => String(item?.id || "").trim() === normalizedEntryId);
+  if (!entry) return "";
+  const images = journalImages(entry);
+  if (!images.length) return "";
+  const normalizedIndex = Math.max(0, Number(imageIndex) || 0);
+  return images[normalizedIndex] || images[0] || "";
+}
+
+async function activateDeferredJournalImage(img) {
+  if (!(img instanceof HTMLImageElement)) return;
+  const entryId = String(img.getAttribute("data-lazy-journal-image-entry") || "").trim();
+  if (!entryId) return;
+  const imageIndex = Math.max(0, Number(img.getAttribute("data-lazy-journal-image-index") || 0) || 0);
+  const source = resolveDeferredJournalImageSource(entryId, imageIndex);
+  if (!source) return;
+  const previewSource = await resolvePreviewImageSource(source, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  if (!img.isConnected) return;
+  img.src = previewSource || source;
+  img.removeAttribute("data-lazy-journal-image-entry");
+  img.removeAttribute("data-lazy-journal-image-index");
+  if (deferredJournalImageObserver) {
+    try {
+      deferredJournalImageObserver.unobserve(img);
+    } catch (error) {
+      // Ignore stale observer detach errors.
+    }
+  }
+}
+
+function syncDeferredJournalImages(root = document, { eagerCount = 0 } = {}) {
+  if (!shouldUseMobileDeferredVarietyImages()) return;
+  const pendingImages = [...root.querySelectorAll("img[data-lazy-journal-image-entry]")];
+  if (!pendingImages.length) return;
+
+  const immediateCount = Math.max(
+    0,
+    Math.min(
+      pendingImages.length,
+      Number.isFinite(Number(eagerCount))
+        ? Number(eagerCount)
+        : (isRealMobileRuntimeMode() ? 2 : 0)
+    )
+  );
+
+  if (immediateCount > 0) {
+    pendingImages.slice(0, immediateCount).forEach((img) => activateDeferredJournalImage(img));
+  }
+
+  const remainingImages = pendingImages.filter((img) => img.hasAttribute("data-lazy-journal-image-entry"));
+  if (!remainingImages.length) return;
+
+  if ("IntersectionObserver" in window) {
+    if (!deferredJournalImageObserver) {
+      deferredJournalImageObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          activateDeferredJournalImage(entry.target);
+        });
+      }, {
+        root: null,
+        rootMargin: deferredJournalImageRootMargin(),
+        threshold: 0.01
+      });
+    }
+    remainingImages.forEach((img) => deferredJournalImageObserver.observe(img));
+    return;
+  }
+
+  remainingImages.forEach((img) => activateDeferredJournalImage(img));
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -17350,6 +17965,62 @@ function isProcessableImageDataUrl(value) {
   return typeof value === "string"
     && value.startsWith("data:image/")
     && !value.startsWith("data:image/svg+xml");
+}
+
+function shouldDerivePreviewImageSource(source = "") {
+  const normalized = String(source || "").trim();
+  return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
+}
+
+async function resolvePreviewImageSource(source = "", maxDimension = LIST_IMAGE_PREVIEW_MAX_DIMENSION, quality = 0.72) {
+  const normalized = String(source || "").trim();
+  if (!shouldDerivePreviewImageSource(normalized)) return normalized;
+
+  const safeMaxDimension = Math.max(160, Number(maxDimension) || LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  const cacheKey = `${safeMaxDimension}|${normalized}`;
+  if (derivedPreviewImageCache.has(cacheKey)) {
+    return derivedPreviewImageCache.get(cacheKey);
+  }
+  if (derivedPreviewImagePromiseCache.has(cacheKey)) {
+    return derivedPreviewImagePromiseCache.get(cacheKey);
+  }
+
+  const promise = new Promise((resolve) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      try {
+        const scale = Math.min(1, safeMaxDimension / Math.max(image.width || 1, image.height || 1));
+        const width = Math.max(1, Math.round((image.width || 1) * scale));
+        const height = Math.max(1, Math.round((image.height || 1) * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          resolve(normalized);
+          return;
+        }
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch (error) {
+        resolve(normalized);
+      }
+    };
+    image.onerror = () => resolve(normalized);
+    image.src = normalized;
+  }).then((resolved) => {
+    derivedPreviewImagePromiseCache.delete(cacheKey);
+    derivedPreviewImageCache.set(cacheKey, resolved);
+    if (derivedPreviewImageCache.size > 160) {
+      const oldestKey = derivedPreviewImageCache.keys().next().value;
+      if (oldestKey) derivedPreviewImageCache.delete(oldestKey);
+    }
+    return resolved;
+  });
+
+  derivedPreviewImagePromiseCache.set(cacheKey, promise);
+  return promise;
 }
 
 function isLightBackgroundPixel(data, index) {
@@ -17723,8 +18394,11 @@ function updateMenuVisibility() {
   if (mainMenuQuickEl) {
     mainMenuQuickEl.hidden = !isFocusedView;
   }
-  if (batchMenuQuickEl) {
-    batchMenuQuickEl.hidden = !state.varieties.length;
+  if (batchSowingQuickEl) {
+    batchSowingQuickEl.hidden = !state.varieties.length;
+  }
+  if (batchMoveQuickEl) {
+    batchMoveQuickEl.hidden = !state.varieties.length;
   }
   updateCatalogHeader();
   syncMobileToolbarScrollState();
@@ -18309,6 +18983,7 @@ async function supabaseSignOut() {
   if (error) {
     throw new Error(error.message || "Cloud odhlásenie sa nepodarilo.");
   }
+  supabaseResolvedImageUrlCache.clear();
   clearSupabaseAuthMirror();
 }
 
@@ -18539,6 +19214,10 @@ async function resolveSupabaseStorageImage(client, source = "") {
   const normalized = String(source || "").trim();
   if (!normalized) return "";
   if (isDirectRenderableImageSource(normalized)) return normalized;
+  const cached = supabaseResolvedImageUrlCache.get(normalized);
+  if (cached && cached.expiresAt > Date.now() && String(cached.url || "").trim()) {
+    return cached.url;
+  }
 
   const { data, error } = await client.storage
     .from(SUPABASE_IMAGE_BUCKET)
@@ -18548,7 +19227,18 @@ async function resolveSupabaseStorageImage(client, source = "") {
     console.warn("Nepodarilo sa pripraviť podpísaný obrázok zo storage", normalized, error);
     return "";
   }
-  return String(data?.signedUrl || "").trim();
+  const resolvedUrl = String(data?.signedUrl || "").trim();
+  if (resolvedUrl) {
+    supabaseResolvedImageUrlCache.set(normalized, {
+      url: resolvedUrl,
+      expiresAt: Date.now() + SUPABASE_SIGNED_IMAGE_CACHE_MS
+    });
+    if (supabaseResolvedImageUrlCache.size > 240) {
+      const oldestKey = supabaseResolvedImageUrlCache.keys().next().value;
+      if (oldestKey) supabaseResolvedImageUrlCache.delete(oldestKey);
+    }
+  }
+  return resolvedUrl;
 }
 
 async function resolveSupabaseStorageImages(client, values = []) {
@@ -18653,8 +19343,8 @@ async function syncStateToSupabase() {
       detail_type: String(card?.type || "").trim(),
       status: String(card?.status || "").trim(),
       notes: String(card?.notes || "").trim(),
-      place: String(card?.place || "").trim(),
-      places: Array.isArray(card?.places) ? card.places : [],
+      place: "",
+      places: [],
       top: Boolean(card?.top),
       rating: Number.isFinite(Number(card?.rating)) ? Number(card.rating) : 0,
       image_path: syncedImages[0] || "",
@@ -18718,7 +19408,7 @@ async function syncStateToSupabase() {
       entry_type: String(entry?.entryType || "note").trim() || "note",
       entry_at: safeSupabaseTimestamp(entry?.date),
       mood: String(entry?.mood || "").trim(),
-      place: String(entry?.place || "").trim(),
+      place: "",
       tags: Array.isArray(entry?.tags) ? entry.tags : [],
       weather: entry?.weather && typeof entry.weather === "object" ? entry.weather : {},
       linked_category_ids: Array.isArray(entry?.linkedCategoryIds) ? entry.linkedCategoryIds : [],
@@ -18900,8 +19590,8 @@ async function importStateFromSupabase() {
       type: String(row?.detail_type || fallbackData.type || "").trim(),
       status: String(row?.status || fallbackData.status || "").trim(),
       notes: String(row?.notes || fallbackData.notes || "").trim(),
-      place: String(row?.place || fallbackData.place || "").trim(),
-      places: Array.isArray(row?.places) ? row.places : (Array.isArray(fallbackData.places) ? fallbackData.places : []),
+      place: "",
+      places: [],
       top: row?.top === undefined ? Boolean(fallbackData.top) : Boolean(row.top),
       rating: Number.isFinite(Number(row?.rating)) ? Number(row.rating) : Number(fallbackData.rating || 0),
       image: finalImages[0] || "",
@@ -18956,7 +19646,7 @@ async function importStateFromSupabase() {
       date: String(row?.entry_at || fallbackData.date || "").trim(),
       entryType: String(row?.entry_type || fallbackData.entryType || "note").trim() || "note",
       mood: String(row?.mood || fallbackData.mood || "").trim(),
-      place: String(row?.place || fallbackData.place || "").trim(),
+      place: "",
       tags: Array.isArray(row?.tags) ? row.tags : (Array.isArray(fallbackData.tags) ? fallbackData.tags : []),
       weather: row?.weather && typeof row.weather === "object" ? row.weather : (fallbackData.weather && typeof fallbackData.weather === "object" ? fallbackData.weather : null),
       linkedCategoryIds,
@@ -20699,6 +21389,12 @@ async function refreshHomeWeatherCard() {
   const [snapshot, trend] = await Promise.all([loadHomeWeatherSnapshot(), loadHomeWeatherTrend()]);
   if (!snapshot) return;
   applyMobileWeatherTheme(snapshot);
+  const titleEl = card.querySelector("[data-home-weather-title]");
+  if (titleEl) {
+    const weatherPreferences = loadWeatherPreferences();
+    const weatherCardPlace = String(snapshot.placeLabel || weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).split(",")[0].trim() || "Záhrada";
+    titleEl.textContent = `${weatherCardPlace} dnes`;
+  }
   const bodyEl = card.querySelector("[data-home-weather-body]");
   if (bodyEl) bodyEl.innerHTML = renderHomeWeatherCardMarkup(snapshot, trend || homeWeatherTrend || []);
   bindWeatherOverviewTriggers(card);
@@ -20716,13 +21412,6 @@ async function refreshHomeWeatherCard() {
 function renderDateInput({ id, name, value = "", required = false }) {
   return `
     <div class="date-input-wrap">
-      <button
-        class="date-input-wrap__trigger"
-        type="button"
-        data-date-trigger="${escapeAttribute(id)}"
-        aria-label="Otvoriť kalendár"
-        title="Vybrať dátum"
-      ></button>
       <input
         class="date-input"
         id="${escapeAttribute(id)}"
@@ -20746,6 +21435,20 @@ function formatInputDate(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function openDateInputPicker(input) {
+  if (!(input instanceof HTMLInputElement)) return;
+  if (typeof input.showPicker === "function") {
+    try {
+      input.showPicker();
+      return;
+    } catch (error) {
+      // Fall back to native focus/click below.
+    }
+  }
+  input.focus({ preventScroll: true });
+  input.click();
 }
 
 function escapeHtml(value) {
