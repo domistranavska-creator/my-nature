@@ -1321,7 +1321,9 @@
       this.volumeRaf = 0;
       this.volumeTimer = 0;
       this.lastFrameTs = 0;
+      this.autoActivationBound = false;
       this.handleUserActivation = this.handleUserActivation.bind(this);
+      this.handleAutoActivationGesture = this.handleAutoActivationGesture.bind(this);
       this.stepMix = this.stepMix.bind(this);
       this.bindUserActivation();
       if (typeof window !== "undefined") {
@@ -1330,11 +1332,36 @@
     }
 
     bindUserActivation() {
-      // Zvuk sa odomyka iba po vedomom kliknuti na jeho ovladanie.
+      if (!this.lowPerformanceMobile || typeof window === "undefined" || typeof document === "undefined" || this.autoActivationBound) return;
+      window.addEventListener("pointerdown", this.handleAutoActivationGesture, { passive: true });
+      window.addEventListener("touchstart", this.handleAutoActivationGesture, { passive: true });
+      window.addEventListener("keydown", this.handleAutoActivationGesture);
+      this.autoActivationBound = true;
     }
 
     unbindUserActivation() {
-      // Globalne auto-activation listenery uz nepouzivame.
+      if (!this.autoActivationBound || typeof window === "undefined") return;
+      window.removeEventListener("pointerdown", this.handleAutoActivationGesture);
+      window.removeEventListener("touchstart", this.handleAutoActivationGesture);
+      window.removeEventListener("keydown", this.handleAutoActivationGesture);
+      this.autoActivationBound = false;
+    }
+
+    handleAutoActivationGesture(event) {
+      if (!this.lowPerformanceMobile || !this.enabled || !this.supported || this.activated) return;
+      const hasPendingSoundscape = Boolean(
+        this.lastInput
+        || (this.lastActiveMix && Object.keys(this.lastActiveMix.activeLayers || {}).length)
+      );
+      if (!hasPendingSoundscape) return;
+      if (String(event?.type || "") === "keydown") {
+        const key = String(event?.key || "");
+        if (key && !["Enter", " ", "Spacebar"].includes(key)) return;
+      }
+      const activationPromise = this.handleUserActivation();
+      if (activationPromise && typeof activationPromise.catch === "function") {
+        activationPromise.catch(() => {});
+      }
     }
 
     setDebug(enabled) {
@@ -1390,6 +1417,7 @@
       if (this.preferDirectAudio) {
         if (this.lastInput) {
           this.apply(this.lastInput);
+          this.primeActiveLoopPlayback(this.lastActiveMix);
         } else {
           this.startMixLoop();
         }
@@ -1405,6 +1433,7 @@
       }
       if (this.lastInput) {
         this.apply(this.lastInput);
+        this.primeActiveLoopPlayback(this.lastActiveMix);
       } else {
         this.startMixLoop();
       }
@@ -1446,6 +1475,26 @@
         : asArray(layerKeys);
       keys.forEach((layerKey) => {
         this.ensureLoopLayer(layerKey);
+      });
+    }
+
+    primeActiveLoopPlayback(activeMix = null) {
+      if (!this.activated || !this.enabled) return;
+      const resolvedMix = activeMix?.activeLayers ? activeMix : this.lastActiveMix;
+      const activeLayers = resolvedMix?.activeLayers || {};
+      Object.keys(activeLayers).forEach((layerKey) => {
+        const targetGain = Number(activeLayers[layerKey]) || 0;
+        if (targetGain <= 0.002) return;
+        const layer = this.ensureLoopLayer(layerKey);
+        if (!layer?.audio || !layer.audio.paused) return;
+        try {
+          const playPromise = layer.audio.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {});
+          }
+        } catch (error) {
+          // Keď mobil ešte blokuje autoplay, ďalšie gesto to môže skúsiť znova.
+        }
       });
     }
 

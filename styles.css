@@ -26328,7 +26328,7 @@ body.app-mobile-shell .mobile-bottom-nav {
   height: auto !important;
   align-items: stretch !important;
   gap: 0 !important;
-  padding: 10px 12px !important;
+  padding: 8px 12px !important;
   background: rgba(255, 255, 255, 0.95) !important;
   border: 1px solid rgba(125, 140, 153, 0.12) !important;
   border-radius: 28px !important;
@@ -26351,14 +26351,14 @@ body.app-mobile-shell .mobile-bottom-nav__button {
   min-width: 0 !important;
   max-width: none !important;
   height: auto !important;
-  min-height: 54px !important;
+  min-height: 50px !important;
   max-height: none !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 5px !important;
-  padding: 6px 4px 2px !important;
+  gap: 4px !important;
+  padding: 5px 4px 1px !important;
   border-radius: 16px !important;
   border: 0 !important;
   background: transparent !important;
@@ -26420,17 +26420,17 @@ body.app-mobile-shell .mobile-bottom-nav__icon--search {
 }
 
 body.app-mobile-shell .mobile-bottom-nav__button--camera {
-  width: 52px !important;
-  min-width: 52px !important;
-  max-width: 52px !important;
-  height: 52px !important;
-  min-height: 52px !important;
-  max-height: 52px !important;
+  width: 46px !important;
+  min-width: 46px !important;
+  max-width: 46px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
   justify-self: center !important;
   align-self: center !important;
   padding: 0 !important;
   gap: 0 !important;
-  margin-top: -4px !important;
+  margin-top: -2px !important;
   margin-bottom: 0 !important;
   border-radius: 999px !important;
   border: 1px solid rgba(255, 255, 255, 0.22) !important;
@@ -26446,7 +26446,7 @@ body.app-mobile-shell .mobile-bottom-nav__button--camera .mobile-bottom-nav__ico
   -webkit-mask-image: none !important;
   mask-image: none !important;
   position: static !important;
-  font-size: 1.5rem !important;
+  font-size: 1.3rem !important;
   font-weight: 300 !important;
   line-height: 1 !important;
 }
@@ -38187,4 +38187,4684 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-car
   contain: none !important;
   content-visibility: visible !important;
   contain-intrinsic-size: 0 0 !important;
+}
+
+/* Mobile compact rebuild:
+   globalne zhustenie mobilu, menej "air", rychlejsie listy a kompaktnejsie pocasie. */
+body.app-mobile-shell {
+  --mobile-compact-space-1: 4px;
+  --mobile-compact-space-2: 6px;
+  --mobile-compact-space-3: 8px;
+  --mobile-compact-space-4: 10px;
+  --mobile-compact-space-5: 12px;
+  --mobile-compact-space-6: 14px;
+  --mobile-compact-radius: 16px;
+  --mobile-compact-radius-lg: 18px;
+  --mobile-compact-control-h: 44px;
+  --mobile-compact-chip-h: 28px;
+}
+
+body.app-mobile-shell .content {
+  padding: 0 10px calc(12px + env(safe-area-inset-bottom)) !important;
+}
+
+body.app-mobile-shell .hero {
+  padding: 8px 10px 12px !important;
+}
+
+body.app-mobile-shell .hero__content,
+body.app-mobile-shell .hero__content--with-weather {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .hero__text {
+  width: min(100%, 272px) !important;
+  min-height: 60px !important;
+  padding: 8px 12px !important;
+  border-radius: var(--mobile-compact-radius-lg) !important;
+}
+
+body.app-mobile-shell .hero h1 {
+  font-size: clamp(1.48rem, 6.8vw, 1.86rem) !important;
+  line-height: 0.96 !important;
+}
+
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .menu-toolbar,
+body.app-mobile-shell .utility-bar__settings,
+body.app-mobile-shell .menu-toolbar__group--primary,
+body.app-mobile-shell .menu-toolbar__group--settings {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .toolbar-search__field,
+body.app-mobile-shell .button--toolbar-home,
+body.app-mobile-shell .button--toolbar-add,
+body.app-mobile-shell .button--toolbar-utility,
+body.app-mobile-shell .toolbar-add-menu__summary,
+body.app-mobile-shell .button:not(.detail-modal__close):not(.journal-overlay-shell__close):not(.detail-modal__back):not(.image-lightbox__back):not(.journal-item__action):not(.gallery-nav) {
+  min-height: var(--mobile-compact-control-h) !important;
+  border-radius: var(--mobile-compact-radius) !important;
+  padding-inline: 14px !important;
+  font-size: 0.92rem !important;
+}
+
+body.app-mobile-shell .button.button--small,
+body.app-mobile-shell .button.button--ghost.button--small,
+body.app-mobile-shell .mini-list__more,
+body.app-mobile-shell .mini-list__more--inline {
+  min-height: 34px !important;
+  padding-inline: 12px !important;
+  font-size: 0.8rem !important;
+}
+
+body.app-mobile-shell .tag,
+body.app-mobile-shell .choice-chip span,
+body.app-mobile-shell .entry-mode-switch__button,
+body.app-mobile-shell .journal-tag-filter__chip,
+body.app-mobile-shell .journal-tag-picker__chip {
+  min-height: var(--mobile-compact-chip-h) !important;
+  padding-inline: 10px !important;
+  font-size: 0.76rem !important;
+}
+
+body.app-mobile-shell .checkbox-row input,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item input {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+}
+
+body.app-mobile-shell input,
+body.app-mobile-shell textarea,
+body.app-mobile-shell select {
+  border-radius: 14px !important;
+  font-size: 0.92rem !important;
+}
+
+body.app-mobile-shell textarea {
+  min-height: 88px !important;
+}
+
+body.app-mobile-shell .panel,
+body.app-mobile-shell .season-card,
+body.app-mobile-shell .home-card,
+body.app-mobile-shell .home-section,
+body.app-mobile-shell .progress-card,
+body.app-mobile-shell .journal-disclosure,
+body.app-mobile-shell .worklog-section,
+body.app-mobile-shell .sidebar-preview-card,
+body.app-mobile-shell .settings-panel,
+body.app-mobile-shell .settings-hero,
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell .subcatalog,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .detail-modal--weather .weather-overview__hero,
+body.app-mobile-shell .detail-modal--weather .weather-overview__external,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group {
+  border-radius: var(--mobile-compact-radius-lg) !important;
+}
+
+body.app-mobile-shell .panel {
+  padding: 12px !important;
+  margin-bottom: 10px !important;
+}
+
+body.app-mobile-shell .panel--menu {
+  padding: 10px !important;
+}
+
+body.app-mobile-shell .season-card,
+body.app-mobile-shell .home-card,
+body.app-mobile-shell .home-section,
+body.app-mobile-shell .progress-card,
+body.app-mobile-shell .journal-disclosure,
+body.app-mobile-shell .worklog-section,
+body.app-mobile-shell .sidebar-preview-card,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .journal-overlay-group {
+  padding: 12px !important;
+}
+
+body.app-mobile-shell .season-card__head,
+body.app-mobile-shell .home-card__head,
+body.app-mobile-shell .home-section__header,
+body.app-mobile-shell .worklog-section__head,
+body.app-mobile-shell .journal-disclosure__summary,
+body.app-mobile-shell .journal-tag-filter__head {
+  margin-bottom: 8px !important;
+}
+
+body.app-mobile-shell .eyebrow {
+  font-size: 0.62rem !important;
+  letter-spacing: 0.12em !important;
+}
+
+body.app-mobile-shell .catalog-grid--main-menu {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  justify-items: stretch !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card {
+  max-width: none !important;
+  border-radius: var(--mobile-compact-radius-lg) !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
+  margin: 10px 10px 0 !important;
+  padding: 6px !important;
+  aspect-ratio: 1 / 0.8 !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
+  padding: 10px 10px 12px !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
+  font-size: 1rem !important;
+  line-height: 1.06 !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
+  min-height: 0 !important;
+  padding: 0 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.25 !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories {
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell.app-focused-mode .catalog-card--child {
+  border-radius: var(--mobile-compact-radius-lg) !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__image,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image {
+  margin: 10px 10px 0 !important;
+  padding: 6px !important;
+  min-height: 92px !important;
+  aspect-ratio: 1 / 0.84 !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__body,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__body {
+  padding: 10px 10px 12px !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__title--body,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__title--body {
+  font-size: 1rem !important;
+  line-height: 1.08 !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__count,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__count {
+  font-size: 0.72rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry {
+  border-radius: var(--mobile-compact-radius-lg) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__main-hit,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety > .catalog-card__main-hit {
+  grid-template-rows: 112px auto minmax(0, 1fr) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image {
+  min-height: 112px !important;
+  height: 112px !important;
+  max-height: 112px !important;
+  margin: 8px 8px 0 !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__body,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__body,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__body {
+  padding: 4px 8px 8px !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__quick {
+  gap: 4px !important;
+  margin-top: 4px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__meta,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__note-preview {
+  font-size: 0.73rem !important;
+  line-height: 1.22 !important;
+}
+
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell.app-focused-mode .category-panel--summary {
+  padding: 12px !important;
+}
+
+body.app-mobile-shell .category-panel__hero,
+body.app-mobile-shell.app-focused-mode .category-panel__hero {
+  gap: 8px !important;
+  padding: 12px !important;
+}
+
+body.app-mobile-shell .category-panel__title-row,
+body.app-mobile-shell.app-focused-mode .category-panel__title-row {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .category-panel__notes,
+body.app-mobile-shell.app-focused-mode .category-panel__notes {
+  font-size: 0.84rem !important;
+  line-height: 1.35 !important;
+}
+
+body.app-mobile-shell .category-panel__chips,
+body.app-mobile-shell .category-panel__chips--actions,
+body.app-mobile-shell.app-focused-mode .category-panel__chips,
+body.app-mobile-shell.app-focused-mode .category-panel__chips--actions {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .task-stack,
+body.app-mobile-shell .journal-list,
+body.app-mobile-shell .mini-list,
+body.app-mobile-shell .progress-card__task-stack,
+body.app-mobile-shell .batch-sowing__list {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .task-item,
+body.app-mobile-shell .journal-item,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item {
+  padding: 10px 12px !important;
+  border-radius: var(--mobile-compact-radius) !important;
+}
+
+body.app-mobile-shell .task-item__header,
+body.app-mobile-shell .journal-item__header,
+body.app-mobile-shell .journal-overlay-card__header {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .task-item__actions,
+body.app-mobile-shell .journal-item__actions,
+body.app-mobile-shell .journal-overlay-card__actions {
+  gap: 4px !important;
+}
+
+body.app-mobile-shell .journal-item__action {
+  width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+}
+
+body.app-mobile-shell .task-item__title,
+body.app-mobile-shell .journal-item__title,
+body.app-mobile-shell .journal-overlay-card__title {
+  font-size: 0.98rem !important;
+  line-height: 1.18 !important;
+}
+
+body.app-mobile-shell .task-item__meta,
+body.app-mobile-shell .journal-item__meta,
+body.app-mobile-shell .journal-overlay-card__text {
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+}
+
+body.app-mobile-shell .task-item__date-badge,
+body.app-mobile-shell .journal-item__date-badge,
+body.app-mobile-shell .task-item__done-badge {
+  min-height: 28px !important;
+  padding-inline: 10px !important;
+  font-size: 0.74rem !important;
+}
+
+body.app-mobile-shell .journal-item__chips,
+body.app-mobile-shell .journal-overlay-card__chips {
+  gap: 5px !important;
+}
+
+body.app-mobile-shell .journal-item__chips .tag,
+body.app-mobile-shell .journal-overlay-card__chips .tag {
+  font-size: 0.72rem !important;
+}
+
+body.app-mobile-shell .journal-item__gallery,
+body.app-mobile-shell .journal-overlay-card__gallery,
+body.app-mobile-shell .journal-item__gallery--manager-compact,
+body.app-mobile-shell .journal-overlay-card__gallery--compact-list {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .journal-item__image,
+body.app-mobile-shell .journal-overlay-card__gallery .journal-item__image {
+  width: 84px !important;
+  height: 84px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .journal-item__gallery--manager-compact .journal-item__image,
+body.app-mobile-shell .journal-overlay-card__gallery--compact-list .journal-item__image {
+  width: 76px !important;
+  height: 76px !important;
+}
+
+body.app-mobile-shell .journal-item__more {
+  min-width: 34px !important;
+  height: 34px !important;
+  font-size: 0.74rem !important;
+}
+
+body.app-mobile-shell .journal-item--manager-compact,
+body.app-mobile-shell .journal-overlay-card--compact-list {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy--editor,
+body.app-mobile-shell .worklog-manager.detail-copy--wide,
+body.app-mobile-shell .weather-overview.detail-copy--wide,
+body.app-mobile-shell .overview-manager.detail-copy--wide,
+body.app-mobile-shell .category-manager.detail-copy--wide,
+body.app-mobile-shell .batch-sowing-manager.detail-copy--wide,
+body.app-mobile-shell .settings-sheet,
+body.app-mobile-shell .settings-hero,
+body.app-mobile-shell .settings-panel,
+body.app-mobile-shell .journal-overlay-shell__body {
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .journal-overlay-frame__head,
+body.app-mobile-shell .journal-overlay-mobile-actions {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline {
+  padding: 6px 46px 8px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline h3,
+body.app-mobile-shell .journal-overlay-frame__title-block h3,
+body.app-mobile-shell #journal-overlay-title {
+  font-size: clamp(1.42rem, 6.4vw, 1.78rem) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__actions .button,
+body.app-mobile-shell .journal-overlay-frame__actions > .button,
+body.app-mobile-shell .journal-overlay-mobile-actions > #journal-overlay-submit,
+body.app-mobile-shell .batch-sowing__toolbar .button,
+body.app-mobile-shell .worklog-task-editor__actions .button {
+  min-height: 38px !important;
+  padding-inline: 12px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-grid,
+body.app-mobile-shell .detail-modal--editor .detail-grid > .field-block,
+body.app-mobile-shell .detail-modal--editor .detail-grid > .field-block--full,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor > label.field-block--full,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor > .upload-field--compact,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor > .danger-zone,
+body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter,
+body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__selection-card {
+  padding: 10px !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-top-row,
+body.app-mobile-shell .detail-modal--editor .status-date-row,
+body.app-mobile-shell .detail-modal--editor .field-block__inline-pair,
+body.app-mobile-shell .settings-panel__actions,
+body.app-mobile-shell .batch-sowing__selection-head,
+body.app-mobile-shell .batch-sowing__toolbar,
+body.app-mobile-shell .worklog-task-editor__actions {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--status .choice-chip span,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--compact-meta .choice-chip span {
+  min-height: 32px !important;
+  padding-inline: 10px !important;
+  font-size: 0.78rem !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item {
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .batch-sowing__copy strong {
+  font-size: 0.9rem !important;
+}
+
+body.app-mobile-shell .batch-sowing__copy small,
+body.app-mobile-shell .batch-sowing__summary {
+  font-size: 0.78rem !important;
+  line-height: 1.3 !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini__meta--inline {
+  margin: 4px 0 0 !important;
+  font-size: 0.74rem !important;
+  line-height: 1.28 !important;
+  color: #596553 !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__card,
+body.app-mobile-shell .home-weather-box .main-menu-weather-mini__card,
+body.app-mobile-shell .add-entry-form__weather--head .main-menu-weather-mini__card {
+  border-radius: var(--mobile-compact-radius-lg) !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__inner,
+body.app-mobile-shell .home-weather-box .main-menu-weather-mini__inner,
+body.app-mobile-shell .add-entry-form__weather--head .main-menu-weather-mini__inner {
+  padding: 10px 12px !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview.detail-copy--wide {
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__hero,
+body.app-mobile-shell .detail-modal--weather .weather-overview__external,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group {
+  padding: 12px !important;
+}
+
+body.app-mobile-shell .weather-overview__hero-days {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .weather-overview__hero-day,
+body.app-mobile-shell .weather-week-switcher__tab {
+  min-width: 96px !important;
+  padding: 8px 10px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .weather-overview__hero-day-main strong {
+  font-size: 1rem !important;
+}
+
+body.app-mobile-shell .weather-overview__hero-day-meta,
+body.app-mobile-shell .weather-overview__hero-day-meta > * {
+  font-size: 0.72rem !important;
+}
+
+body.app-mobile-shell .weather-week-switcher__tabs {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .weather-week-switcher__tab-title {
+  font-size: 0.82rem !important;
+}
+
+body.app-mobile-shell .weather-week-switcher__tab-range {
+  font-size: 0.68rem !important;
+}
+
+body.app-mobile-shell .weather-week-card--compact-list {
+  padding: 10px !important;
+  border-radius: var(--mobile-compact-radius) !important;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(244, 238, 228, 0.94)) !important;
+  border: 1px solid rgba(129, 110, 84, 0.14) !important;
+  box-shadow:
+    0 10px 22px rgba(53, 44, 29, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+}
+
+body.app-mobile-shell .weather-week-card__head--compact-list {
+  display: grid !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell .weather-week-card__inline-summary {
+  margin: 0 !important;
+  font-size: 0.76rem !important;
+  line-height: 1.3 !important;
+  color: #5d6957 !important;
+}
+
+body.app-mobile-shell .weather-week-rows {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .weather-week-row {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 9px 10px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.56) !important;
+  border: 1px solid rgba(133, 115, 89, 0.1) !important;
+}
+
+body.app-mobile-shell .weather-week-row.is-today {
+  background: rgba(249, 246, 220, 0.72) !important;
+}
+
+body.app-mobile-shell .weather-week-row__top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .weather-week-row__day {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .weather-week-row__day strong {
+  font-size: 0.92rem !important;
+  color: #1d2717 !important;
+}
+
+body.app-mobile-shell .weather-week-row__day span {
+  font-size: 0.72rem !important;
+  color: #66715f !important;
+}
+
+body.app-mobile-shell .weather-week-row__today {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 22px !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  background: rgba(140, 176, 89, 0.18) !important;
+  color: #516734 !important;
+  font-weight: 800 !important;
+}
+
+body.app-mobile-shell .weather-week-row__main {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+body.app-mobile-shell .weather-week-row__icon {
+  font-size: 1rem !important;
+  line-height: 1 !important;
+}
+
+body.app-mobile-shell .weather-week-row__temps {
+  font-size: 0.9rem !important;
+  color: #1f2918 !important;
+}
+
+body.app-mobile-shell .weather-week-row__meta {
+  font-size: 0.74rem !important;
+  line-height: 1.26 !important;
+  color: #5c6857 !important;
+}
+
+body.app-mobile-shell .weather-week-row__flags {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 5px !important;
+}
+
+body.app-mobile-shell .weather-week-row__flag {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 22px !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+}
+
+body.app-mobile-shell .weather-week-row__flag--rain {
+  background: rgba(134, 180, 214, 0.18) !important;
+  color: #325470 !important;
+}
+
+body.app-mobile-shell .weather-week-row__flag--storm {
+  background: rgba(157, 124, 197, 0.16) !important;
+  color: #5c447b !important;
+}
+
+body.app-mobile-shell .weather-week-row__flag--frost {
+  background: rgba(173, 208, 228, 0.18) !important;
+  color: #345f73 !important;
+}
+
+body.app-mobile-shell .weather-week-row__flag--heat {
+  background: rgba(243, 200, 126, 0.22) !important;
+  color: #765019 !important;
+}
+
+body.app-mobile-shell .weather-week-row__flag--wind {
+  background: rgba(192, 221, 176, 0.24) !important;
+  color: #496035 !important;
+}
+
+/* Mobile compact rebuild v2:
+   este vyraznejsie zhustenie po prvom prechode. */
+body.app-mobile-shell {
+  --mobile-compact-control-h: 40px;
+  --mobile-compact-chip-h: 24px;
+}
+
+body.app-mobile-shell .content {
+  padding: 0 8px calc(10px + env(safe-area-inset-bottom)) !important;
+}
+
+body.app-mobile-shell .hero {
+  padding: 6px 8px 8px !important;
+}
+
+body.app-mobile-shell .hero__content,
+body.app-mobile-shell .hero__content--with-weather {
+  gap: 4px !important;
+}
+
+body.app-mobile-shell .hero__text {
+  width: min(100%, 240px) !important;
+  min-height: 50px !important;
+  padding: 6px 10px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .hero h1 {
+  font-size: clamp(1.28rem, 6vw, 1.58rem) !important;
+  line-height: 0.98 !important;
+}
+
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .menu-toolbar,
+body.app-mobile-shell .utility-bar__settings,
+body.app-mobile-shell .menu-toolbar__group--primary,
+body.app-mobile-shell .menu-toolbar__group--settings {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .toolbar-search__field,
+body.app-mobile-shell .button--toolbar-home,
+body.app-mobile-shell .button--toolbar-add,
+body.app-mobile-shell .button--toolbar-utility,
+body.app-mobile-shell .toolbar-add-menu__summary,
+body.app-mobile-shell .button:not(.detail-modal__close):not(.journal-overlay-shell__close):not(.detail-modal__back):not(.image-lightbox__back):not(.journal-item__action):not(.gallery-nav) {
+  min-height: 40px !important;
+  border-radius: 14px !important;
+  padding-inline: 12px !important;
+  font-size: 0.84rem !important;
+}
+
+body.app-mobile-shell .toolbar-search__field input {
+  font-size: 0.84rem !important;
+}
+
+body.app-mobile-shell .button.button--small,
+body.app-mobile-shell .button.button--ghost.button--small,
+body.app-mobile-shell .mini-list__more,
+body.app-mobile-shell .mini-list__more--inline {
+  min-height: 30px !important;
+  padding-inline: 10px !important;
+  font-size: 0.74rem !important;
+}
+
+body.app-mobile-shell .tag,
+body.app-mobile-shell .choice-chip span,
+body.app-mobile-shell .entry-mode-switch__button,
+body.app-mobile-shell .journal-tag-filter__chip,
+body.app-mobile-shell .journal-tag-picker__chip {
+  min-height: 24px !important;
+  padding-inline: 8px !important;
+  font-size: 0.7rem !important;
+}
+
+body.app-mobile-shell .checkbox-row input,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item input {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+}
+
+body.app-mobile-shell input,
+body.app-mobile-shell textarea,
+body.app-mobile-shell select {
+  border-radius: 12px !important;
+  font-size: 0.86rem !important;
+}
+
+body.app-mobile-shell textarea {
+  min-height: 74px !important;
+}
+
+body.app-mobile-shell .panel {
+  padding: 10px !important;
+  margin-bottom: 8px !important;
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .panel--menu {
+  padding: 8px !important;
+}
+
+body.app-mobile-shell .season-card,
+body.app-mobile-shell .home-card,
+body.app-mobile-shell .home-section,
+body.app-mobile-shell .progress-card,
+body.app-mobile-shell .journal-disclosure,
+body.app-mobile-shell .worklog-section,
+body.app-mobile-shell .sidebar-preview-card,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .settings-panel,
+body.app-mobile-shell .settings-hero,
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell .subcatalog,
+body.app-mobile-shell .detail-modal--weather .weather-overview__hero,
+body.app-mobile-shell .detail-modal--weather .weather-overview__external,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group {
+  padding: 10px !important;
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .season-card__head,
+body.app-mobile-shell .home-card__head,
+body.app-mobile-shell .home-section__header,
+body.app-mobile-shell .worklog-section__head,
+body.app-mobile-shell .journal-disclosure__summary,
+body.app-mobile-shell .journal-tag-filter__head {
+  margin-bottom: 6px !important;
+}
+
+body.app-mobile-shell .eyebrow {
+  font-size: 0.58rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--main-menu {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card {
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
+  margin: 8px 8px 0 !important;
+  padding: 4px !important;
+  aspect-ratio: 1 / 0.74 !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
+  padding: 8px 8px 10px !important;
+  gap: 3px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
+  font-size: 0.9rem !important;
+  line-height: 1.02 !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
+  font-size: 0.66rem !important;
+  line-height: 1.18 !important;
+}
+
+/* Final mobile root category hard lock:
+   hlavne kategorie musia byt natvrdo identicke s podradenymi. */
+body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card {
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: 0 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card,
+body.app-mobile-shell .catalog-card--main-menu-card:hover,
+body.app-mobile-shell .catalog-card--main-menu-card:focus-within {
+  background: var(--mobile-glass-card-bg) !important;
+  border-color: var(--mobile-glass-border) !important;
+  box-shadow:
+    0 10px 26px rgba(45, 37, 25, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 0 0 1px rgba(130, 111, 84, 0.04) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  border-radius: 16px !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card::before,
+body.app-mobile-shell .catalog-card--main-menu-card:hover::before,
+body.app-mobile-shell .catalog-card--main-menu-card:focus-within::before {
+  border-color: rgba(255, 255, 255, 0.58) !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
+  margin: 8px 8px 0 !important;
+  padding: 4px !important;
+  min-height: 78px !important;
+  aspect-ratio: 1 / 0.76 !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
+  display: grid !important;
+  justify-items: center !important;
+  align-content: start !important;
+  gap: 3px !important;
+  padding: 8px 8px 10px !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--category {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
+  width: 100% !important;
+  margin: 0 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.02 !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
+  font-size: 0.66rem !important;
+  line-height: 1.18 !important;
+}
+
+/* Mobile root category hard lock:
+   hlavne kategorie maju mat natvrdo identicky look, vysku a rozmery ako podradene. */
+body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card {
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: 0 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card,
+body.app-mobile-shell .catalog-card--main-menu-card:hover,
+body.app-mobile-shell .catalog-card--main-menu-card:focus-within {
+  background: var(--mobile-glass-card-bg) !important;
+  border-color: var(--mobile-glass-border) !important;
+  box-shadow:
+    0 10px 26px rgba(45, 37, 25, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 0 0 1px rgba(130, 111, 84, 0.04) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  border-radius: 16px !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card::before,
+body.app-mobile-shell .catalog-card--main-menu-card:hover::before,
+body.app-mobile-shell .catalog-card--main-menu-card:focus-within::before {
+  border-color: rgba(255, 255, 255, 0.58) !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
+  margin: 8px 8px 0 !important;
+  padding: 4px !important;
+  min-height: 78px !important;
+  aspect-ratio: 1 / 0.76 !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
+  display: grid !important;
+  justify-items: center !important;
+  align-content: start !important;
+  gap: 3px !important;
+  padding: 8px 8px 10px !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
+  width: 100% !important;
+  margin: 0 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.02 !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
+  font-size: 0.66rem !important;
+  line-height: 1.18 !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell.app-focused-mode .catalog-card--child {
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__image,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image {
+  margin: 8px 8px 0 !important;
+  padding: 4px !important;
+  min-height: 78px !important;
+  aspect-ratio: 1 / 0.76 !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__body,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__body {
+  padding: 8px 8px 10px !important;
+  gap: 3px !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__title--body,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__title--body {
+  font-size: 0.9rem !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__count,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__count {
+  font-size: 0.66rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry {
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__main-hit,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety > .catalog-card__main-hit {
+  grid-template-rows: 102px auto minmax(0, 1fr) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image {
+  min-height: 102px !important;
+  height: 102px !important;
+  max-height: 102px !important;
+  margin: 6px 6px 0 !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__body,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__body,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__body {
+  padding: 4px 6px 6px !important;
+  gap: 3px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__meta,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__note-preview {
+  font-size: 0.69rem !important;
+  line-height: 1.18 !important;
+}
+
+body.app-mobile-shell .category-panel--summary,
+body.app-mobile-shell.app-focused-mode .category-panel--summary {
+  padding: 10px !important;
+}
+
+body.app-mobile-shell .category-panel__hero,
+body.app-mobile-shell.app-focused-mode .category-panel__hero {
+  gap: 6px !important;
+  padding: 10px !important;
+}
+
+body.app-mobile-shell .category-panel__notes,
+body.app-mobile-shell.app-focused-mode .category-panel__notes {
+  font-size: 0.78rem !important;
+  line-height: 1.28 !important;
+}
+
+body.app-mobile-shell .task-stack,
+body.app-mobile-shell .journal-list,
+body.app-mobile-shell .mini-list,
+body.app-mobile-shell .progress-card__task-stack,
+body.app-mobile-shell .batch-sowing__list {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .task-item,
+body.app-mobile-shell .journal-item,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item {
+  padding: 8px 10px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .task-item__header,
+body.app-mobile-shell .journal-item__header,
+body.app-mobile-shell .journal-overlay-card__header {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .journal-item__action {
+  width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+}
+
+body.app-mobile-shell .task-item__title,
+body.app-mobile-shell .journal-item__title,
+body.app-mobile-shell .journal-overlay-card__title {
+  font-size: 0.88rem !important;
+  line-height: 1.12 !important;
+}
+
+body.app-mobile-shell .task-item__meta,
+body.app-mobile-shell .journal-item__meta,
+body.app-mobile-shell .journal-overlay-card__text {
+  font-size: 0.76rem !important;
+  line-height: 1.28 !important;
+}
+
+body.app-mobile-shell .task-item__date-badge,
+body.app-mobile-shell .journal-item__date-badge,
+body.app-mobile-shell .task-item__done-badge {
+  min-height: 24px !important;
+  padding-inline: 8px !important;
+  font-size: 0.68rem !important;
+}
+
+body.app-mobile-shell .journal-item__gallery,
+body.app-mobile-shell .journal-overlay-card__gallery,
+body.app-mobile-shell .journal-item__gallery--manager-compact,
+body.app-mobile-shell .journal-overlay-card__gallery--compact-list {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .journal-item__image,
+body.app-mobile-shell .journal-overlay-card__gallery .journal-item__image {
+  width: 68px !important;
+  height: 68px !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .journal-item__gallery--manager-compact .journal-item__image,
+body.app-mobile-shell .journal-overlay-card__gallery--compact-list .journal-item__image {
+  width: 62px !important;
+  height: 62px !important;
+}
+
+body.app-mobile-shell .journal-item__more {
+  min-width: 28px !important;
+  height: 28px !important;
+  font-size: 0.68rem !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy--editor,
+body.app-mobile-shell .worklog-manager.detail-copy--wide,
+body.app-mobile-shell .weather-overview.detail-copy--wide,
+body.app-mobile-shell .overview-manager.detail-copy--wide,
+body.app-mobile-shell .category-manager.detail-copy--wide,
+body.app-mobile-shell .batch-sowing-manager.detail-copy--wide,
+body.app-mobile-shell .settings-sheet,
+body.app-mobile-shell .settings-hero,
+body.app-mobile-shell .settings-panel,
+body.app-mobile-shell .journal-overlay-shell__body {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .journal-overlay-frame__head,
+body.app-mobile-shell .journal-overlay-mobile-actions {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline {
+  padding: 4px 40px 6px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline h3,
+body.app-mobile-shell .journal-overlay-frame__title-block h3,
+body.app-mobile-shell #journal-overlay-title {
+  font-size: clamp(1.22rem, 5.6vw, 1.5rem) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__actions .button,
+body.app-mobile-shell .journal-overlay-frame__actions > .button,
+body.app-mobile-shell .journal-overlay-mobile-actions > #journal-overlay-submit,
+body.app-mobile-shell .batch-sowing__toolbar .button,
+body.app-mobile-shell .worklog-task-editor__actions .button {
+  min-height: 34px !important;
+  padding-inline: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-grid,
+body.app-mobile-shell .detail-modal--editor .detail-grid > .field-block,
+body.app-mobile-shell .detail-modal--editor .detail-grid > .field-block--full,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor > label.field-block--full,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor > .upload-field--compact,
+body.app-mobile-shell .detail-modal--editor .detail-form--editor > .danger-zone,
+body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__filter,
+body.app-mobile-shell .detail-modal--editor .batch-sowing-manager__selection-card {
+  padding: 8px !important;
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-top-row,
+body.app-mobile-shell .detail-modal--editor .status-date-row,
+body.app-mobile-shell .detail-modal--editor .field-block__inline-pair,
+body.app-mobile-shell .settings-panel__actions,
+body.app-mobile-shell .batch-sowing__selection-head,
+body.app-mobile-shell .batch-sowing__toolbar,
+body.app-mobile-shell .worklog-task-editor__actions {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--status .choice-chip span,
+body.app-mobile-shell .detail-modal--editor .choice-group.choice-group--compact-meta .choice-chip span {
+  min-height: 28px !important;
+  padding-inline: 8px !important;
+  font-size: 0.72rem !important;
+}
+
+body.app-mobile-shell .batch-sowing__copy strong {
+  font-size: 0.82rem !important;
+}
+
+body.app-mobile-shell .batch-sowing__copy small,
+body.app-mobile-shell .batch-sowing__summary {
+  font-size: 0.72rem !important;
+  line-height: 1.24 !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini__meta--inline {
+  margin: 2px 0 0 !important;
+  font-size: 0.68rem !important;
+  line-height: 1.22 !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__card,
+body.app-mobile-shell .home-weather-box .main-menu-weather-mini__card,
+body.app-mobile-shell .add-entry-form__weather--head .main-menu-weather-mini__card {
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__inner,
+body.app-mobile-shell .home-weather-box .main-menu-weather-mini__inner,
+body.app-mobile-shell .add-entry-form__weather--head .main-menu-weather-mini__inner {
+  padding: 8px 10px !important;
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__art .weather-illustration {
+  width: 50px !important;
+  height: 40px !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__temperature {
+  font-size: 1.28rem !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__condition {
+  font-size: 0.82rem !important;
+}
+
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__eyebrow,
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__phase,
+body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__meta--quiet {
+  font-size: 0.64rem !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview.detail-copy--wide {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__hero,
+body.app-mobile-shell .detail-modal--weather .weather-overview__external,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group {
+  padding: 10px !important;
+}
+
+body.app-mobile-shell .weather-overview__hero-days {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .weather-overview__hero-day,
+body.app-mobile-shell .weather-week-switcher__tab {
+  min-width: 84px !important;
+  padding: 6px 8px !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .weather-overview__hero-day-main strong {
+  font-size: 0.88rem !important;
+}
+
+body.app-mobile-shell .weather-overview__hero-day-meta,
+body.app-mobile-shell .weather-overview__hero-day-meta > * {
+  font-size: 0.66rem !important;
+}
+
+body.app-mobile-shell .weather-week-switcher__tabs {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .weather-week-switcher__tab-title {
+  font-size: 0.76rem !important;
+}
+
+body.app-mobile-shell .weather-week-switcher__tab-range {
+  font-size: 0.62rem !important;
+}
+
+body.app-mobile-shell .weather-week-card--compact-list {
+  padding: 8px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .weather-week-card__head--compact-list {
+  gap: 3px !important;
+}
+
+body.app-mobile-shell .weather-week-card__inline-summary {
+  font-size: 0.7rem !important;
+}
+
+body.app-mobile-shell .weather-week-rows {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .weather-week-row {
+  gap: 3px !important;
+  padding: 7px 8px !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .weather-week-row__top {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .weather-week-row__day {
+  gap: 4px !important;
+}
+
+body.app-mobile-shell .weather-week-row__day strong {
+  font-size: 0.82rem !important;
+}
+
+body.app-mobile-shell .weather-week-row__day span {
+  font-size: 0.66rem !important;
+}
+
+body.app-mobile-shell .weather-week-row__today,
+body.app-mobile-shell .weather-week-row__flag {
+  min-height: 20px !important;
+  padding: 0 6px !important;
+  font-size: 0.64rem !important;
+}
+
+body.app-mobile-shell .weather-week-row__main {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .weather-week-row__icon {
+  font-size: 0.9rem !important;
+}
+
+body.app-mobile-shell .weather-week-row__temps {
+  font-size: 0.82rem !important;
+}
+
+body.app-mobile-shell .weather-week-row__meta {
+  font-size: 0.68rem !important;
+  line-height: 1.18 !important;
+}
+
+body.app-mobile-shell .weather-week-row__flags {
+  gap: 4px !important;
+}
+/* Mobile journal preview refresh:
+   preview denníka nech je bližšie appkovému listu s médiom, nie len suché textové boxy. */
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile {
+  gap: 0 !important;
+  padding: 12px !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at top right, rgba(244, 249, 235, 0.32), transparent 34%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(243, 238, 228, 0.9)) !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-mobile-shell {
+  display: grid !important;
+  gap: 12px !important;
+  align-items: start !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile-media .sidebar-preview-card__journal-mobile-shell {
+  grid-template-columns: 92px minmax(0, 1fr) !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-media {
+  width: 92px !important;
+  min-width: 92px !important;
+  aspect-ratio: 0.86 !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+  background: rgba(241, 244, 235, 0.94) !important;
+  border: 1px solid rgba(214, 206, 191, 0.86) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 18px rgba(45, 37, 25, 0.06) !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-media img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-mobile-main {
+  display: grid !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  align-content: start !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__journal-top {
+  position: relative !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__meta--journal {
+  padding-right: 0 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.18 !important;
+  letter-spacing: 0.08em !important;
+  color: #708062 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__mood {
+  position: static !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 10px !important;
+  margin-left: auto !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__title--journal {
+  margin: 0 !important;
+  font-size: 1.06rem !important;
+  line-height: 1.14 !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__excerpt--journal-mobile {
+  margin: 0 !important;
+  font-size: 0.84rem !important;
+  line-height: 1.42 !important;
+  color: #58664e !important;
+  -webkit-line-clamp: 3 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-mobile-bottom {
+  display: grid !important;
+  gap: 7px !important;
+  margin-top: 2px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__type-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: fit-content !important;
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #86b44c, #648f33) !important;
+  border: 1px solid rgba(82, 123, 41, 0.4) !important;
+  color: #fffdf7 !important;
+  font-size: 0.74rem !important;
+  font-weight: 800 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 6px 12px rgba(72, 108, 34, 0.16) !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__tag-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__tag-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 24px !important;
+  padding: 0 9px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(214, 206, 191, 0.82) !important;
+  color: #667456 !important;
+  font-size: 0.74rem !important;
+  font-weight: 700 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile-plain .sidebar-preview-card__journal-mobile-shell {
+  grid-template-columns: 1fr !important;
+}
+
+/* Mobile task compact pass:
+   task preview aj task manager nech su viac list a menej nafuknute karty. */
+body.app-mobile-shell .workspace-side .progress-card__task-stack {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--task {
+  padding: 8px 10px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__task-row {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  gap: 8px !important;
+  align-items: start !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__checkbox-wrap,
+body.app-mobile-shell .workspace-side .sidebar-preview-card__checkbox {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__title {
+  font-size: 0.84rem !important;
+  line-height: 1.14 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__badge {
+  grid-column: 2 !important;
+  justify-self: start !important;
+  min-height: 22px !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;
+  font-size: 0.64rem !important;
+  margin-top: 3px !important;
+}
+
+body.app-mobile-shell .workspace-side .mini-list__more {
+  min-height: 28px !important;
+  padding-inline: 10px !important;
+  font-size: 0.72rem !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 2px 4px !important;
+  margin-bottom: 8px !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head h4 {
+  font-size: 1rem !important;
+  line-height: 1.08 !important;
+  margin: 0 !important;
+  flex: 1 1 auto !important;
+  text-align: left !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head .button,
+body.app-mobile-shell .detail-modal--worklog #open-add-task-from-worklog {
+  min-width: 0 !important;
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  border-radius: 14px !important;
+  font-size: 0.76rem !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-task-editor {
+  padding: 8px 10px !important;
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-stack {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item {
+  min-height: 0 !important;
+  padding: 8px 10px 8px 12px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__header {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "main action"
+    "status action" !important;
+  column-gap: 8px !important;
+  row-gap: 4px !important;
+  align-items: start !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__main {
+  grid-area: main !important;
+  min-height: 0 !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__status {
+  grid-area: status !important;
+  flex-direction: row !important;
+  justify-self: start !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding-left: 28px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__side,
+body.app-mobile-shell .detail-modal--worklog .task-item__actions {
+  grid-area: action !important;
+  grid-column: auto !important;
+  width: auto !important;
+  justify-content: flex-end !important;
+  justify-self: end !important;
+  align-self: start !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__actions .journal-item__action,
+body.app-mobile-shell .detail-modal--worklog .task-item__actions .task-item__action,
+body.app-mobile-shell .detail-modal--worklog .task-item__actions .button {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  border-radius: 10px !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__main input[type="checkbox"] {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  margin-top: 1px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__title {
+  font-size: 0.86rem !important;
+  line-height: 1.16 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__date-badge,
+body.app-mobile-shell .detail-modal--worklog .task-item__done-badge {
+  min-height: 22px !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;
+  font-size: 0.66rem !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item__meta,
+body.app-mobile-shell .detail-modal--worklog .journal-item__chips {
+  margin-top: 4px !important;
+}
+
+/* Final mobile task cleanup:
+   plan prace nech je skutocny husty zoznam a bez laveho akcentoveho pruhu. */
+body.app-mobile-shell .detail-modal--worklog .task-item::before,
+body.app-mobile-shell .detail-modal--worklog .task-item::after,
+body.app-mobile-shell .detail-modal--worklog .task-item--done::before,
+body.app-mobile-shell .detail-modal--worklog .task-item--done::after,
+body.app-mobile-shell .task-item::before,
+body.app-mobile-shell .task-item--done::before,
+body.app-mobile-shell .task-item--done::after,
+body.app-mobile-shell .detail-modal--editor .batch-sowing__item::before {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell .workspace-side .progress-card__task-stack {
+  gap: 5px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 7px 10px !important;
+  border-radius: 16px !important;
+  background: rgba(255, 252, 247, 0.74) !important;
+  border: 1px solid rgba(133, 117, 89, 0.12) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 4px 12px rgba(41, 32, 18, 0.04) !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__task-mobile-main {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile .sidebar-preview-card__checkbox-wrap,
+body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile .sidebar-preview-card__checkbox {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile .sidebar-preview-card__checkbox {
+  border-radius: 6px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__title--task-mobile {
+  margin-top: 1px !important;
+  font-size: 0.82rem !important;
+  line-height: 1.18 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__task-mobile-meta {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  padding-left: 26px !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__mini-state {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 22px !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  background: rgba(238, 247, 221, 0.92) !important;
+  border: 1px solid rgba(136, 154, 94, 0.16) !important;
+  color: #5d7538 !important;
+  font-size: 0.64rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile .sidebar-preview-card__badge {
+  min-height: 22px !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;
+  font-size: 0.64rem !important;
+}
+
+body.app-mobile-shell .workspace-side .mini-list__more {
+  min-height: 27px !important;
+  padding-inline: 10px !important;
+  font-size: 0.71rem !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .detail-layout--worklog {
+  gap: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager.detail-copy--wide {
+  padding: 8px 10px 12px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section,
+body.app-mobile-shell .detail-modal--worklog .worklog-section--single {
+  display: grid !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section::before,
+body.app-mobile-shell .detail-modal--worklog .worklog-section::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  padding: 0 2px 2px !important;
+  margin-bottom: 2px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head .catalog-card__actions {
+  margin-left: auto !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head h4 {
+  font-size: 1rem !important;
+  line-height: 1.08 !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head .button,
+body.app-mobile-shell .detail-modal--worklog #open-add-task-from-worklog {
+  min-width: 0 !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 0.74rem !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-task-editor {
+  padding: 8px 10px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(133, 117, 89, 0.12) !important;
+  background: rgba(255, 251, 245, 0.72) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 16px rgba(43, 34, 20, 0.04) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-stack--planner {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog #worklog-task-list[hidden] {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item,
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item.task-item--mobile-list {
+  gap: 4px !important;
+  min-height: 0 !important;
+  padding: 8px 10px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(133, 117, 89, 0.12) !important;
+  background: rgba(255, 251, 246, 0.74) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 4px 12px rgba(41, 32, 18, 0.04) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item.task-item--done {
+  opacity: 1 !important;
+  background: rgba(247, 247, 241, 0.72) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__row {
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__row--primary {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  column-gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__main--mobile {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  justify-self: stretch !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__main--mobile input[type="checkbox"] {
+  width: 19px !important;
+  height: 19px !important;
+  min-width: 19px !important;
+  min-height: 19px !important;
+  margin: 1px 0 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__title {
+  font-size: 0.9rem !important;
+  line-height: 1.18 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  min-height: 0 !important;
+  max-width: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list.task-item--done .task-item__title {
+  text-decoration: line-through !important;
+  text-decoration-thickness: 1.4px !important;
+  color: rgba(93, 99, 84, 0.86) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__actions--mobile {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  margin: 0 !important;
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  justify-self: end !important;
+  align-self: center !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__actions--mobile .button,
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__actions--mobile .journal-item__action {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  border-radius: 10px !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__row--meta {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 4px !important;
+  padding-left: 0 !important;
+  min-width: 0 !important;
+  margin-top: -2px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__date-badge,
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__done-badge {
+  min-height: 22px !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;
+  font-size: 0.65rem !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__chips--mobile,
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__meta--mobile {
+  margin: 0 0 0 27px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__chips--mobile {
+  gap: 4px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__meta--mobile {
+  font-size: 0.72rem !important;
+  line-height: 1.24 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .journal-item__action--danger {
+  background: rgba(235, 243, 252, 0.96) !important;
+  color: #5d7290 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head h4 {
+  flex: 1 1 auto !important;
+  text-align: left !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__main--mobile {
+  order: 1 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__actions--mobile {
+  order: 2 !important;
+  position: static !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .detail-modal__content {
+  padding-top: 46px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager.detail-copy--wide {
+  padding-top: 2px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head {
+  gap: 10px !important;
+  padding: 0 2px 6px !important;
+  margin-bottom: 4px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head h4 {
+  font-size: 0.98rem !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.02em !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head .catalog-card__actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog #open-add-task-from-worklog {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(92, 130, 37, 0.36) !important;
+  background: linear-gradient(180deg, #8fc74b, #6ea431) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 8px 18px rgba(88, 128, 38, 0.24) !important;
+  color: #ffffff !important;
+  font-size: 1.26rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  text-indent: 0 !important;
+  letter-spacing: 0 !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .detail-modal__content {
+  padding-top: 18px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager.detail-copy--wide {
+  padding-top: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 34px !important;
+  gap: 0 !important;
+  padding: 0 76px 4px !important;
+  margin-bottom: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head h4 {
+  width: 100% !important;
+  margin: 0 !important;
+  text-align: center !important;
+  font-size: 0.98rem !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.02em !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head .catalog-card__actions {
+  position: absolute !important;
+  right: 2px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  margin-left: 0 !important;
+  justify-self: auto !important;
+  align-self: auto !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item.task-item--done,
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item.task-item--mobile-list.task-item--done {
+  background: linear-gradient(180deg, rgba(240, 247, 231, 0.96), rgba(231, 241, 220, 0.9)) !important;
+  border-color: rgba(124, 157, 76, 0.18) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list.task-item--done .task-item__title {
+  text-decoration: none !important;
+  color: #47612c !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list.task-item--done .task-item__date-badge,
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list.task-item--done .task-item__done-badge {
+  background: rgba(236, 245, 220, 0.96) !important;
+  border-color: rgba(136, 154, 94, 0.18) !important;
+  color: #557135 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile.sidebar-preview-card--task-overdue {
+  background: linear-gradient(180deg, rgba(255, 248, 246, 0.92), rgba(250, 236, 233, 0.88)) !important;
+  border-color: rgba(186, 72, 60, 0.16) !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile.sidebar-preview-card--task-overdue .sidebar-preview-card__title--task-mobile {
+  color: #8f352d !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item.task-item--overdue,
+body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item.task-item--mobile-list.task-item--overdue {
+  background: linear-gradient(180deg, rgba(255, 247, 245, 0.98), rgba(248, 232, 228, 0.92)) !important;
+  border-color: rgba(186, 72, 60, 0.18) !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list.task-item--overdue .task-item__title {
+  color: #8f352d !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list.task-item--overdue .task-item__date-badge {
+  background: rgba(255, 239, 236, 0.96) !important;
+  border-color: rgba(186, 72, 60, 0.18) !important;
+  color: #b13d32 !important;
+}
+
+body.app-mobile-shell .detail-modal [hidden],
+body.app-mobile-shell .journal-overlay-shell [hidden] {
+  display: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed {
+  padding-top: 8px !important;
+  margin-top: 2px !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-focused-mode .menu-toolbar,
+body.app-mobile-shell.app-focused-mode .menu-toolbar__group--primary,
+body.app-mobile-shell.app-focused-mode .toolbar-search {
+  min-height: 50px !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-focused-mode .toolbar-search__field,
+body.app-mobile-shell.app-focused-mode .toolbar-search__field:focus-within {
+  box-sizing: border-box !important;
+  margin-top: 0 !important;
+}
+
+.detail-layout--card-view {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.detail-modal--card-view .detail-image--card-view {
+  display: grid;
+  gap: 14px;
+  align-self: start;
+}
+
+.detail-modal--card-view .card-view-hero-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.card-view-hero {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 30px;
+  background: linear-gradient(180deg, rgba(244, 239, 228, 0.98), rgba(232, 241, 247, 0.9));
+  box-shadow: 0 22px 48px rgba(52, 77, 94, 0.14);
+  overflow: hidden;
+  cursor: default;
+}
+
+.card-view-hero.is-clickable {
+  cursor: pointer;
+}
+
+.card-view-hero img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(50vh, 360px);
+  aspect-ratio: auto;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 24px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.card-view-hero__count {
+  justify-self: end;
+  margin-top: -6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 249, 233, 0.94);
+  border: 1px solid rgba(196, 180, 136, 0.34);
+  color: #665128;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.card-view-gallery {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.card-view-gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.card-view-gallery__thumb {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid rgba(151, 170, 186, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  overflow: hidden;
+  box-shadow: 0 10px 22px rgba(52, 77, 94, 0.08);
+}
+
+.card-view-gallery__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-view-gallery__thumb.is-active {
+  border-color: rgba(118, 165, 62, 0.55);
+  box-shadow: 0 0 0 2px rgba(168, 207, 105, 0.2);
+}
+
+.detail-copy--card-view {
+  display: grid;
+  gap: 16px;
+}
+
+.card-view-head {
+  display: grid;
+  gap: 12px;
+}
+
+.card-view-head__eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-view-head__eyebrow span {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 249, 235, 0.84);
+  border: 1px solid rgba(188, 175, 133, 0.26);
+  color: #5a6640;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.card-view-head__topline {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.card-view-head__title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-view-head__topline h3 {
+  margin: 0;
+  color: #2e3f2a;
+  font-size: clamp(1.36rem, 2.4vw, 2.06rem);
+  line-height: 1.04;
+}
+
+.card-view-head__summary {
+  margin: -2px 0 0;
+  color: #586a4b;
+  font-size: 0.94rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.detail-modal--card-view .detail-copy__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.detail-modal--card-view #card-view-edit {
+  min-height: 40px;
+  padding-inline: 16px;
+  border-radius: 999px;
+  background: rgba(255, 251, 245, 0.94);
+  border: 1px solid rgba(187, 195, 204, 0.28);
+  color: #35503b;
+  box-shadow: 0 10px 24px rgba(68, 83, 92, 0.08);
+  font-size: 0.83rem;
+  font-weight: 800;
+}
+
+.card-view-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-view-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 31px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: #385433;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.card-view-chip--neutral {
+  background: rgba(245, 244, 239, 0.96);
+}
+
+.card-view-chip--green {
+  background: rgba(250, 247, 239, 0.96);
+}
+
+.card-view-chip--gold {
+  background: rgba(250, 247, 239, 0.96);
+  color: #7a6420;
+}
+
+.card-view-chip--rose {
+  background: rgba(250, 247, 239, 0.96);
+  color: #8d5b53;
+}
+
+.card-view-chip--sky {
+  background: rgba(250, 247, 239, 0.96);
+  color: #557086;
+}
+
+.card-view-chip--sand {
+  background: rgba(250, 247, 239, 0.96);
+  color: #6d5a35;
+}
+
+.card-view-chip--violet,
+.card-view-chip--violet-soft {
+  background: rgba(250, 247, 239, 0.96);
+  color: #6d57a3;
+}
+
+.card-view-chip--cream {
+  background: rgba(250, 247, 239, 0.96);
+  color: #8f6b00;
+}
+
+.card-view-sections {
+  display: grid;
+  gap: 14px;
+}
+
+.card-view-panel {
+  border-radius: 24px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(249, 246, 239, 0.9));
+  border: 1px solid rgba(173, 184, 194, 0.18);
+  box-shadow: 0 14px 32px rgba(70, 82, 92, 0.08);
+}
+
+.card-view-panel h4 {
+  margin: 0 0 10px;
+  color: #56674b;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.card-view-panel__body {
+  display: grid;
+  gap: 8px;
+}
+
+.card-view-row {
+  display: grid;
+  gap: 3px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(169, 178, 189, 0.16);
+}
+
+.card-view-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.card-view-row span {
+  color: #7c8875;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.card-view-row strong {
+  color: #304129;
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.card-view-note {
+  margin: 0;
+  color: #445445;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.card-view-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 38px;
+  margin-top: 6px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(233, 243, 249, 0.96);
+  color: #44637c;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+body.app-mobile-shell .detail-layout--card-view {
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+body.app-mobile-shell .detail-modal--card-view .detail-modal__content {
+  position: relative;
+  padding-top: 0;
+}
+
+body.app-mobile-shell .detail-modal--card-view .detail-image--card-view {
+  gap: 6px;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-hero-bar {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: 14px;
+  z-index: 30;
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-hero {
+  padding: 8px;
+  border-radius: 26px;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-hero img {
+  border-radius: 22px;
+  max-height: min(42vh, 320px);
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-gallery__thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head {
+  gap: 10px;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__topline {
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__topline h3 {
+  font-size: clamp(1.3rem, 6vw, 1.72rem);
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__summary {
+  font-size: 0.88rem;
+}
+
+body.app-mobile-shell .detail-modal--card-view #card-view-edit {
+  min-height: 36px;
+  padding-inline: 13px;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 251, 245, 0.94);
+  border: 1px solid rgba(181, 194, 205, 0.24);
+  color: #37522d;
+  box-shadow: 0 10px 20px rgba(61, 82, 73, 0.07);
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-chip-list {
+  gap: 7px;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-chip {
+  min-height: 29px;
+  padding: 5px 11px;
+  font-size: 0.76rem;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-panel {
+  padding: 14px 15px;
+  border-radius: 22px;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-panel h4 {
+  margin-bottom: 8px;
+  font-size: 0.74rem;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-row {
+  padding: 7px 0;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-row strong {
+  font-size: 0.94rem;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-note {
+  font-size: 0.92rem;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__quick,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__quick {
+  gap: 6px !important;
+  margin-top: 7px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .tag,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .tag,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .tag,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .tag--favorite,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .tag--avoid,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .tag--never-grown,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .tag--hybrid,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .tag--rating,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .tag--favorite,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .tag--avoid,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .tag--never-grown,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .tag--hybrid,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .tag--rating,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .tag--favorite,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .tag--avoid,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .tag--never-grown,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .tag--hybrid,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .tag--rating {
+  min-height: 24px !important;
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 249, 241, 0.94) !important;
+  color: #56664c !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .tag--rating,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .tag--rating,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .tag--rating {
+  background: rgba(255, 249, 241, 0.94) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .tag--hybrid,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .tag--hybrid,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .tag--hybrid {
+  color: #695c92 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__meta,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__note-preview {
+  padding: 7px 12px !important;
+  border-radius: 18px !important;
+  background: rgba(255, 249, 241, 0.94) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #4e5e47 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__meta {
+  text-align: center !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card__note-preview {
+  text-align: center !important;
+}
+
+/* Finalny jednotny system preview + view kariet */
+
+.catalog-grid--varieties .catalog-card--preview,
+.catalog-grid--varieties .catalog-card--preview:hover,
+.catalog-grid--varieties .catalog-card--preview:focus-within,
+.catalog-grid--varieties .catalog-card--preview:focus-visible {
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, rgba(244, 250, 255, 0.92), rgba(229, 240, 248, 0.86)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.54) !important;
+  box-shadow:
+    0 0 0 1px rgba(183, 198, 210, 0.32),
+    0 16px 32px rgba(52, 77, 94, 0.08) !important;
+  transform: none !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview::before,
+.catalog-grid--varieties .catalog-card--preview::after {
+  content: none !important;
+  display: none !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
+  display: grid !important;
+  grid-template-rows: 124px auto !important;
+  gap: 10px !important;
+  height: 100% !important;
+  padding: 10px !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview {
+  position: relative !important;
+  margin: 0 !important;
+  min-height: 124px !important;
+  height: 124px !important;
+  max-height: 124px !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  background: linear-gradient(180deg, rgba(247, 243, 232, 0.96), rgba(233, 239, 226, 0.92)) !important;
+  box-shadow: none !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::after,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__shade,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__note-preview {
+  display: none !important;
+  content: none !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  transform: none !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__eyebrow {
+  position: absolute !important;
+  top: 10px !important;
+  left: 10px !important;
+  right: auto !important;
+  margin: 0 !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 251, 242, 0.88) !important;
+  color: #6b7a61 !important;
+  font-size: 0.67rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  line-height: 1.1 !important;
+  max-width: calc(100% - 20px) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__body--preview {
+  display: grid !important;
+  gap: 6px !important;
+  align-content: start !important;
+  justify-items: start !important;
+  padding: 0 2px 2px !important;
+  height: auto !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__title--body {
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #2f4137 !important;
+  font-size: 1.02rem !important;
+  line-height: 1.08 !important;
+  font-weight: 800 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__subtitle {
+  margin: -1px 0 0 !important;
+  color: #718173 !important;
+  font-size: 0.76rem !important;
+  line-height: 1.25 !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__meta-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #4f6252 !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  line-height: 1.28 !important;
+  text-align: left !important;
+  min-width: 0 !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__rating-inline {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  min-height: 22px !important;
+  padding: 0 !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__rating-inline .star-rating {
+  gap: 1px !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__rating-inline .star-rating__star {
+  font-size: 0.82rem !important;
+}
+
+.catalog-grid--varieties .catalog-card--preview .catalog-card__quick--preview {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.preview-card-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 249, 241, 0.92);
+  color: #57674f;
+  font-size: 0.71rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.preview-card-badge--green {
+  color: #4f7147;
+}
+
+.preview-card-badge--gold {
+  color: #7a6420;
+}
+
+.preview-card-badge--rose {
+  color: #8d5b53;
+}
+
+.preview-card-badge--violet,
+.preview-card-badge--violet-soft {
+  color: #6d57a3;
+}
+
+.preview-card-badge--sky {
+  color: #557086;
+}
+
+.preview-card-badge--sand {
+  color: #6d5a35;
+}
+
+.detail-modal--card-view .card-view-head__eyebrow {
+  gap: 0 !important;
+}
+
+.detail-modal--card-view .card-view-head__eyebrow span {
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  color: #72816a !important;
+  font-size: 0.72rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.11em !important;
+  text-transform: uppercase !important;
+  box-shadow: none !important;
+}
+
+.detail-modal--card-view .card-view-sections {
+  gap: 18px !important;
+}
+
+.detail-modal--card-view .card-view-panel {
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.detail-modal--card-view .card-view-panel + .card-view-panel {
+  padding-top: 14px !important;
+  border-top: 1px solid rgba(176, 189, 198, 0.2) !important;
+}
+
+.detail-modal--card-view .card-view-panel--note {
+  padding-top: 14px !important;
+  border-top: 1px solid rgba(176, 189, 198, 0.2) !important;
+}
+
+.detail-modal--card-view .card-view-panel h4 {
+  margin: 0 0 7px !important;
+  color: #60725a !important;
+  font-size: 0.73rem !important;
+  letter-spacing: 0.1em !important;
+}
+
+.detail-modal--card-view .card-view-panel__body {
+  gap: 0 !important;
+}
+
+.detail-modal--card-view .card-view-row {
+  padding: 9px 0 !important;
+  gap: 2px !important;
+}
+
+.detail-modal--card-view .card-view-note {
+  color: #425242 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties {
+  grid-auto-rows: 1fr !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:hover,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:focus-within {
+  border-radius: 24px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
+  grid-template-rows: 108px auto !important;
+  gap: 8px !important;
+  padding: 9px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview {
+  min-height: 108px !important;
+  height: 108px !important;
+  max-height: 108px !important;
+  border-radius: 18px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__eyebrow {
+  top: 8px !important;
+  left: 8px !important;
+  font-size: 0.64rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__title--body {
+  font-size: 0.96rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__subtitle {
+  font-size: 0.72rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview {
+  font-size: 0.77rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__rating-inline .star-rating__star {
+  font-size: 0.76rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__quick--preview {
+  gap: 5px !important;
+}
+
+body.app-mobile-shell .preview-card-badge {
+  min-height: 22px;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+}
+
+body.app-mobile-shell .detail-modal--card-view .detail-copy--card-view {
+  gap: 12px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__topline {
+  align-items: start !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-panel + .card-view-panel,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel--note {
+  padding-top: 12px !important;
+}
+
+/* Mobile toolbar search final clipping fix:
+   keep the search pill fully visible in main menu and focused categories. */
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .menu-toolbar,
+body.app-mobile-shell .menu-toolbar__group--primary,
+body.app-mobile-shell .toolbar-search,
+body.app-mobile-shell.app-main-menu-mode .utility-bar,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .toolbar-search,
+body.app-mobile-shell.app-focused-mode .utility-bar,
+body.app-mobile-shell.app-focused-mode .menu-toolbar,
+body.app-mobile-shell.app-focused-mode .menu-toolbar__group--primary,
+body.app-mobile-shell.app-focused-mode .toolbar-search {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .toolbar-search__field,
+body.app-mobile-shell .toolbar-search__field:focus-within,
+body.app-mobile-shell.app-main-menu-mode .toolbar-search__field,
+body.app-mobile-shell.app-main-menu-mode .toolbar-search__field:focus-within,
+body.app-mobile-shell.app-focused-mode .toolbar-search__field,
+body.app-mobile-shell.app-focused-mode .toolbar-search__field:focus-within {
+  box-sizing: border-box !important;
+  min-height: 46px !important;
+  height: 46px !important;
+  padding: 0 12px !important;
+  display: grid !important;
+  align-items: center !important;
+  align-self: center !important;
+  margin-top: 0 !important;
+  transform: none !important;
+}
+
+body.app-mobile-shell .toolbar-search__field input,
+body.app-mobile-shell.app-main-menu-mode .toolbar-search__field input,
+body.app-mobile-shell.app-focused-mode .toolbar-search__field input {
+  min-height: 0 !important;
+  height: auto !important;
+  line-height: 1.2 !important;
+  align-self: center !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell .utility-bar.is-collapsed .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar__group--primary,
+body.app-mobile-shell.app-focused-mode .utility-bar.is-collapsed .menu-toolbar__group--primary {
+  min-height: 46px !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Mobile final card system pass:
+   compact preview + quiet view detail. */
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:hover,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:focus-within {
+  border-radius: 18px !important;
+  box-shadow:
+    0 6px 16px rgba(47, 66, 80, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
+  grid-template-rows: auto auto auto !important;
+  gap: 2px !important;
+  padding: 7px 7px 8px !important;
+  align-content: start !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__head--preview {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: calc(2 * 1.12em + 2px) !important;
+  padding: 0 2px !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview {
+  display: grid !important;
+  place-items: center !important;
+  min-height: 78px !important;
+  height: auto !important;
+  max-height: none !important;
+  width: 86% !important;
+  padding: 4px 6px !important;
+  margin-top: -2px !important;
+  justify-self: center !important;
+  border-radius: 12px !important;
+  overflow: visible !important;
+  background: linear-gradient(180deg, rgba(248, 245, 237, 0.96), rgba(239, 244, 236, 0.9)) !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img {
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 94px !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  justify-self: center !important;
+  margin: 0 auto !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:hover .catalog-card__image--preview img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:focus-within .catalog-card__image--preview img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:hover .catalog-card__main-hit--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:focus-within .catalog-card__main-hit--preview {
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__foot--preview {
+  display: grid !important;
+  gap: 2px !important;
+  align-content: start !important;
+  justify-items: center !important;
+  padding: 0 1px !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__meta-support {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  min-height: 0 !important;
+  width: 100% !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__title--body {
+  color: #1e2c22 !important;
+  font-size: 0.74rem !important;
+  line-height: 1.12 !important;
+  font-weight: 800 !important;
+  display: block !important;
+  text-align: center !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: calc(2 * 1.12em) !important;
+  padding: 0 2px !important;
+  margin: 0 auto !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  max-height: calc(2 * 1.12em) !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__title-suffix {
+  color: #7260c4 !important;
+  font-weight: 900 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview {
+  color: #5d6b60 !important;
+  font-size: 0.61rem !important;
+  font-weight: 760 !important;
+  line-height: 1.1 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__rating-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__rating-inline {
+  min-height: 0 !important;
+  opacity: 0.82 !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__rating-inline .star-rating__star {
+  font-size: 0.56rem !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__quick--preview {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  margin-top: 0 !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .preview-card-badge {
+  min-height: 13px !important;
+  padding: 1px 5px !important;
+  font-size: 0.5rem !important;
+  line-height: 1.1 !important;
+  font-weight: 720 !important;
+  background: rgba(255, 250, 243, 0.72) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .detail-layout--card-view {
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .detail-copy--card-view {
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-hero {
+  padding: 6px !important;
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, rgba(244, 239, 228, 0.9), rgba(232, 241, 247, 0.72)) !important;
+  box-shadow: 0 6px 16px rgba(52, 77, 94, 0.08) !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-hero img {
+  max-height: min(27vh, 198px) !important;
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-gallery {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-gallery__thumb {
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.74) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__eyebrow span {
+  padding: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  color: #72806f !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.08em !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__topline {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__title-line {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__title-line .card-view-chip {
+  min-height: 16px !important;
+  padding: 2px 6px !important;
+  font-size: 0.58rem !important;
+  line-height: 1.1 !important;
+  align-self: center !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__topline h3 {
+  color: #243246 !important;
+  font-size: clamp(1.18rem, 5.2vw, 1.54rem) !important;
+  line-height: 1.05 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__summary {
+  margin: 0 !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view #card-view-edit {
+  position: absolute !important;
+  top: calc(14px + env(safe-area-inset-top)) !important;
+  right: 14px !important;
+  z-index: 31 !important;
+  min-height: 32px !important;
+  padding-inline: 12px !important;
+  border-radius: 999px !important;
+  background: #1f3553 !important;
+  border: 1px solid rgba(17, 33, 54, 0.78) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(23, 42, 66, 0.18) !important;
+  font-size: 0.74rem !important;
+  font-weight: 800 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view #card-view-edit:hover,
+body.app-mobile-shell .detail-modal--card-view #card-view-edit:focus-visible {
+  background: #17304d !important;
+  border-color: rgba(12, 25, 42, 0.88) !important;
+  color: #ffffff !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-chip-list {
+  gap: 5px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-chip {
+  min-height: 16px !important;
+  padding: 2px 6px !important;
+  font-size: 0.58rem !important;
+  background: rgba(255, 250, 243, 0.72) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-panel,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel--note {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-panel + .card-view-panel,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel--note {
+  padding-top: 14px !important;
+  border-top: 1px solid rgba(176, 189, 198, 0.18) !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-panel h4 {
+  margin: 0 0 6px !important;
+  font-size: 0.68rem !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-panel__body {
+  gap: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-row {
+  grid-template-columns: minmax(0, 92px) minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 8px !important;
+  padding: 7px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-row span {
+  color: #7a8677 !important;
+  font-size: 0.74rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-row strong {
+  color: #304129 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-note {
+  font-size: 0.94rem !important;
+  line-height: 1.62 !important;
+  color: #31423a !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-link {
+  min-height: 32px !important;
+  padding: 0 10px !important;
+  background: rgba(233, 243, 249, 0.84) !important;
+  box-shadow: none !important;
+}
+
+/* Main menu / category preview search final pass:
+   this is a separate issue from focused categories. */
+body.app-mobile-shell.app-main-menu-mode .utility-bar,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .toolbar-search,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar__group--primary {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed {
+  padding-top: 10px !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed .menu-toolbar__group--primary {
+  min-height: 48px !important;
+  max-height: none !important;
+  align-items: center !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .toolbar-search {
+  min-height: 46px !important;
+  align-self: center !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .toolbar-search__field,
+body.app-mobile-shell.app-main-menu-mode .toolbar-search__field:focus-within {
+  min-height: 46px !important;
+  height: 46px !important;
+  margin-top: 2px !important;
+  transform: none !important;
+}
+
+/* Mobile reset:
+   docasne uplne vypni horny hero + toolbar blok, aby sme ho vedeli nasadzovat znovu postupne. */
+body.app-mobile-shell .hero,
+body.app-mobile-shell .utility-bar,
+body.app-mobile-shell .mobile-toolbar-weather-slot {
+  display: none !important;
+}
+
+body.app-mobile-shell .content {
+  margin-top: 0 !important;
+  padding-top: 8px !important;
+}
+
+body.app-mobile-shell .panel--menu {
+  padding-top: 0 !important;
+}
+
+body.app-mobile-shell {
+  --mobile-sky-entry-offset: 148px;
+  --mobile-root-categories-preview-offset: var(--mobile-sky-entry-offset);
+}
+
+/* Mobile category entry spacing:
+   po otvoreni kategorie posun prvy blok nizsie,
+   aby ostala nad obsahom viditelna obloha. */
+body.app-mobile-shell.app-focused-mode #catalog > .category-shell {
+  margin-top: var(--mobile-sky-entry-offset) !important;
+}
+
+/* Mobile root categories spacing:
+   spodné tlačidlo Kategórie scrolluje na sekciu root kategórií,
+   preto pridávame odstup len v tomto stave, nie v celom hlavnom menu. */
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview [data-main-menu-categories-section] {
+  padding-top: var(--mobile-root-categories-preview-offset) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card {
+  max-width: none !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 10px 22px rgba(56, 47, 30, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__image {
+  margin: 8px 8px 0 !important;
+  padding: 4px !important;
+  min-height: 78px !important;
+  aspect-ratio: 1 / 0.76 !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__image img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  transform: none !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__body {
+  display: grid !important;
+  justify-items: center !important;
+  align-content: start !important;
+  gap: 3px !important;
+  padding: 8px 8px 10px !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__head--category {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__title--body {
+  width: 100% !important;
+  margin: 0 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.02 !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__count {
+  font-size: 0.66rem !important;
+  line-height: 1.18 !important;
+}
+
+/* Mobile memories viewer:
+   zmensi viewer a posunie ho nizsie, aby bolo nad nim viac vidno oblohu a slnko. */
+body.app-mobile-shell.app-main-menu-mode .workspace-side .memory-strip__frame {
+  width: 78% !important;
+  max-width: 78% !important;
+  min-width: 0 !important;
+  margin: 164px auto 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .workspace-side .memory-strip__hero {
+  touch-action: pan-y pinch-zoom !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* Mobile sky weather pill:
+   vratime len samostatny weather pill nad oblohu,
+   bez searchu, utility baru a stareho hero bloku. */
+.mobile-sky-weather-pill {
+  display: none;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill {
+  display: block !important;
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  z-index: 8;
+  width: min(34vw, 132px);
+  max-width: min(34vw, 132px);
+  pointer-events: auto;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill #hero-weather-mini,
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini--hero {
+  display: flex !important;
+  justify-content: flex-end !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__card--hero-pill {
+  width: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.92), rgba(247, 243, 235, 0.76)) !important;
+  box-shadow:
+    0 10px 20px rgba(22, 30, 20, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__card--hero-pill::before {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-compact {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  gap: 5px !important;
+  align-items: start !important;
+  padding: 6px 8px 6px !important;
+  position: relative !important;
+  isolation: isolate !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-art {
+  width: 30px !important;
+  height: 24px !important;
+  display: grid !important;
+  place-items: center !important;
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-art .weather-illustration {
+  width: 88px !important;
+  height: 74px !important;
+  margin: 0 !important;
+  transform: scale(0.34) translate(-4px, -6px) !important;
+  transform-origin: top left !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-art .weather-illustration__glow {
+  opacity: 0.78 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-copy {
+  display: grid !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+  align-self: start !important;
+  padding-top: 1px !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-topline {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-phase {
+  min-width: 16px !important;
+  min-height: 16px !important;
+  padding: 0 4px !important;
+  border-radius: 999px !important;
+  font-size: 0.52rem !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-temperature {
+  font-size: 0.98rem !important;
+  line-height: 1 !important;
+  letter-spacing: -0.05em !important;
+  color: #24331f !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-condition {
+  margin: -1px 0 0 !important;
+  font-size: 0.58rem !important;
+  line-height: 1.08 !important;
+  font-weight: 700 !important;
+  color: #51604c !important;
+  white-space: nowrap !important;
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-meta {
+  display: none !important;
+}
+
+/* Mobile home floating top bar:
+   vracia iba jemny search trigger + zvuk + nastavenia,
+   bez plneho headera a bez blokovania pozadia. */
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home {
+  display: block !important;
+  position: fixed !important;
+  top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 22 !important;
+  padding: 12px 16px !important;
+  margin: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home::before,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__center,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--primary {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__left,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .utility-bar__settings,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--settings {
+  display: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__center {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--primary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--primary > .toolbar-add-menu,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-worklog-panel,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-journal-panel,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-mobile-preview,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--primary > #open-main-menu {
+  display: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search {
+  flex: 1 1 68% !important;
+  width: auto !important;
+  max-width: 70% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__field,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__field:focus-within {
+  min-height: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  padding: 0 14px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 8px 18px rgba(8, 16, 30, 0.12) !important;
+  backdrop-filter: blur(10px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(125%) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__icon svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  stroke: rgba(247, 252, 255, 0.96) !important;
+  fill: none !important;
+  stroke-width: 2 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__icon::before {
+  content: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__field input {
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: rgba(245, 251, 255, 0.98) !important;
+  caret-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__field input::placeholder {
+  color: rgba(239, 246, 251, 0.76) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__clear {
+  color: rgba(246, 251, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #open-settings-panel,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 24px !important;
+  max-width: none !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  text-indent: -9999px !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #open-settings-panel::before,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound::before {
+  font-size: 22px !important;
+  color: rgba(248, 252, 255, 0.98) !important;
+  text-shadow: 0 2px 10px rgba(8, 15, 28, 0.28) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"],
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="off"] {
+  background: none !important;
+  border-color: transparent !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #open-settings-panel:focus-visible,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound:focus-visible,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__field:focus-within {
+  outline: none !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.34),
+    0 10px 24px rgba(8, 16, 30, 0.16) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__results {
+  top: var(--toolbar-search-overlay-top, calc(env(safe-area-inset-top, 0px) + 60px)) !important;
+  left: var(--toolbar-search-overlay-left, 16px) !important;
+  right: auto !important;
+  width: min(var(--toolbar-search-overlay-width, calc(100vw - 32px)), calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px) !important;
+  max-height: min(52dvh, 340px) !important;
+  padding: 10px !important;
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.84), rgba(239, 245, 251, 0.76)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.26) !important;
+  box-shadow: 0 14px 30px rgba(7, 13, 24, 0.16) !important;
+  backdrop-filter: blur(14px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(130%) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__item {
+  min-height: 64px !important;
+  padding: 10px 12px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(200, 214, 229, 0.62) !important;
+  background: rgba(255, 255, 255, 0.52) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__item:hover,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__item:focus-visible {
+  background: rgba(255, 255, 255, 0.68) !important;
+  border-color: rgba(180, 199, 217, 0.72) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__item-main strong,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__empty {
+  color: #223446 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__item-main span {
+  color: rgba(76, 97, 118, 0.88) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__item-badge {
+  padding: 4px 8px !important;
+  font-size: 0.64rem !important;
+  line-height: 1.1 !important;
+  color: #54697f !important;
+  background: rgba(240, 245, 250, 0.9) !important;
+  border: 1px solid rgba(200, 214, 229, 0.8) !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search__empty--floating-prompt {
+  min-height: 52px !important;
+  display: grid !important;
+  place-items: center !important;
+  text-align: center !important;
+  font-size: 0.84rem !important;
+  color: #42576e !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__center,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .menu-toolbar__group--primary,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home .toolbar-search {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"],
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="off"],
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound:focus-visible {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound::before,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"]::before,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"][data-audio-ready="ready"]::before,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound[data-audio-ready="pending"]::before,
+body.app-mobile-shell.app-main-menu-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="off"]::before {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill {
+  top: calc(env(safe-area-inset-top, 0px) + 72px) !important;
+  right: 4px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill {
+  display: block !important;
+  position: absolute !important;
+  top: calc(env(safe-area-inset-top, 0px) + 72px) !important;
+  right: 4px !important;
+  z-index: 8 !important;
+  width: min(34vw, 132px) !important;
+  max-width: min(34vw, 132px) !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill #hero-weather-mini,
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini--hero {
+  display: flex !important;
+  justify-content: flex-end !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__card--hero-pill {
+  width: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.92), rgba(247, 243, 235, 0.76)) !important;
+  box-shadow:
+    0 10px 20px rgba(22, 30, 20, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__card--hero-pill::before {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-compact {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  gap: 5px !important;
+  align-items: start !important;
+  padding: 6px 8px 6px !important;
+  position: relative !important;
+  isolation: isolate !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-art {
+  width: 30px !important;
+  height: 24px !important;
+  display: grid !important;
+  place-items: center !important;
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-art .weather-illustration {
+  width: 88px !important;
+  height: 74px !important;
+  margin: 0 !important;
+  transform: scale(0.34) translate(-4px, -6px) !important;
+  transform-origin: top left !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-art .weather-illustration__glow {
+  opacity: 0.78 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-copy {
+  display: grid !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+  align-self: start !important;
+  padding-top: 1px !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-topline {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-phase {
+  min-width: 16px !important;
+  min-height: 16px !important;
+  padding: 0 4px !important;
+  border-radius: 999px !important;
+  font-size: 0.52rem !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-temperature {
+  font-size: 0.98rem !important;
+  line-height: 1 !important;
+  letter-spacing: -0.05em !important;
+  color: #24331f !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-condition {
+  margin: -1px 0 0 !important;
+  font-size: 0.58rem !important;
+  line-height: 1.08 !important;
+  font-weight: 700 !important;
+  color: #51604c !important;
+  white-space: nowrap !important;
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__hero-meta {
+  display: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home {
+  display: block !important;
+  position: fixed !important;
+  top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 22 !important;
+  padding: 12px 16px !important;
+  margin: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home::before,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__center,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__group--primary,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search {
+  overflow: visible !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__left,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .utility-bar__settings,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__group--settings {
+  display: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__center {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__group--primary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__group--primary > .toolbar-add-menu,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-worklog-panel,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-journal-panel,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-mobile-preview,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .menu-toolbar__group--primary > #open-main-menu {
+  display: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search {
+  flex: 1 1 68% !important;
+  width: auto !important;
+  max-width: 70% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__field,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__field:focus-within {
+  min-height: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  padding: 0 14px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 8px 18px rgba(8, 16, 30, 0.12) !important;
+  backdrop-filter: blur(10px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(125%) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__icon svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  stroke: rgba(247, 252, 255, 0.96) !important;
+  fill: none !important;
+  stroke-width: 2 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__icon::before {
+  content: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__field input {
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: rgba(245, 251, 255, 0.98) !important;
+  caret-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__field input::placeholder {
+  color: rgba(239, 246, 251, 0.76) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__clear {
+  color: rgba(246, 251, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #open-settings-panel,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 24px !important;
+  max-width: none !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  text-indent: -9999px !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #open-settings-panel::before,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound::before {
+  font-size: 22px !important;
+  color: rgba(248, 252, 255, 0.98) !important;
+  text-shadow: 0 2px 10px rgba(8, 15, 28, 0.28) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"],
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="off"],
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound:focus-visible {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound::before,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"]::before,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"][data-audio-ready="ready"]::before,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound[data-audio-ready="pending"]::before,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #toggle-weather-sound[data-sound-state="off"]::before {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home #open-settings-panel:focus-visible,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__field:focus-within {
+  outline: none !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.34),
+    0 10px 24px rgba(8, 16, 30, 0.16) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__results {
+  top: var(--toolbar-search-overlay-top, calc(env(safe-area-inset-top, 0px) + 60px)) !important;
+  left: var(--toolbar-search-overlay-left, 16px) !important;
+  right: auto !important;
+  width: min(var(--toolbar-search-overlay-width, calc(100vw - 32px)), calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px) !important;
+  max-height: min(52dvh, 340px) !important;
+  padding: 10px !important;
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.84), rgba(239, 245, 251, 0.76)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.26) !important;
+  box-shadow: 0 14px 30px rgba(7, 13, 24, 0.16) !important;
+  backdrop-filter: blur(14px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(130%) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__item {
+  min-height: 64px !important;
+  padding: 10px 12px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(200, 214, 229, 0.62) !important;
+  background: rgba(255, 255, 255, 0.52) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__item:hover,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__item:focus-visible {
+  background: rgba(255, 255, 255, 0.68) !important;
+  border-color: rgba(180, 199, 217, 0.72) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__item-main strong,
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__empty {
+  color: #223446 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__item-main span {
+  color: rgba(76, 97, 118, 0.88) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__item-badge {
+  padding: 4px 8px !important;
+  font-size: 0.64rem !important;
+  line-height: 1.1 !important;
+  color: #54697f !important;
+  background: rgba(240, 245, 250, 0.9) !important;
+  border: 1px solid rgba(200, 214, 229, 0.8) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .utility-bar--floating-home .toolbar-search__empty--floating-prompt {
+  min-height: 52px !important;
+  display: grid !important;
+  place-items: center !important;
+  text-align: center !important;
+  font-size: 0.84rem !important;
+  color: #42576e !important;
+}
+
+/* Shared mobile top anchors:
+   search, icons and weather pill must stay on the same fixed coordinates
+   in home, category preview and deeper focused category views. */
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) {
+  --mobile-floating-topbar-top: calc(env(safe-area-inset-top, 0px) + 6px);
+  --mobile-floating-topbar-pad-x: 16px;
+  --mobile-floating-topbar-pad-y: 12px;
+  --mobile-floating-weather-top: calc(env(safe-area-inset-top, 0px) + 72px);
+  --mobile-floating-weather-right: 4px;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home {
+  position: fixed !important;
+  top: var(--mobile-floating-topbar-top) !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: var(--mobile-floating-topbar-pad-y) var(--mobile-floating-topbar-pad-x) !important;
+  z-index: 22 !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary {
+  gap: 12px !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search {
+  flex: 1 1 68% !important;
+  max-width: 70% !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-sky-weather-pill {
+  position: fixed !important;
+  top: var(--mobile-floating-weather-top) !important;
+  right: var(--mobile-floating-weather-right) !important;
+  left: auto !important;
+  z-index: 20 !important;
+  width: min(34vw, 132px) !important;
+  max-width: min(34vw, 132px) !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home::before,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home::after,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__center,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__left,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .utility-bar__settings,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--settings,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > .toolbar-add-menu,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-worklog-panel,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-journal-panel,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-mobile-preview,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #open-main-menu {
+  display: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__center {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto !important;
+  align-items: center !important;
+  justify-content: stretch !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  gap: 12px !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search {
+  flex: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field:focus-within {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  padding: 0 14px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 8px 18px rgba(8, 16, 30, 0.12) !important;
+  backdrop-filter: blur(10px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(125%) !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  stroke: rgba(247, 252, 255, 0.96) !important;
+  fill: none !important;
+  stroke-width: 2 !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon::before {
+  content: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field input {
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: rgba(245, 251, 255, 0.98) !important;
+  caret-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field input::placeholder {
+  color: rgba(239, 246, 251, 0.76) !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__clear {
+  color: rgba(246, 251, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Final shared mobile top bar lock:
+   home aj hlbšie kategórie musia mať identický closed top bar a weather pill. */
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home {
+  display: block !important;
+  position: fixed !important;
+  top: var(--mobile-floating-topbar-top) !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 22 !important;
+  padding: var(--mobile-floating-topbar-pad-y) var(--mobile-floating-topbar-pad-x) !important;
+  margin: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home::before,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__center,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary {
+  overflow: visible !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__left,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .utility-bar__settings,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--settings,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > .toolbar-add-menu,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-worklog-panel,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-journal-panel,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-mobile-preview,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #open-main-menu {
+  display: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__center {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  gap: 12px !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search {
+  flex: 1 1 68% !important;
+  width: auto !important;
+  max-width: 70% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field:focus-within {
+  min-height: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  padding: 0 14px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 8px 18px rgba(8, 16, 30, 0.12) !important;
+  backdrop-filter: blur(10px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(125%) !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  stroke: rgba(247, 252, 255, 0.96) !important;
+  fill: none !important;
+  stroke-width: 2 !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon::before {
+  content: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field input {
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: rgba(245, 251, 255, 0.98) !important;
+  caret-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field input::placeholder {
+  color: rgba(239, 246, 251, 0.76) !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__clear {
+  color: rgba(246, 251, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #open-settings-panel,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 24px !important;
+  max-width: none !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  text-indent: -9999px !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #open-settings-panel::before,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound::before {
+  font-size: 22px !important;
+  color: rgba(248, 252, 255, 0.98) !important;
+  text-shadow: 0 2px 10px rgba(8, 15, 28, 0.28) !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"],
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound[data-sound-state="off"],
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound:focus-visible {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound::before,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"]::before,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound[data-sound-state="on"][data-audio-ready="ready"]::before,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound[data-audio-ready="pending"]::before,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound[data-sound-state="off"]::before {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+/* Mobile memories hero:
+   pevný rozmer a plné vyplnenie obrázkom ako hero karta. */
+body.app-mobile-shell .memory-strip__hero,
+body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
+  overflow: hidden !important;
+  background: #111923 !important;
+}
+
+body.app-mobile-shell .memory-strip__backdrop,
+body.app-mobile-shell .workspace-layout--menu .memory-strip__backdrop {
+  display: none !important;
+}
+
+body.app-mobile-shell .memory-strip__hero img,
+body.app-mobile-shell .workspace-layout--menu .memory-strip__hero img {
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+body.app-mobile-shell .memory-strip__hero[role="button"],
+body.app-mobile-shell .workspace-layout--menu .memory-strip__hero[role="button"] {
+  cursor: pointer !important;
+}
+
+body.app-mobile-shell .memory-strip__note,
+body.app-mobile-shell .workspace-layout--menu .memory-strip__note {
+  padding: 28px 16px 14px !important;
+  text-align: left !important;
+  font-size: 1rem !important;
+  line-height: 1.26 !important;
+}
+
+.journal-overlay-card[data-journal-entry-id] {
+  scroll-margin-top: 96px;
+}
+
+/* Mobile floating top chrome host:
+   search, zvuk, nastavenia a weather pill sedia hore v stranke,
+   ale pri scrollovani maju odist s obsahom prec. */
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-floating-top-chrome-host {
+  position: absolute !important;
+  inset: 0 0 auto 0 !important;
+  height: 0 !important;
+  z-index: 22 !important;
+  pointer-events: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-floating-top-chrome-host:empty {
+  display: none !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-floating-top-chrome-host .utility-bar--floating-home {
+  position: absolute !important;
+  top: var(--mobile-floating-topbar-top) !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-floating-top-chrome-host .mobile-sky-weather-pill {
+  position: absolute !important;
+  top: var(--mobile-floating-weather-top) !important;
+  right: var(--mobile-floating-weather-right) !important;
+  left: auto !important;
+}
+
+/* Final mobile main category lock:
+   hlavne kategorie musia mat natvrdo rovnaky look, vysku, rozmer a image frame ako podradene. */
+body.app-mobile-shell .catalog-grid--main-menu {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card {
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: 0 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card,
+body.app-mobile-shell .catalog-card--main-menu-card:hover,
+body.app-mobile-shell .catalog-card--main-menu-card:focus-within {
+  background: var(--mobile-glass-card-bg) !important;
+  border-color: var(--mobile-glass-border) !important;
+  box-shadow:
+    0 10px 26px rgba(45, 37, 25, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 0 0 1px rgba(130, 111, 84, 0.04) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  border-radius: 16px !important;
+  min-height: 0 !important;
+  max-width: none !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card::before,
+body.app-mobile-shell .catalog-card--main-menu-card:hover::before,
+body.app-mobile-shell .catalog-card--main-menu-card:focus-within::before {
+  border-color: rgba(255, 255, 255, 0.58) !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
+  margin: 8px 8px 0 !important;
+  padding: 4px !important;
+  min-height: 78px !important;
+  aspect-ratio: 1 / 0.76 !important;
+  border-radius: 12px !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
+  display: grid !important;
+  justify-items: center !important;
+  align-content: start !important;
+  gap: 3px !important;
+  padding: 8px 8px 10px !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--category {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
+  width: 100% !important;
+  margin: 0 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.02 !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
+  font-size: 0.66rem !important;
+  line-height: 1.18 !important;
 }

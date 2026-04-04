@@ -385,9 +385,16 @@
     const deviceDpr = Math.max(1, Number(window.devicePixelRatio) || 1);
     const isMobileShell = isMobileWeatherShell();
     const lowPerformanceMobile = isLowPerformanceMobileWeatherMode();
+    const warmEdgePhase = state.activePhase === "dawn" || state.activePhase === "sunset";
     if (canvas === state.skyCanvas) {
       if (isMobileShell) {
         if (lowPerformanceMobile) return 1;
+        if (warmEdgePhase) {
+          if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1.16);
+          if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1.22);
+          if (state.activeCloudPreset === "partly") return Math.min(deviceDpr, 1.28);
+          return Math.min(deviceDpr, 1.32);
+        }
         if (state.activeCloudPreset === "overcast") return Math.min(deviceDpr, 1);
         if (state.activeCloudPreset === "cloudy") return Math.min(deviceDpr, 1);
         if (state.activeCloudPreset === "partly") return Math.min(deviceDpr, 1.02);

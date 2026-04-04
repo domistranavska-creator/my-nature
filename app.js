@@ -1,13 +1,7 @@
 ﻿const STORAGE_KEY = "moja-zahrada-v2";
 const WEATHER_PREFERENCES_KEY = "moja-zahrada-weather-preferences-v1";
-const FOLDER_STORAGE_META_KEY = "moja-zahrada-folder-storage-meta-v1";
-const FOLDER_STORAGE_DB_NAME = "moja-zahrada-folder-storage-v1";
-const FOLDER_STORAGE_DB_STORE = "handles";
-const FOLDER_STORAGE_HANDLE_ID = "state-directory";
-const FOLDER_STORAGE_FILE_NAME = "moja-zahrada-data.json";
-const FOLDER_STORAGE_BACKUP_FILE_NAME = "moja-zahrada-data-backup.json";
-const EBIRD_PREFERENCES_KEY = "moja-zahrada-ebird-preferences-v1";
 const EBIRD_TAXONOMY_CACHE_KEY = "moja-zahrada-ebird-taxonomy-v1";
+const EMBEDDED_EBIRD_API_KEY = "4ork1lgg5p9k";
 const LOCAL_AUTH_PROFILE_KEY = "moja-zahrada-local-auth-profile-v1";
 const LOCAL_AUTH_SESSION_KEY = "moja-zahrada-local-auth-session-v1";
 const SUPABASE_PREFERENCES_KEY = "moja-zahrada-supabase-preferences-v1";
@@ -965,8 +959,6 @@ let homeWeatherLoadPromise = null;
 let homeWeatherTrendLoadPromise = null;
 let homeWeatherOverviewLoadPromise = null;
 let homeWeatherRefreshTimer = null;
-let folderStorageWriteQueue = Promise.resolve();
-let folderStorageWriteAlertShown = false;
 let authGatePreviousOverflow = null;
 
 const mainMenuEl = document.getElementById("main-menu");
@@ -2205,6 +2197,7 @@ function syncResponsiveAppShellClass() {
   syncResponsiveToolbarButtonPlacement();
   syncMobileBottomNavPlacement();
   syncMobileWeatherMiniPlacement();
+  syncMobileTopStripVisibility();
   applyMobileWeatherTheme();
   applyMobileWeatherSceneMode();
   syncMobileToolbarScrollState();
@@ -2815,6 +2808,7 @@ const imageLightboxBackEl = document.getElementById("image-lightbox-back");
 const imageLightboxPrevEl = document.getElementById("image-lightbox-prev");
 const imageLightboxNextEl = document.getElementById("image-lightbox-next");
 const detailModalBackEl = document.getElementById("detail-modal-back");
+let detailModalBackOverride = null;
 const undoDeleteEl = document.getElementById("undo-delete");
 const restoreResetEl = document.getElementById("restore-reset");
 const mainMenuQuickEl = document.getElementById("open-main-menu");
@@ -2836,8 +2830,63 @@ const workspaceLayoutEl = document.querySelector(".workspace-layout");
 const workspaceMainEl = document.querySelector(".workspace-main");
 const utilityBarEl = document.querySelector(".utility-bar");
 const pageShellEl = document.querySelector(".page-shell");
+const floatingWeatherMiniEl = document.querySelector(".mobile-sky-weather-pill");
 const heroWeatherWrapEl = document.querySelector(".hero__weather");
+const utilityBarOriginalParentEl = utilityBarEl?.parentElement || null;
+const utilityBarOriginalNextSiblingEl = utilityBarEl?.nextSibling || null;
+const floatingWeatherMiniOriginalParentEl = floatingWeatherMiniEl?.parentElement || null;
+const floatingWeatherMiniOriginalNextSiblingEl = floatingWeatherMiniEl?.nextSibling || null;
 const heroWeatherOriginalParentEl = heroWeatherWrapEl?.parentElement || null;
+// Dočasný reset hornej toolbar vrstvy:
+// search, zvuk, nastavenia a hero weather pill skladáme neskôr nanovo.
+const TOP_STRIP_RESET_ACTIVE = true;
+function isHomeFloatingTopBarMode() {
+  if (typeof document === "undefined") return false;
+  return TOP_STRIP_RESET_ACTIVE
+    && isCompactAppShellViewport()
+    && (
+      document.body?.classList.contains("app-main-menu-mode")
+      || document.body?.classList.contains("app-focused-mode")
+    );
+}
+function isTopStripResetMode() {
+  return TOP_STRIP_RESET_ACTIVE && isCompactAppShellViewport();
+}
+
+function ensureMobileFloatingTopChromeHost() {
+  if (!pageShellEl) return null;
+  let host = pageShellEl.querySelector(".mobile-floating-top-chrome-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.className = "mobile-floating-top-chrome-host";
+    if (utilityBarOriginalParentEl?.parentElement === pageShellEl) {
+      pageShellEl.insertBefore(host, utilityBarOriginalParentEl);
+    } else {
+      pageShellEl.insertBefore(host, pageShellEl.firstChild || null);
+    }
+  }
+  return host;
+}
+
+function restoreMobileFloatingTopChromeMounts() {
+  const host = pageShellEl?.querySelector(".mobile-floating-top-chrome-host");
+  if (floatingWeatherMiniEl && floatingWeatherMiniOriginalParentEl && floatingWeatherMiniEl.parentElement !== floatingWeatherMiniOriginalParentEl) {
+    const weatherReferenceEl = floatingWeatherMiniOriginalNextSiblingEl?.parentElement === floatingWeatherMiniOriginalParentEl
+      ? floatingWeatherMiniOriginalNextSiblingEl
+      : floatingWeatherMiniOriginalParentEl.firstChild;
+    floatingWeatherMiniOriginalParentEl.insertBefore(floatingWeatherMiniEl, weatherReferenceEl);
+  }
+  if (utilityBarEl && utilityBarOriginalParentEl && utilityBarEl.parentElement !== utilityBarOriginalParentEl) {
+    const utilityReferenceEl = utilityBarOriginalNextSiblingEl?.parentElement === utilityBarOriginalParentEl
+      ? utilityBarOriginalNextSiblingEl
+      : null;
+    utilityBarOriginalParentEl.insertBefore(utilityBarEl, utilityReferenceEl);
+  }
+  if (host && !host.children.length) {
+    host.remove();
+  }
+}
+
 const toolbarAddMenuPanelOriginalParentEl = toolbarAddMenuPanelEl?.parentElement || null;
 const mainMenuQuickOriginalParentEl = mainMenuQuickEl?.parentElement || null;
 const worklogQuickOriginalParentEl = worklogPanelToggleEl?.parentElement || null;
@@ -2992,12 +3041,9 @@ window.addEventListener("resize", () => {
   scheduleGlobalViewportMaintenance({ resize: true });
 }, { passive: true });
 window.addEventListener("scroll", () => {
-  scheduleGlobalViewportMaintenance({ scroll: true });
+scheduleGlobalViewportMaintenance({ scroll: true });
 }, { passive: true });
 scheduleImageBackgroundCleanup();
-hydrateStateFromFolderStorage().catch((error) => {
-  console.warn("Dočasné diskové úložisko sa nepodarilo načítať.", error);
-});
 
 function closeToolbarAddMenu({ skipHistory = true } = {}) {
   if (toolbarAddMenuEl?.open) {
@@ -3229,9 +3275,59 @@ function renderJournalOverlayCard(entry) {
   const weatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry));
   const headerWeatherWidgets = weatherWidgets;
   const footerChips = chips;
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+
+  if (isMobileShell) {
+    const previewText = trimText(safeText, 180);
+    return `
+      <article class="journal-overlay-card journal-overlay-card--compact-list ${images.length ? "journal-overlay-card--with-image" : ""}" data-journal-entry-id="${escapeAttribute(safeId)}">
+        <div class="journal-overlay-card__header">
+          <div class="journal-overlay-card__meta">
+            <div class="journal-overlay-card__topline">
+              <span class="journal-item__date-badge">${escapeHtml(dateLabel)}</span>
+              ${headerWeatherWidgets}
+            </div>
+            <div class="journal-overlay-card__title-row">
+              <strong class="journal-overlay-card__title">${escapeHtml(safeTitle)}</strong>
+              ${renderMoodBadge(normalizedEntry.mood, "journal-overlay-card__mood")}
+            </div>
+          </div>
+          <div class="journal-overlay-card__actions">
+            <button class="button button--ghost journal-item__action" type="button" data-edit-journal-overlay="${escapeAttribute(safeId)}" aria-label="Upraviť záznam" title="Upraviť">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 20h4l10-10-4-4L4 16v4z"></path>
+                <path d="M13 7l4 4"></path>
+              </svg>
+            </button>
+            <button class="button button--ghost journal-item__action journal-item__action--danger" type="button" data-delete-journal-overlay="${escapeAttribute(safeId)}" aria-label="Vymazať záznam" title="Vymazať">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 7h14"></path>
+                <path d="M9 7V5h6v2"></path>
+                <path d="M8 7l1 12h6l1-12"></path>
+                <path d="M10 10v6"></path>
+                <path d="M14 10v6"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        ${previewText ? `<p class="journal-overlay-card__text">${escapeHtml(previewText)}</p>` : ""}
+        ${walkMarkup}
+        ${renderJournalVideoPlayer(video, `Video zápisu ${safeTitle}`, "journal-item__video")}
+        ${images[0] ? `
+          <div class="journal-overlay-card__gallery journal-overlay-card__gallery--compact-list">
+            <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(safeId)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(safeTitle)}">
+              ${renderJournalImageTag(images[0], safeTitle, { entryId: safeId, index: 0 })}
+            </button>
+            ${images.length > 1 ? `<span class="journal-item__more">+${images.length - 1}</span>` : ""}
+          </div>
+        ` : ""}
+        ${footerChips.length ? `<div class="journal-overlay-card__footer"><div class="journal-item__chips journal-overlay-card__chips">${footerChips.map(renderJournalChip).join("")}</div></div>` : ""}
+      </article>
+    `;
+  }
 
   return `
-    <article class="journal-overlay-card ${images.length ? "journal-overlay-card--with-image" : ""} ${safeText || walkMarkup ? "" : "journal-overlay-card--compact"}">
+    <article class="journal-overlay-card ${images.length ? "journal-overlay-card--with-image" : ""} ${safeText || walkMarkup ? "" : "journal-overlay-card--compact"}" data-journal-entry-id="${escapeAttribute(safeId)}">
       <div class="journal-overlay-card__header">
         <div class="journal-overlay-card__meta">
           <div class="journal-overlay-card__topline">
@@ -3289,7 +3385,7 @@ function renderJournalOverlayCardsSafe(entries) {
       const fallbackDate = String(entry?.date || todayISO()).trim() || todayISO();
       const fallbackText = String(entry?.text || "").trim();
       return `
-        <article class="journal-overlay-card journal-overlay-card--fallback">
+        <article class="journal-overlay-card journal-overlay-card--fallback" data-journal-entry-id="${escapeAttribute(String(entry?.id || ""))}">
           <div class="journal-overlay-card__header">
             <div class="journal-overlay-card__meta">
               <div class="journal-overlay-card__topline">
@@ -3430,6 +3526,35 @@ function openJournalOverlayList(initialTagKey = "") {
   };
 
   renderOverlay();
+}
+
+function openJournalOverlayEntry(entryId = "") {
+  const normalizedEntryId = String(entryId || "").trim();
+  if (!normalizedEntryId) {
+    openJournalOverlayList();
+    return;
+  }
+
+  openJournalOverlayList();
+
+  const scrollToEntry = () => {
+    const root = ensureJournalOverlayRoot();
+    const escapedEntryId = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+      ? CSS.escape(normalizedEntryId)
+      : normalizedEntryId.replace(/["\\]/g, "\\$&");
+    const targetCard = root.querySelector(`[data-journal-entry-id="${escapedEntryId}"]`);
+    if (!targetCard) return;
+    targetCard.scrollIntoView({ block: "start", behavior: navigationScrollBehavior() });
+  };
+
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(scrollToEntry);
+    });
+    return;
+  }
+
+  scrollToEntry();
 }
 
 function renderJournalComposerImagePreview(existingImages, pendingUrls, existingVideo = "", pendingVideoUrl = "") {
@@ -4832,7 +4957,10 @@ function openFocusedCategoryNavigation(categoryId = "", { scrollToTop = true } =
   if (scrollToTop) {
     scrollNavigationViewportTop();
     if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(scrollNavigationViewportTop);
+      window.requestAnimationFrame(() => {
+        scrollNavigationViewportTop();
+        window.requestAnimationFrame(scrollNavigationViewportTop);
+      });
     }
   }
 }
@@ -4893,7 +5021,7 @@ function bindCatalogDelegatedActions() {
     const varietyTrigger = event.target.closest("[data-open-variety]");
     if (varietyTrigger) {
       event.preventDefault();
-      openStoredCardEditor(varietyTrigger.dataset.openVariety || "");
+      openStoredCardView(varietyTrigger.dataset.openVariety || "");
     }
   });
 
@@ -4907,7 +5035,7 @@ function bindCatalogDelegatedActions() {
     const varietyTrigger = event.target.closest("[data-open-variety][role='button']");
     if (varietyTrigger) {
       event.preventDefault();
-      openStoredCardEditor(varietyTrigger.dataset.openVariety || "");
+      openStoredCardView(varietyTrigger.dataset.openVariety || "");
     }
   });
 }
@@ -4964,10 +5092,18 @@ function renderToolbarSearchResults() {
   const { wrap, input, results } = toolbarSearchElements();
   if (!input || !results) return;
   const query = String(input.value || "").trim();
+  const isFloatingSearchMode = isHomeFloatingTopBarMode();
   toolbarSearchQuery = query;
   toolbarSearchLastResults = toolbarSearchMatches(query);
 
   if (query.length < 2) {
+    if (isFloatingSearchMode && document.activeElement === input) {
+      results.hidden = false;
+      results.innerHTML = '<div class="toolbar-search__empty toolbar-search__empty--floating-prompt">Začni písať názov karty alebo kategórie.</div>';
+      wrap?.classList.add("is-open");
+      syncToolbarSearchOverlayPosition();
+      return;
+    }
     results.hidden = true;
     results.innerHTML = "";
     wrap?.classList.remove("is-open");
@@ -5013,14 +5149,19 @@ function renderToolbarSearchResults() {
         render();
       }
       scrollNavigationViewportTop();
-      openStoredCardEditor(id);
+      openStoredCardView(id);
     });
   });
 }
 
 function ensureToolbarSearch() {
+  if (isTopStripResetMode() && !isHomeFloatingTopBarMode()) {
+    document.getElementById("toolbar-search")?.remove();
+    return null;
+  }
   const group = document.querySelector(".menu-toolbar__group--primary");
   if (!group) return null;
+  const placeholderText = isHomeFloatingTopBarMode() ? "Hľadať..." : "Hľadať kartu alebo kategóriu";
   let wrap = document.getElementById("toolbar-search");
   if (!wrap) {
     wrap = document.createElement("div");
@@ -5034,7 +5175,7 @@ function ensureToolbarSearch() {
             <path d="M16 16l4 4"></path>
           </svg>
         </span>
-        <input id="toolbar-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Hľadať kartu alebo kategóriu">
+        <input id="toolbar-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="${escapeAttribute(placeholderText)}">
         <button class="toolbar-search__clear" id="toolbar-search-clear" type="button" aria-label="Vymazať hľadanie" hidden>×</button>
       </label>
       <div class="toolbar-search__results" id="toolbar-search-results" hidden></div>
@@ -5055,6 +5196,7 @@ function ensureToolbarSearch() {
   const input = document.getElementById("toolbar-search-input");
   const clearButton = document.getElementById("toolbar-search-clear");
   const results = document.getElementById("toolbar-search-results");
+  if (input) input.placeholder = placeholderText;
 
   if (input && !input.dataset.bound) {
     input.dataset.bound = "true";
@@ -5063,7 +5205,7 @@ function ensureToolbarSearch() {
       renderToolbarSearchResults();
     });
     input.addEventListener("focus", () => {
-      if (String(input.value || "").trim().length >= 2) {
+      if (isHomeFloatingTopBarMode() || String(input.value || "").trim().length >= 2) {
         renderToolbarSearchResults();
       }
     });
@@ -5085,8 +5227,7 @@ function ensureToolbarSearch() {
   if (clearButton && !clearButton.dataset.bound) {
     clearButton.dataset.bound = "true";
     clearButton.addEventListener("click", () => {
-      clearToolbarSearch({ keepFocus: true });
-      input?.focus();
+      clearToolbarSearch();
     });
   }
 
@@ -5237,7 +5378,7 @@ function wireStaticEvents() {
     };
   }
 
-  if (settingsPanelToggleEl) {
+  if (settingsPanelToggleEl && settingsPanelToggleEl.dataset.boundSettings !== "true") {
     settingsPanelToggleEl.addEventListener("click", () => {
       closeToolbarAddMenu();
       openSettingsManager();
@@ -5309,6 +5450,7 @@ function wireStaticEvents() {
   detailModal.addEventListener("close", () => {
     unlockDetailBodyScroll();
     syncMobileOverlayBottomNavPlacement();
+    detailModalBackOverride = null;
     if (!overlayHistoryNavigating) {
       clearOverlayHistory("detail");
       return;
@@ -5318,6 +5460,9 @@ function wireStaticEvents() {
 
   if (detailModalBackEl) {
     detailModalBackEl.addEventListener("click", () => {
+      if (typeof detailModalBackOverride === "function" && detailModalBackOverride()) {
+        return;
+      }
       if (activeOverlayHistoryKind === "detail" && typeof window !== "undefined" && window.history?.back) {
         window.history.back();
         return;
@@ -5949,6 +6094,10 @@ function renderMainMenu() {
 }
 
 function ensureSettingsToolbarButton() {
+  if (isTopStripResetMode() && !isHomeFloatingTopBarMode()) {
+    document.getElementById("open-settings-panel")?.remove();
+    return null;
+  }
   const toolbarSlot = document.getElementById("menu-toolbar-settings-slot") || document.querySelector(".utility-bar__settings");
   if (!toolbarSlot) return null;
   const mobilePrimaryGroup = document.querySelector(".menu-toolbar__group--primary");
@@ -5960,11 +6109,18 @@ function ensureSettingsToolbarButton() {
     if (button.parentElement !== targetParent) {
       targetParent.appendChild(button);
     }
-    button.setAttribute("aria-label", "Nastavenia");
-    button.setAttribute("title", "Nastavenia");
-    button.dataset.toolbarEmoji = "\u2699\uFE0F";
-    return button;
+  button.setAttribute("aria-label", "Nastavenia");
+  button.setAttribute("title", "Nastavenia");
+  button.dataset.toolbarEmoji = "\u2699\uFE0F";
+  if (button.dataset.boundSettings !== "true") {
+    button.dataset.boundSettings = "true";
+    button.addEventListener("click", () => {
+      closeToolbarAddMenu();
+      openSettingsManager();
+    });
   }
+  return button;
+}
 
   button = document.createElement("button");
   button.className = "button button--ghost button--toolbar-utility";
@@ -5979,6 +6135,10 @@ function ensureSettingsToolbarButton() {
 }
 
 function ensureMobilePreviewButton() {
+  if (isTopStripResetMode()) {
+    document.getElementById("toggle-mobile-preview")?.remove();
+    return null;
+  }
   if (isEmbeddedMobilePreviewMode()) {
     document.getElementById("toggle-mobile-preview")?.remove();
     return null;
@@ -6009,6 +6169,10 @@ function ensureMobilePreviewButton() {
 }
 
 function ensureMobileWeatherSoundButton() {
+  if (isTopStripResetMode() && !isHomeFloatingTopBarMode()) {
+    document.getElementById("toggle-weather-sound")?.remove();
+    return null;
+  }
   const toolbarSlot = document.getElementById("menu-toolbar-settings-slot") || document.querySelector(".utility-bar__settings");
   if (!toolbarSlot) return null;
   const mobilePrimaryGroup = document.querySelector(".menu-toolbar__group--primary");
@@ -6041,6 +6205,20 @@ function ensureMobileWeatherSoundButton() {
     targetParent.insertBefore(button, settingsButton);
   } else {
     targetParent.appendChild(button);
+  }
+  if (button.dataset.bound !== "true") {
+    button.dataset.bound = "true";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (activatePendingMobileWeatherSound()) {
+        setMobileWeatherSoundPanelOpen(false);
+        return;
+      }
+      const nextEnabled = !mobileWeatherSoundEnabled;
+      setMobileWeatherSoundEnabled(nextEnabled, { activate: nextEnabled });
+      setMobileWeatherSoundPanelOpen(false);
+    });
+    window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
   }
   syncMobileWeatherSoundButton();
   return button;
@@ -6213,7 +6391,7 @@ function runMobileBottomNavAction(action = "") {
       return;
     }
     if (normalizedAction === "camera") {
-      openMobileCameraPicker();
+      openBottomNavMediaChooser();
       return;
     }
     if (normalizedAction === "journal") {
@@ -6244,6 +6422,80 @@ function runMobileBottomNavAction(action = "") {
   };
 
   applyAction();
+}
+
+function shouldUseDirectBottomNavMediaChooser() {
+  if (typeof document === "undefined" || typeof window === "undefined") return false;
+  if (!document.body?.classList.contains("app-mobile-shell")) return false;
+  if (isEmbeddedMobilePreviewMode()) return false;
+  if (window.parent !== window) return false;
+  if (typeof navigator !== "undefined" && Number(navigator.maxTouchPoints) > 0) return true;
+  const userAgent = String(navigator?.userAgent || "");
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(userAgent)) return true;
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches;
+  }
+  return false;
+}
+
+function ensureBottomNavMediaInput() {
+  if (typeof document === "undefined") return null;
+  let input = document.getElementById("mobile-bottom-nav-media-input");
+  if (!(input instanceof HTMLInputElement)) {
+    input = document.createElement("input");
+    input.id = "mobile-bottom-nav-media-input";
+    input.type = "file";
+    input.accept = `${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`;
+    input.hidden = true;
+    document.body.appendChild(input);
+  }
+
+  if (input.dataset.bound !== "true") {
+    input.dataset.bound = "true";
+    input.addEventListener("change", () => {
+      const file = Array.from(input.files || []).find((item) => item instanceof File && item.size) || null;
+      input.value = "";
+      if (!file) return;
+      handleGenericMobileMediaFile(file);
+    });
+  }
+
+  if (input.parentElement !== document.body) {
+    document.body.appendChild(input);
+  }
+
+  input.accept = `${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`;
+  input.removeAttribute("capture");
+  input.removeAttribute("multiple");
+  return input;
+}
+
+function openBottomNavMediaChooser() {
+  if (!shouldUseDirectBottomNavMediaChooser()) {
+    openMobileCameraPicker();
+    return;
+  }
+
+  const input = ensureBottomNavMediaInput();
+  if (!(input instanceof HTMLInputElement)) {
+    openMobileCameraPicker();
+    return;
+  }
+
+  closeMobileCameraPicker();
+  mobileCameraPickerTargetInputEl = null;
+  mobileCameraPickerTargetOptions = null;
+
+  input.value = "";
+  try {
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+  } catch (error) {
+    console.debug("Natívny media picker sa otvorí cez klik namiesto showPicker().", error);
+  }
+  input.click();
 }
 
 function bindMobileBottomNav(slot) {
@@ -6570,6 +6822,7 @@ function ensureMobileCameraPicker() {
     const openInput = (selector) => {
       const input = host.querySelector(selector);
       if (input instanceof HTMLInputElement) {
+        input.value = "";
         input.click();
       }
     };
@@ -6592,7 +6845,7 @@ function ensureMobileCameraPicker() {
         return;
       }
       if (action === "capture-photo") {
-        openInput(isCompactMode ? "#mobile-media-capture-input" : "#mobile-camera-capture-input");
+        openInput("#mobile-camera-capture-input");
         return;
       }
       if (action === "pick-photo") {
@@ -6661,7 +6914,8 @@ function openMobileCameraPicker() {
     title: "Pridať médiá",
     subtitle: "",
     actions: [
-      { id: "capture-photo", label: "Odfotiť alebo natočiť video" },
+      { id: "capture-photo", label: "Odfotiť" },
+      { id: "capture-video", label: "Natočiť video" },
       { id: "pick-photo", label: "Vybrať z telefónu" }
     ]
   });
@@ -6824,7 +7078,17 @@ function ensureMobileWeatherToolbarSlot() {
 }
 
 function syncMobileWeatherMiniPlacement() {
+  if (isTopStripResetMode()) {
+    if (heroWeatherWrapEl) {
+      heroWeatherWrapEl.setAttribute("hidden", "hidden");
+      heroWeatherWrapEl.style.setProperty("display", "none");
+    }
+    document.getElementById("mobile-toolbar-weather-slot")?.remove();
+    return;
+  }
   if (typeof document === "undefined" || !heroWeatherWrapEl || !heroWeatherOriginalParentEl) return;
+  heroWeatherWrapEl.removeAttribute("hidden");
+  heroWeatherWrapEl.style.removeProperty("display");
   const isMobileShell = document.body.classList.contains("app-mobile-shell");
   if (isMobileShell) {
     const slot = ensureMobileWeatherToolbarSlot();
@@ -6837,6 +7101,123 @@ function syncMobileWeatherMiniPlacement() {
     heroWeatherOriginalParentEl.appendChild(heroWeatherWrapEl);
   }
   document.getElementById("mobile-toolbar-weather-slot")?.remove();
+}
+
+function syncMobileTopStripVisibility() {
+  if (typeof document === "undefined") return;
+  const contentEl = document.querySelector(".content");
+  const heroEl = document.querySelector(".hero");
+  const heroContentEl = document.querySelector(".hero__content");
+  const heroTextEl = document.querySelector(".hero__text");
+  const heroOverlayEl = document.querySelector(".hero__overlay");
+  const shouldHideLegacyTopStrip = isTopStripResetMode();
+  const showHomeFloatingTopBar = isHomeFloatingTopBarMode();
+  if (showHomeFloatingTopBar) {
+    const host = ensureMobileFloatingTopChromeHost();
+    if (host) {
+      if (utilityBarEl && utilityBarEl.parentElement !== host) {
+        host.appendChild(utilityBarEl);
+      }
+      if (floatingWeatherMiniEl && floatingWeatherMiniEl.parentElement !== host) {
+        host.appendChild(floatingWeatherMiniEl);
+      }
+    }
+  } else {
+    restoreMobileFloatingTopChromeMounts();
+  }
+  if (shouldHideLegacyTopStrip && !showHomeFloatingTopBar) {
+    document.getElementById("toolbar-search")?.remove();
+    document.getElementById("toggle-weather-sound")?.remove();
+    document.getElementById("open-settings-panel")?.remove();
+  }
+  if (shouldHideLegacyTopStrip) {
+    document.getElementById("toggle-mobile-preview")?.remove();
+    document.getElementById("mobile-toolbar-weather-slot")?.remove();
+  }
+  if (utilityBarEl) {
+    if (showHomeFloatingTopBar) {
+      utilityBarEl.removeAttribute("hidden");
+      utilityBarEl.style.removeProperty("display");
+    } else if (shouldHideLegacyTopStrip) {
+      utilityBarEl.setAttribute("hidden", "hidden");
+      utilityBarEl.style.setProperty("display", "none", "important");
+    } else {
+      utilityBarEl.removeAttribute("hidden");
+      utilityBarEl.style.removeProperty("display");
+    }
+  }
+  if (heroWeatherWrapEl) {
+    if (shouldHideLegacyTopStrip) {
+      heroWeatherWrapEl.setAttribute("hidden", "hidden");
+      heroWeatherWrapEl.style.setProperty("display", "none", "important");
+    } else {
+      heroWeatherWrapEl.removeAttribute("hidden");
+      heroWeatherWrapEl.style.removeProperty("display");
+    }
+  }
+  if (heroEl) {
+    if (shouldHideLegacyTopStrip) {
+      heroEl.setAttribute("hidden", "hidden");
+      heroEl.style.setProperty("display", "none", "important");
+    } else {
+      heroEl.removeAttribute("hidden");
+      heroEl.style.removeProperty("display");
+      heroEl.style.removeProperty("min-height");
+      heroEl.style.removeProperty("height");
+      heroEl.style.removeProperty("padding");
+      heroEl.style.removeProperty("margin");
+      heroEl.style.removeProperty("background");
+      heroEl.style.removeProperty("box-shadow");
+      heroEl.style.removeProperty("border-radius");
+      heroEl.style.removeProperty("overflow");
+    }
+  }
+  if (heroContentEl) {
+    if (shouldHideLegacyTopStrip) {
+      heroContentEl.setAttribute("hidden", "hidden");
+      heroContentEl.style.setProperty("display", "none", "important");
+    } else {
+      heroContentEl.removeAttribute("hidden");
+      heroContentEl.style.removeProperty("display");
+      heroContentEl.style.removeProperty("max-height");
+      heroContentEl.style.removeProperty("min-height");
+      heroContentEl.style.removeProperty("padding");
+      heroContentEl.style.removeProperty("margin");
+      heroContentEl.style.removeProperty("overflow");
+    }
+  }
+  if (heroTextEl) {
+    if (shouldHideLegacyTopStrip) {
+      heroTextEl.setAttribute("hidden", "hidden");
+      heroTextEl.style.setProperty("display", "none", "important");
+    } else {
+      heroTextEl.removeAttribute("hidden");
+      heroTextEl.style.removeProperty("display");
+    }
+  }
+  if (heroOverlayEl) {
+    if (shouldHideLegacyTopStrip) {
+      heroOverlayEl.setAttribute("hidden", "hidden");
+      heroOverlayEl.style.setProperty("display", "none", "important");
+    } else {
+      heroOverlayEl.removeAttribute("hidden");
+      heroOverlayEl.style.removeProperty("display");
+    }
+  }
+  if (contentEl) {
+    if (shouldHideLegacyTopStrip) {
+      contentEl.style.setProperty("padding-top", "0px", "important");
+    } else {
+      contentEl.style.removeProperty("padding-top");
+    }
+  }
+  if (menuPanelEl) {
+    if (shouldHideLegacyTopStrip) {
+      menuPanelEl.style.setProperty("margin-top", "0");
+    } else {
+      menuPanelEl.style.removeProperty("margin-top");
+    }
+  }
 }
 
 function renderProgressOverview() {
@@ -9427,16 +9808,29 @@ function renderMainMenuWeatherMini(weather, options = {}) {
   const dayPeriod = weatherSnapshotDayPeriod(weather);
   const phaseLabel = dayPeriod === "night" ? "Noc" : "Deň";
   const phaseIcon = dayPeriod === "night" ? ICONS.weatherMoon : ICONS.weatherSun;
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const mobileInlineDetails = [
+    weather.rain ? `zrážky ${weather.rain}` : "",
+    weather.wind ? `vietor ${weather.wind}` : "",
+    sunshine ? `slnko ${sunshine}` : ""
+  ].filter(Boolean).join(" • ");
 
   if (options.heroCompact) {
     const heroMeta = weather.wind || weather.rain || weather.humidity || "";
     return `
       <div class="main-menu-weather-mini__card main-menu-weather-mini__card--${weatherVisualTone(weather)} main-menu-weather-mini__card--${escapeAttribute(dayPeriod)} main-menu-weather-mini__card--hero-pill"${triggerAttributes}>
-        <div class="main-menu-weather-mini__hero-pill">
-          <span class="main-menu-weather-mini__hero-phase main-menu-weather-mini__hero-phase--${escapeAttribute(dayPeriod)}" aria-label="${escapeAttribute(phaseLabel)}" title="${escapeAttribute(phaseLabel)}"><span aria-hidden="true">${escapeHtml(phaseIcon)}</span></span>
-          <strong class="main-menu-weather-mini__hero-temperature">${escapeHtml(weather.temperature || "—")}</strong>
-          <span class="main-menu-weather-mini__hero-condition">${escapeHtml(weather.condition || "Počasie")}</span>
-          ${heroMeta ? `<span class="main-menu-weather-mini__hero-meta">${escapeHtml(heroMeta)}</span>` : ""}
+        <div class="main-menu-weather-mini__hero-compact">
+          <span class="main-menu-weather-mini__hero-art">
+            ${weatherIllustrationMarkup(weather)}
+          </span>
+          <div class="main-menu-weather-mini__hero-copy">
+            <div class="main-menu-weather-mini__hero-topline">
+              <strong class="main-menu-weather-mini__hero-temperature">${escapeHtml(weather.temperature || "—")}</strong>
+              <span class="main-menu-weather-mini__hero-phase main-menu-weather-mini__hero-phase--${escapeAttribute(dayPeriod)}" aria-label="${escapeAttribute(phaseLabel)}" title="${escapeAttribute(phaseLabel)}"><span aria-hidden="true">${escapeHtml(phaseIcon)}</span></span>
+            </div>
+            <span class="main-menu-weather-mini__hero-condition">${escapeHtml(weather.condition || "Počasie")}</span>
+            ${heroMeta ? `<span class="main-menu-weather-mini__hero-meta">${escapeHtml(heroMeta)}</span>` : ""}
+          </div>
         </div>
       </div>
     `;
@@ -9458,12 +9852,16 @@ function renderMainMenuWeatherMini(weather, options = {}) {
             <strong class="main-menu-weather-mini__temperature">${escapeHtml(weather.temperature || "—")}</strong>
             <span class="main-menu-weather-mini__condition">${escapeHtml(weather.condition || "Počasie")}</span>
           </div>
-          <div class="main-menu-weather-mini__details">
-            ${mainMenuWeatherDetailMarkup("Vlhkosť", weather.humidity)}
-            ${mainMenuWeatherDetailMarkup("Zrážky", weather.rain)}
-            ${mainMenuWeatherDetailMarkup("Vietor", weather.wind)}
-            ${mainMenuWeatherDetailMarkup("Slnko", sunshine)}
-          </div>
+          ${isMobileShell
+            ? `<p class="main-menu-weather-mini__meta main-menu-weather-mini__meta--inline">${escapeHtml(mobileInlineDetails || weather.humidity || observedLabel || "")}</p>`
+            : `
+              <div class="main-menu-weather-mini__details">
+                ${mainMenuWeatherDetailMarkup("Vlhkosť", weather.humidity)}
+                ${mainMenuWeatherDetailMarkup("Zrážky", weather.rain)}
+                ${mainMenuWeatherDetailMarkup("Vietor", weather.wind)}
+                ${mainMenuWeatherDetailMarkup("Slnko", sunshine)}
+              </div>
+            `}
           ${!options.compactTrend ? `<p class="main-menu-weather-mini__meta main-menu-weather-mini__meta--quiet">${escapeHtml(observedLabel)}</p>` : ""}
         </div>
       </div>
@@ -10463,6 +10861,88 @@ function syncDetailEditorImagePresentation(previewEl) {
   }
 }
 
+function previewCardBadgeMarkup(label, tone = "neutral") {
+  const safeLabel = String(label || "").trim();
+  if (!safeLabel) return "";
+  return `<span class="preview-card-badge preview-card-badge--${escapeAttribute(tone)}">${escapeHtml(safeLabel)}</span>`;
+}
+
+function previewCardPrimaryMeta(item) {
+  const resolvedType = cardType(item);
+
+  if (resolvedType === "variety" && entryKind(item) === "detail") {
+    const primaryStatus = primaryStatusValue(varietyStatusValues(item));
+    if (primaryStatus === "planned") return "Plánujem";
+    if (primaryStatus === "harvested") return "Zber";
+    if (primaryStatus === "sown" || primaryStatus === "transplanted") return "Vysiata";
+    return "";
+  }
+
+  if (isQuickEntry(item)) return "Záznam";
+  if (isGalleryEntry(item)) return "Galéria";
+  if (resolvedType === "bird") return "Pozorovanie";
+  return cardTypeLabel(resolvedType);
+}
+
+function previewCardSubtitle(item) {
+  if (cardType(item) === "bird") {
+    return String(item.birdLatinName || "").trim();
+  }
+  return "";
+}
+
+function previewCardBadges(item) {
+  const resolvedType = cardType(item);
+  const badges = [];
+
+  if (resolvedType === "variety") {
+    if (item.top) badges.push(previewCardBadgeMarkup("top odroda", "gold"));
+  }
+
+  return badges.filter(Boolean).slice(0, 2).join("");
+}
+
+function previewCardEyebrow(category) {
+  return String(category?.name || "").trim() || "";
+}
+
+function renderCompactPreviewCard(item, {
+  category = null,
+  extraClassName = "",
+  ariaLabel = ""
+} = {}) {
+  const title = entryDisplayName(item);
+  const titleMarkup = inferBreedingType(item) === "hybrid"
+    ? `${escapeHtml(title)} <span class="catalog-card__title-suffix">F1</span>`
+    : escapeHtml(title);
+  const meta = previewCardPrimaryMeta(item);
+  const badgesMarkup = previewCardBadges(item);
+  const ratingMarkup = Number(item.rating) > 0
+    ? `<span class="catalog-card__rating-inline" aria-label="Hodnotenie ${Math.max(0, Math.min(5, Number(item.rating) || 0))} z 5">${renderStarRating(item.rating, true)}</span>`
+    : "";
+  return `
+    <article class="catalog-card catalog-card--variety catalog-card--preview ${escapeAttribute(extraClassName)}" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
+      <button class="catalog-card__main-hit catalog-card__main-hit--preview" type="button" data-open-variety="${item.id}" aria-label="${escapeAttribute(ariaLabel || `Otvoriť kartu ${title}`)}">
+        <div class="catalog-card__head catalog-card__head--preview">
+          <h3 class="catalog-card__title catalog-card__title--body">${titleMarkup}</h3>
+        </div>
+        <div class="catalog-card__image catalog-card__image--preview">
+          ${renderVarietyCardImageTag(item, title)}
+        </div>
+        <div class="catalog-card__foot catalog-card__foot--preview">
+          ${meta ? `<p class="catalog-card__meta catalog-card__meta--preview">${escapeHtml(meta)}</p>` : ""}
+          ${(ratingMarkup || badgesMarkup) ? `
+            <div class="catalog-card__meta-support">
+              ${ratingMarkup ? `<div class="catalog-card__rating-row">${ratingMarkup}</div>` : ""}
+              ${badgesMarkup ? `<div class="catalog-card__quick catalog-card__quick--preview">${badgesMarkup}</div>` : ""}
+            </div>
+          ` : ""}
+        </div>
+      </button>
+    </article>
+  `;
+}
+
 function renderVarietyCard(variety) {
   if (isQuickEntry(variety)) {
     return renderQuickEntryCard(variety);
@@ -10471,178 +10951,39 @@ function renderVarietyCard(variety) {
     return renderGalleryEntryCard(variety);
   }
   const category = state.categories.find((item) => item.id === variety.categoryId);
-  const previewText = trimText(varietyPreviewText(variety), 110);
   if (cardType(variety) !== "variety") {
-    return renderUniversalCard(variety, category, previewText);
+    return renderUniversalCard(variety, category);
   }
-  const statusValues = varietyStatusValues(variety);
-  const summaryTags = [
-    variety.top ? '<span class="tag tag--favorite">top odroda</span>' : "",
-    variety.notGrowingThisYear ? '<span class="tag tag--avoid">nepestujem tento rok</span>' : "",
-    variety.avoidNextYear ? '<span class="tag tag--avoid">neodporúčam</span>' : "",
-    variety.neverGrown ? '<span class="tag tag--never-grown">ešte som nepestovala</span>' : "",
-    inferBreedingType(variety) === "hybrid" ? '<span class="tag tag--hybrid">F1</span>' : "",
-    ...statusValues
-      .filter((status) => !(status === "sown" && variety.sowedAt))
-      .map((status) => `<span class="tag">${escapeHtml(statusLabel(status))}</span>`),
-    variety.rating ? `<span class="tag tag--rating">${renderStarRating(variety.rating, true)}</span>` : ""
-  ].filter(Boolean);
-  const selectedDetails = [
-    variety.sowedAt ? `Vysiate: ${formatDate(variety.sowedAt)}.` : "",
-    variety.transplantedAt ? `Vysadené: ${formatDate(variety.transplantedAt)}.` : "",
-    variety.harvestedAt ? `Zberané: ${formatDate(variety.harvestedAt)}.` : ""
-  ].filter(Boolean);
-  const summaryTagsHtml = summaryTags.length ? summaryTags.join("") : "";
-  const quickSectionHtml = `<div class="catalog-card__quick ${summaryTags.length ? "" : "is-empty"}">${summaryTagsHtml || '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>'}</div>`;
-  const selectedDetailsHtml = selectedDetails.length ? escapeHtml(selectedDetails.join(" ")) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
-  const previewTextHtml = previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
-  return `
-    <article class="catalog-card catalog-card--variety" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
-      <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť odrodu ${escapeHtml(variety.name)}">
-        <div class="catalog-card__image">
-          ${renderVarietyCardImageTag(variety, variety.name)}
-          <div class="catalog-card__shade">
-            <h3 class="catalog-card__title">${escapeHtml(variety.name)}</h3>
-          </div>
-        </div>
-        ${quickSectionHtml}
-        <div class="catalog-card__body">
-          <p class="catalog-card__meta ${selectedDetails.length ? "" : "is-empty"}">${selectedDetailsHtml}</p>
-          <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewTextHtml}</p>
-        </div>
-      </button>
-    </article>
-  `;
+  return renderCompactPreviewCard(variety, {
+    category,
+    ariaLabel: `Otvoriť odrodu ${variety.name}`
+  });
 }
 
-function renderUniversalCard(item, category, previewText) {
-  const isBirdCard = cardType(item) === "bird";
-  const birdLatinName = isBirdCard ? String(item?.birdLatinName || "").trim() : "";
-  const birdExternalUrl = isBirdCard && item.birdSource === "ebird"
-    ? String(item?.birdExternalUrl || "").trim()
-    : "";
-  const mushroomEdibilityValues = normalizeTagList(item.mushroomEdibilityValues?.length ? item.mushroomEdibilityValues : item.mushroomEdibility);
-  const mushroomGatheringValues = normalizeTagList(item.mushroomGatheringValues?.length ? item.mushroomGatheringValues : item.mushroomGathering);
-  const summaryTags = [
-    ...(
-      cardType(item) === "mushroom"
-        ? mushroomEdibilityValues
-          .map((value) => mushroomEdibilityLabel(value))
-          .filter(Boolean)
-          .map((label) => `<span class="tag">${escapeHtml(label)}</span>`)
-        : []
-    ),
-    ...(
-      cardType(item) === "mushroom"
-        ? mushroomGatheringValues
-          .map((value) => mushroomGatheringLabel(value))
-          .filter(Boolean)
-          .map((label) => `<span class="tag">${escapeHtml(label)}</span>`)
-        : []
-    ),
-    cardType(item) === "wild-plant" && item.isMedicinal ? '<span class="tag">liečivá</span>' : "",
-    cardType(item) === "wild-plant" && item.isPoisonous ? '<span class="tag">jedovatá</span>' : "",
-    cardType(item) === "bird" && item.birdContact ? `<span class="tag">${escapeHtml(birdContactLabel(item.birdContact))}</span>` : "",
-    cardType(item) === "pest-problem" && normalizeIdList(item.affectedCategoryIds?.length ? item.affectedCategoryIds : item.affectedCategoryId).length
-      ? `<span class="tag">${escapeHtml(`Týka sa: ${normalizeIdList(item.affectedCategoryIds?.length ? item.affectedCategoryIds : item.affectedCategoryId).map(categoryName).join(", ")}`)}</span>`
-      : "",
-    cardType(item) === "processing-recipe" && normalizeIdList(item.relatedCategoryIds?.length ? item.relatedCategoryIds : item.relatedCategoryId).length
-      ? `<span class="tag">${escapeHtml(`Súvisí s: ${normalizeIdList(item.relatedCategoryIds?.length ? item.relatedCategoryIds : item.relatedCategoryId).map(categoryName).join(", ")}`)}</span>`
-      : ""
-  ].filter(Boolean);
-  const selectedDetails = [
-    item.recordedAt ? `${cardDateLabel(cardType(item))}: ${formatDate(item.recordedAt)}.` : ""
-  ].filter(Boolean);
-  const summaryTagsHtml = summaryTags.length ? summaryTags.join("") : "";
-  const quickSectionHtml = summaryTags.length
-    ? `<div class="catalog-card__quick">${summaryTagsHtml}</div>`
-    : "";
-  const selectedDetailsHtml = selectedDetails.length ? escapeHtml(selectedDetails.join(" ")) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
-  const previewTextHtml = previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>';
-  const birdIdentityHtml = isBirdCard && birdLatinName
-    ? `
-          <div class="catalog-card__bird-identity">
-            ${birdLatinName ? `<span class="catalog-card__bird-latin">${escapeHtml(birdLatinName)}</span>` : ""}
-          </div>
-        `
-    : "";
-  const birdExternalLinkHtml = birdExternalUrl
-    ? `<a class="catalog-card__external-link catalog-card__external-link--bird-card" href="${escapeAttribute(birdExternalUrl)}" target="_blank" rel="noreferrer noopener" data-stop-card-open>${ICONS.cardBird} Otvoriť v eBirde</a>`
-    : "";
-  return `
-    <article class="catalog-card catalog-card--clickable catalog-card--variety ${isBirdCard ? "catalog-card--bird" : ""}" data-open-variety="${item.id}" tabindex="0" role="button" aria-label="Otvoriť kartu ${escapeHtml(entryDisplayName(item))}" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
-      <div class="catalog-card__image">
-        ${renderVarietyCardImageTag(item, entryDisplayName(item))}
-        <div class="catalog-card__shade">
-          <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(item))}</h3>
-          ${birdIdentityHtml}
-        </div>
-      </div>
-      ${quickSectionHtml}
-      <div class="catalog-card__body">
-        <p class="catalog-card__meta ${selectedDetails.length ? "" : "is-empty"}">${selectedDetailsHtml}</p>
-        ${birdExternalLinkHtml}
-        <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewTextHtml}</p>
-      </div>
-    </article>
-  `;
+function renderUniversalCard(item, category) {
+  return renderCompactPreviewCard(item, {
+    category,
+    extraClassName: cardType(item) === "bird" ? "catalog-card--bird" : "",
+    ariaLabel: `Otvoriť kartu ${entryDisplayName(item)}`
+  });
 }
 
 function renderQuickEntryCard(variety) {
   const category = state.categories.find((item) => item.id === variety.categoryId);
-  const previewText = trimText(varietyPreviewText(variety), 110);
-  const imageCount = normalizeVarietyImages(variety).length;
-  const quickTags = [
-    '<span class="tag">rýchly záznam</span>',
-    imageCount ? `<span class="tag">${countedLabel(imageCount, "fotka", "fotky", "fotiek")}</span>` : ""
-  ].filter(Boolean);
-  return `
-    <article class="catalog-card catalog-card--variety catalog-card--quick-entry" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
-      <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť záznam ${escapeHtml(entryDisplayName(variety))}">
-        <div class="catalog-card__image">
-          ${renderVarietyCardImageTag(variety, entryDisplayName(variety))}
-          <div class="catalog-card__shade">
-            <p class="eyebrow">${escapeHtml(entryKindLabel(variety))}</p>
-            <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(variety))}</h3>
-          </div>
-        </div>
-        <div class="catalog-card__quick">${quickTags.join("")}</div>
-        <div class="catalog-card__body">
-          <p class="catalog-card__meta">${escapeHtml(categoryName(variety.categoryId))}</p>
-          <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>'}</p>
-        </div>
-      </button>
-    </article>
-  `;
+  return renderCompactPreviewCard(variety, {
+    category,
+    extraClassName: "catalog-card--quick-entry",
+    ariaLabel: `Otvoriť záznam ${entryDisplayName(variety)}`
+  });
 }
 
 function renderGalleryEntryCard(variety) {
   const category = state.categories.find((item) => item.id === variety.categoryId);
-  const previewText = trimText(varietyPreviewText(variety), 110);
-  const images = normalizeVarietyImages(variety);
-  const imageCount = images.length;
-  const galleryTags = [
-    '<span class="tag tag--gallery">galéria</span>',
-    imageCount ? `<span class="tag">${countedLabel(imageCount, "fotka", "fotky", "fotiek")}</span>` : ""
-  ].filter(Boolean);
-  return `
-    <article class="catalog-card catalog-card--variety catalog-card--gallery-entry" style="--category-accent:${escapeAttribute(category?.color || "#7e9f4b")}">
-      <button class="catalog-card__main-hit catalog-card__main-hit--variety" type="button" data-open-variety="${variety.id}" aria-label="Otvoriť galériu ${escapeHtml(entryDisplayName(variety))}">
-        <div class="catalog-card__image">
-          ${renderVarietyCardImageTag(variety, entryDisplayName(variety))}
-          <div class="catalog-card__shade">
-            <p class="eyebrow">Galéria</p>
-            <h3 class="catalog-card__title">${escapeHtml(entryDisplayName(variety))}</h3>
-          </div>
-        </div>
-        <div class="catalog-card__quick">${galleryTags.join("")}</div>
-        <div class="catalog-card__body">
-          <p class="catalog-card__meta">${escapeHtml(categoryName(variety.categoryId))}</p>
-          <p class="catalog-card__note-preview ${previewText ? "" : "is-empty"}">${previewText ? escapeHtml(previewText) : '<span class="catalog-card__placeholder" aria-hidden="true">&nbsp;</span>'}</p>
-        </div>
-      </button>
-    </article>
-  `;
+  return renderCompactPreviewCard(variety, {
+    category,
+    extraClassName: "catalog-card--gallery-entry",
+    ariaLabel: `Otvoriť galériu ${entryDisplayName(variety)}`
+  });
 }
 
 function renderOverview() {
@@ -10797,21 +11138,77 @@ function renderJournalSidebarCard(entry) {
     : (journalDisplayTitle(normalizedEntry) || "Záhradný zápis");
   const walkTimeRange = isWalkEntry ? walkTimeRangeLabel(normalizedEntry.walk) : "";
   const sidebarDateLabel = [formatDate(normalizedEntry.date), walkTimeRange].filter(Boolean).join(" • ");
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+
+  if (!isMobileShell) {
+    return `
+      <article class="sidebar-preview-card sidebar-preview-card--journal">
+        <div class="sidebar-preview-card__journal-top">
+          <p class="sidebar-preview-card__meta sidebar-preview-card__meta--journal">${escapeHtml(sidebarDateLabel)}</p>
+          ${renderMoodBadge(normalizedEntry.mood, "sidebar-preview-card__mood")}
+        </div>
+        <p class="sidebar-preview-card__title sidebar-preview-card__title--journal">${escapeHtml(displayTitle)}</p>
+        ${previewText ? `<p class="sidebar-preview-card__excerpt">${escapeHtml(previewText)}</p>` : ""}
+        ${chips.length ? `<div class="sidebar-preview-card__footer"><div class="home-chip-row">${chips.map(renderJournalChip).join("")}</div></div>` : ""}
+      </article>
+    `;
+  }
+
+  const leadImage = journalImages(normalizedEntry)[0] || "";
+  const visibleTags = (Array.isArray(normalizedEntry.tags) ? normalizedEntry.tags : [])
+    .map((tag) => String(tag || "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  const typeLabel = journalEntryTypeLabel(normalizedEntry.entryType || "note");
   return `
-    <article class="sidebar-preview-card sidebar-preview-card--journal">
-      <div class="sidebar-preview-card__journal-top">
-        <p class="sidebar-preview-card__meta sidebar-preview-card__meta--journal">${escapeHtml(sidebarDateLabel)}</p>
-        ${renderMoodBadge(normalizedEntry.mood, "sidebar-preview-card__mood")}
+    <article class="sidebar-preview-card sidebar-preview-card--journal sidebar-preview-card--journal-mobile ${leadImage ? "sidebar-preview-card--journal-mobile-media" : "sidebar-preview-card--journal-mobile-plain"}">
+      <div class="sidebar-preview-card__journal-mobile-shell">
+        ${leadImage ? `
+          <div class="sidebar-preview-card__journal-media">
+            <img src="${escapeAttribute(leadImage)}" alt="${escapeAttribute(displayTitle)}" loading="lazy" decoding="async" fetchpriority="low">
+          </div>
+        ` : ""}
+        <div class="sidebar-preview-card__journal-mobile-main">
+          <div class="sidebar-preview-card__journal-top">
+            <p class="sidebar-preview-card__meta sidebar-preview-card__meta--journal">${escapeHtml(sidebarDateLabel)}</p>
+            ${renderMoodBadge(normalizedEntry.mood, "sidebar-preview-card__mood")}
+          </div>
+          <p class="sidebar-preview-card__title sidebar-preview-card__title--journal">${escapeHtml(displayTitle)}</p>
+          ${previewText ? `<p class="sidebar-preview-card__excerpt sidebar-preview-card__excerpt--journal-mobile">${escapeHtml(previewText)}</p>` : ""}
+          <div class="sidebar-preview-card__journal-mobile-bottom">
+            <span class="sidebar-preview-card__type-pill">${escapeHtml(`Typ: ${typeLabel}`)}</span>
+            ${visibleTags.length ? `
+              <div class="sidebar-preview-card__tag-row">
+                ${visibleTags.map((tag) => `<span class="sidebar-preview-card__tag-chip">${escapeHtml(tag.startsWith("#") ? tag : `#${tag}`)}</span>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        </div>
       </div>
-      <p class="sidebar-preview-card__title sidebar-preview-card__title--journal">${escapeHtml(displayTitle)}</p>
-      ${previewText ? `<p class="sidebar-preview-card__excerpt">${escapeHtml(previewText)}</p>` : ""}
-      ${chips.length ? `<div class="sidebar-preview-card__footer"><div class="home-chip-row">${chips.map(renderJournalChip).join("")}</div></div>` : ""}
     </article>
   `;
 }
 
 function renderTaskSidebarCard(task) {
   const isOverdue = Boolean(task.date && task.date < todayISO());
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  if (isMobileShell) {
+    return `
+      <article class="sidebar-preview-card sidebar-preview-card--task sidebar-preview-card--task-mobile ${isOverdue ? "sidebar-preview-card--task-overdue" : ""} ${task.done ? "sidebar-preview-card--task-done" : ""}">
+        <label class="sidebar-preview-card__task-mobile-main" aria-label="Označiť úlohu ako hotovú">
+          <span class="sidebar-preview-card__checkbox-wrap">
+            <input class="sidebar-preview-card__checkbox-input" type="checkbox" data-toggle-task="${task.id}" ${task.done ? "checked" : ""}>
+            <span class="sidebar-preview-card__checkbox" aria-hidden="true"></span>
+          </span>
+          <span class="sidebar-preview-card__title sidebar-preview-card__title--task-mobile">${escapeHtml(task.text)}</span>
+        </label>
+        <div class="sidebar-preview-card__task-mobile-meta">
+          ${task.done ? '<span class="sidebar-preview-card__mini-state">Hotovo</span>' : ""}
+          <span class="sidebar-preview-card__badge ${isOverdue ? "sidebar-preview-card__badge--overdue" : ""}">${escapeHtml(task.date ? formatDate(task.date) : "bez termínu")}</span>
+        </div>
+      </article>
+    `;
+  }
   return `
     <article class="sidebar-preview-card sidebar-preview-card--task ${isOverdue ? "sidebar-preview-card--task-overdue" : ""}">
       <div class="sidebar-preview-card__task-row">
@@ -10858,39 +11255,32 @@ function renderMemories() {
   memoryStripEl.innerHTML = memoryItems.length
     ? `
       <div class="memory-strip__frame">
-        ${memoryItems.length > 1 ? `
-          <button class="memory-strip__nav memory-strip__nav--prev" type="button" data-memory-step="-1" aria-label="Predošlá spomienka">‹</button>
-        ` : ""}
-        <div class="memory-strip__hero" aria-label="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}">
+        <div
+          class="memory-strip__hero"
+          aria-label="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}"
+          role="button"
+          tabindex="0"
+          data-open-memory-entry="${escapeAttribute(memoryItems[memoryCarouselIndex].entryId)}"
+        >
           <span class="memory-strip__backdrop" style="background-image:url('${escapeAttribute(memoryItems[memoryCarouselIndex].image)}')"></span>
           <img src="${escapeAttribute(memoryItems[memoryCarouselIndex].image)}" alt="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}" loading="lazy" decoding="async" fetchpriority="low">
-          <span class="memory-strip__count">${memoryCarouselIndex + 1}/${memoryItems.length}</span>
           ${memoryItems[memoryCarouselIndex].entryText
             ? `<span class="memory-strip__note">${escapeHtml(trimText(memoryItems[memoryCarouselIndex].entryText, 160))}</span>`
             : ""}
         </div>
-        ${memoryItems.length > 1 ? `
-          <button class="memory-strip__nav memory-strip__nav--next" type="button" data-memory-step="1" aria-label="Ďalšia spomienka">›</button>
-        ` : ""}
       </div>
     `
     : '<div class="empty-state empty-state--compact">Keď pridáš fotky do denníka, ukážu sa aj tu.</div>';
 
-  memoryStripEl.querySelectorAll("[data-memory-step]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (memoryItems.length < 2) return;
-      const step = Number(button.getAttribute("data-memory-step") || 0);
-      if (!step) return;
-      memoryCarouselIndex = (memoryCarouselIndex + step + memoryItems.length) % memoryItems.length;
-      renderMemories();
-    });
-  });
-
   const memoryHero = memoryStripEl.querySelector(".memory-strip__hero");
   const memoryHeroImage = memoryHero?.querySelector("img");
   if (memoryHero && memoryHeroImage) {
+    const openLinkedJournalEntry = () => {
+      const entryId = String(memoryHero.getAttribute("data-open-memory-entry") || "").trim();
+      if (!entryId) return;
+      openJournalOverlayEntry(entryId);
+    };
+
     const syncMemoryHeroOrientation = () => {
       const isPortrait = memoryHeroImage.naturalHeight > memoryHeroImage.naturalWidth;
       memoryHero.classList.toggle("memory-strip__hero--portrait", isPortrait);
@@ -10902,6 +11292,52 @@ function renderMemories() {
     } else {
       memoryHeroImage.addEventListener("load", syncMemoryHeroOrientation, { once: true });
     }
+
+    if (memoryItems.length > 1) {
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchActive = false;
+      let swipeConsumed = false;
+
+      memoryHero.addEventListener("touchstart", (event) => {
+        const touch = event.changedTouches?.[0];
+        if (!touch) return;
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchActive = true;
+        swipeConsumed = false;
+      }, { passive: true });
+
+      memoryHero.addEventListener("touchcancel", () => {
+        touchActive = false;
+      }, { passive: true });
+
+      memoryHero.addEventListener("touchend", (event) => {
+        if (!touchActive) return;
+        touchActive = false;
+        const touch = event.changedTouches?.[0];
+        if (!touch) return;
+        const deltaX = touch.clientX - touchStartX;
+        const deltaY = touch.clientY - touchStartY;
+        if (Math.abs(deltaX) < 28 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+        swipeConsumed = true;
+        memoryCarouselIndex = (memoryCarouselIndex + (deltaX < 0 ? 1 : -1) + memoryItems.length) % memoryItems.length;
+        renderMemories();
+      }, { passive: true });
+
+      memoryHero.addEventListener("click", () => {
+        if (swipeConsumed) return;
+        openLinkedJournalEntry();
+      });
+    } else {
+      memoryHero.addEventListener("click", openLinkedJournalEntry);
+    }
+
+    memoryHero.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openLinkedJournalEntry();
+    });
   }
 
   const openAllJournalButton = document.getElementById("open-all-journal-from-memories");
@@ -11449,6 +11885,7 @@ function renderInsights() {
   if (!insightStripEl) return;
   const weather = insightWeatherSignals();
   const isMobileRuntime = Boolean(document.body?.classList.contains("app-mobile-runtime"));
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
   const compactAlerts = isMobileRuntime ? weather.alerts.slice(0, 3) : [];
   const tips = buildSmartInsights(weather, { includeAlerts: !isMobileRuntime || compactAlerts.length === 0 });
   if (insightTipIndex >= tips.length) {
@@ -11457,26 +11894,21 @@ function renderInsights() {
   insightStripEl.innerHTML = (tips.length || compactAlerts.length)
     ? `
       ${compactAlerts.length ? renderInsightSignalDock(compactAlerts) : ""}
-      ${tips.length && isMobileRuntime ? `
-        <div class="insight-strip__stack">
-          ${tips.slice(0, 3).map((tip) => `
-            <article class="insight-strip__slide insight-strip__slide--stacked is-active">
-              <p class="insight-strip__eyebrow">${escapeHtml(tip.eyebrow)}</p>
-              <h4>${escapeHtml(tip.title)}</h4>
-              <p>${escapeHtml(tip.body)}</p>
-            </article>
-          `).join("")}
-        </div>
-      ` : ""}
-      ${tips.length && !isMobileRuntime ? `
+      ${tips.length ? `
         <div class="insight-strip__ticker">
-          ${tips.map((tip, index) => `
-            <article class="insight-strip__slide ${index === insightTipIndex ? "is-active" : ""}">
-              <p class="insight-strip__eyebrow">${escapeHtml(tip.eyebrow)}</p>
-              <h4>${escapeHtml(tip.title)}</h4>
-              <p>${escapeHtml(tip.body)}</p>
-            </article>
-          `).join("")}
+          ${tips.map((tip, index) => {
+            const title = String(tip?.title || "").trim();
+            const body = String(tip?.body || "").trim();
+            const renderedTitle = isMobileShell ? trimText(title, 44) : title;
+            const renderedBody = isMobileShell ? trimText(body, 132) : body;
+            return `
+              <article class="insight-strip__slide ${index === insightTipIndex ? "is-active" : ""}">
+                <p class="insight-strip__eyebrow">${escapeHtml(tip.eyebrow)}</p>
+                <h4>${escapeHtml(renderedTitle)}</h4>
+                <p>${escapeHtml(renderedBody)}</p>
+              </article>
+            `;
+          }).join("")}
         </div>
       ` : ""}
     `
@@ -11495,7 +11927,7 @@ function syncOverviewHighlights() {
   const compactAlerts = isMobileRuntime ? weather.alerts.slice(0, 3) : [];
   const tips = buildSmartInsights(weather, { includeAlerts: !isMobileRuntime || compactAlerts.length === 0 });
   const canRotateMemories = memoryItems.length > 1;
-  const canRotateTips = !isMobileRuntime && tips.length > 1;
+  const canRotateTips = tips.length > 1;
 
   if (!canRotateMemories && !canRotateTips) return;
 
@@ -11597,27 +12029,17 @@ function openTaskManager() {
           <div class="worklog-section__head">
             <h4>Plán práce</h4>
             <div class="catalog-card__actions">
-              <button class="button" type="button" id="open-add-task-from-worklog" aria-expanded="false">Pridať úlohu</button>
+              <button class="button" type="button" id="open-add-task-from-worklog" aria-expanded="false" aria-label="Pridať úlohu" title="Pridať úlohu">+</button>
             </div>
           </div>
           <div class="worklog-task-editor" id="worklog-task-editor">
             <form id="worklog-task-form" class="task-form task-form--planner">
               <input name="text" type="text" placeholder="Napríklad: Presadiť papriky do väčších kelímkov" required>
               ${renderDateInput({ id: "worklog-task-date", name: "date" })}
-              ${renderRelationDisclosure({
-                summaryLabel: "Súvisí s kategóriou a kartou",
-                categoryLabel: "Kategória",
-                categoryInputName: "linkedCategoryIds",
-                categoryValues: [],
-                cardLabel: "Súvisí s kartou",
-                cardInputName: "linkedVarietyId",
-                cardValue: "",
-                cardWrapKey: "task",
-                cardCategoryIds: []
-              })}
+              ${renderTaskRelationFields()}
             </form>
             <div class="worklog-task-editor__actions">
-              <button class="button button--ghost" type="button" id="close-add-task-editor">Zrušiť</button>
+              <button class="button" type="submit" form="worklog-task-form" id="close-add-task-editor">Uložiť</button>
             </div>
           </div>
           <div id="worklog-task-list" class="task-stack task-stack--planner"></div>
@@ -11630,29 +12052,17 @@ function openTaskManager() {
   const taskEditor = document.getElementById("worklog-task-editor");
   const taskList = document.getElementById("worklog-task-list");
   const openTaskButton = document.getElementById("open-add-task-from-worklog");
-  const closeTaskEditorButton = document.getElementById("close-add-task-editor");
   const taskTextInput = taskForm.elements.text;
-  const linkedCategoryInputs = [...taskForm.querySelectorAll('input[name="linkedCategoryIds"]')];
+  const linkedCategorySelect = taskForm.elements.linkedCategoryIds;
   const linkedVarietySelect = taskForm.elements.linkedVarietyId;
   const linkedVarietyWrap = taskForm.querySelector('[data-linked-variety-wrap="task"]');
-  const relationDisclosure = taskForm.querySelector("[data-relation-disclosure]");
-  const relationSummary = relationDisclosure?.querySelector("[data-relation-summary]") || null;
   let isTaskEditorOpen = false;
 
   const rerenderTaskManager = () => renderTaskManagerList(taskList, null, rerenderTaskManager);
 
-  const selectedTaskCategoryIds = () => linkedCategoryInputs
-    .filter((input) => input.checked)
-    .map((input) => String(input.value || "").trim())
-    .filter(Boolean);
-
-  const syncTaskRelationSummary = () => {
-    const linkedCategoryIds = selectedTaskCategoryIds();
-    const linkedVarietyId = String(linkedVarietySelect?.value || "").trim();
-    if (relationSummary) {
-      relationSummary.textContent = relationDisclosureSummaryText(linkedCategoryIds, linkedVarietyId);
-    }
-    relationDisclosure?.classList.toggle("has-selection", Boolean(linkedCategoryIds.length || linkedVarietyId));
+  const selectedTaskCategoryIds = () => {
+    const value = String(linkedCategorySelect?.value || "").trim();
+    return value ? [value] : [];
   };
 
   const renderTaskVarietyOptions = () => {
@@ -11666,7 +12076,6 @@ function openTaskManager() {
       linkedVarietySelect.innerHTML = '<option value="">Bez karty</option>';
       linkedVarietySelect.value = "";
       if (linkedVarietyWrap) linkedVarietyWrap.hidden = true;
-      syncTaskRelationSummary();
       return;
     }
 
@@ -11683,34 +12092,28 @@ function openTaskManager() {
 
     if (previousValue && filteredVarieties.some((item) => item.id === previousValue)) {
       linkedVarietySelect.value = previousValue;
-      syncTaskRelationSummary();
       return;
     }
 
     linkedVarietySelect.value = "";
-    syncTaskRelationSummary();
   };
 
   const clearTaskForm = () => {
     taskForm.reset();
-    linkedCategoryInputs.forEach((input) => {
-      input.checked = false;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    if (linkedCategorySelect) linkedCategorySelect.value = "";
     if (linkedVarietySelect) {
       linkedVarietySelect.value = "";
     }
-    if (relationDisclosure) {
-      relationDisclosure.open = false;
-    }
     renderTaskVarietyOptions();
-    syncTaskRelationSummary();
   };
 
   const setTaskEditorOpen = (nextOpen) => {
     isTaskEditorOpen = Boolean(nextOpen);
     taskEditor?.classList.toggle("is-open", isTaskEditorOpen);
-    openTaskButton.textContent = isTaskEditorOpen ? "Uložiť úlohu" : "Pridať úlohu";
+    if (taskList) taskList.hidden = isTaskEditorOpen;
+    openTaskButton.textContent = "+";
+    openTaskButton.setAttribute("aria-label", isTaskEditorOpen ? "Zavrieť pridávanie úlohy" : "Pridať úlohu");
+    openTaskButton.setAttribute("title", isTaskEditorOpen ? "Zavrieť pridávanie úlohy" : "Pridať úlohu");
     openTaskButton.setAttribute("aria-expanded", isTaskEditorOpen ? "true" : "false");
     if (isTaskEditorOpen) {
       window.setTimeout(() => {
@@ -11721,25 +12124,25 @@ function openTaskManager() {
     clearTaskForm();
   };
 
-  setupCategoryTreePickers(taskForm);
-  linkedCategoryInputs.forEach((input) => {
-    input.addEventListener("change", () => {
-      renderTaskVarietyOptions();
-    });
+  detailModalBackOverride = () => {
+    if (!isTaskEditorOpen) return false;
+    setTaskEditorOpen(false);
+    return true;
+  };
+
+  linkedCategorySelect?.addEventListener("change", () => {
+    renderTaskVarietyOptions();
   });
   linkedVarietySelect?.addEventListener("change", () => {
     const varietyId = String(linkedVarietySelect.value || "").trim();
-    if (!varietyId) {
-      syncTaskRelationSummary();
-      return;
-    }
+    if (!varietyId) return;
     const variety = state.varieties.find((item) => item.id === varietyId);
     if (!variety) return;
-    const matchingInput = linkedCategoryInputs.find((input) => String(input.value || "").trim() === String(variety.categoryId || "").trim());
-    if (!matchingInput) return;
-    if (!matchingInput.checked) {
-      matchingInput.checked = true;
-      matchingInput.dispatchEvent(new Event("change", { bubbles: true }));
+    const nextCategoryId = String(variety.categoryId || "").trim();
+    if (!nextCategoryId || !linkedCategorySelect) return;
+    if (String(linkedCategorySelect.value || "").trim() !== nextCategoryId) {
+      linkedCategorySelect.value = nextCategoryId;
+      linkedCategorySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
     linkedVarietySelect.value = varietyId;
   });
@@ -11750,10 +12153,6 @@ function openTaskManager() {
       setTaskEditorOpen(true);
       return;
     }
-    taskForm.requestSubmit();
-  });
-
-  closeTaskEditorButton?.addEventListener("click", () => {
     setTaskEditorOpen(false);
   });
 
@@ -13607,10 +14006,37 @@ function bindTaskActions(container) {
 function renderTaskItem(task, { showDelete = true, labelClickable = true } = {}) {
   const isOverdue = Boolean(!task.done && task.date && task.date < todayISO());
   const chips = taskLinkChips(task);
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
   const checkboxContent = `
     <input type="checkbox" data-toggle-task="${task.id}" ${task.done ? "checked" : ""}>
     <span class="task-item__title">${escapeHtml(task.text)}</span>
   `;
+  if (isMobileShell) {
+    return `
+      <article class="task-item task-item--mobile-list ${task.done ? "task-item--done" : ""} ${isOverdue ? "task-item--overdue" : ""}">
+        <div class="task-item__row task-item__row--primary">
+          ${labelClickable ? `<label class="checkbox-row task-item__main task-item__main--mobile">${checkboxContent}</label>` : `<div class="checkbox-row task-item__main task-item__main--mobile">${checkboxContent}</div>`}
+          ${showDelete ? `<div class="task-item__side task-item__actions task-item__actions--mobile">
+            <button class="button button--ghost journal-item__action journal-item__action--danger" type="button" data-delete-task="${task.id}" aria-label="Vymazať úlohu" title="Vymazať">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 7h14"></path>
+                <path d="M9 7V5h6v2"></path>
+                <path d="M8 7l1 12h6l1-12"></path>
+                <path d="M10 10v6"></path>
+                <path d="M14 10v6"></path>
+              </svg>
+            </button>
+          </div>` : ""}
+        </div>
+        <div class="task-item__row task-item__row--meta">
+          ${task.done ? '<span class="task-item__done-badge">Hotovo</span>' : ""}
+          <span class="task-item__date-badge ${task.done ? "task-item__date-badge--done" : ""} ${isOverdue ? "task-item__date-badge--overdue" : ""}">${task.date ? formatDate(task.date) : "bez termínu"}</span>
+        </div>
+        ${chips.length ? `<div class="journal-item__chips task-item__chips task-item__chips--mobile">${chips.map(renderJournalChip).join("")}</div>` : ""}
+        ${!chips.length && taskLinkSummary(task) ? `<p class="task-item__meta task-item__meta--mobile">${escapeHtml(taskLinkSummary(task))}</p>` : ""}
+      </article>
+    `;
+  }
   return `
     <article class="task-item ${task.done ? "task-item--done" : ""} ${isOverdue ? "task-item--overdue" : ""}">
       <div class="task-item__header">
@@ -13707,7 +14133,8 @@ function worklogSummaryText(taskCount = state.customTasks.length, journalCount =
 }
 
 function resetDetailModalClasses() {
-  detailModal.classList.remove("detail-modal--worklog", "detail-modal--overview", "detail-modal--batch", "detail-modal--weather", "detail-modal--editor", "detail-modal--settings", "detail-modal--editor-topline");
+  detailModalBackOverride = null;
+  detailModal.classList.remove("detail-modal--worklog", "detail-modal--overview", "detail-modal--batch", "detail-modal--weather", "detail-modal--editor", "detail-modal--settings", "detail-modal--editor-topline", "detail-modal--card-view");
 }
 
 function orderedCategories() {
@@ -14031,52 +14458,16 @@ function birdConfidenceLabel(value) {
   return labels[String(value || "").trim()] || "";
 }
 
-function loadEbirdPreferences() {
-  try {
-    const raw = localStorage.getItem(EBIRD_PREFERENCES_KEY);
-    if (!raw) return { apiKey: "" };
-    const parsed = JSON.parse(raw);
-    return {
-      apiKey: String(parsed?.apiKey || "").trim()
-    };
-  } catch (error) {
-    console.warn("Nepodarilo sa načítať eBird nastavenia.", error);
-    return { apiKey: "" };
-  }
-}
-
-function saveEbirdPreferences(nextPreferences = {}) {
-  try {
-    const current = loadEbirdPreferences();
-    localStorage.setItem(EBIRD_PREFERENCES_KEY, JSON.stringify({
-      ...current,
-      ...nextPreferences,
-      apiKey: String(nextPreferences?.apiKey ?? current.apiKey ?? "").trim()
-    }));
-    return true;
-  } catch (error) {
-    console.warn("Nepodarilo sa uložiť eBird nastavenia.", error);
-    return false;
-  }
-}
-
 function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--settings");
-  const preferences = loadEbirdPreferences();
   const weatherPreferences = loadWeatherPreferences();
-  const folderStoragePreferences = loadFolderStoragePreferences();
   const authProfile = loadLocalAuthProfile();
   const authSession = loadLocalAuthSession();
   const supabasePreferences = loadSupabasePreferences();
   const supabaseAuthMirror = loadSupabaseAuthMirror();
   const supabaseSyncMeta = loadSupabaseSyncMeta();
-  const currentApiKey = String(preferences.apiKey || "").trim();
   const currentWeatherPlace = String(weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).trim() || GARDEN_WEATHER_PLACE;
-  const hasApiKey = Boolean(currentApiKey);
-  const folderStorageEnabled = Boolean(folderStoragePreferences.enabled);
-  const folderStorageSupported = supportsFolderStorage();
-  const currentFolderName = String(folderStoragePreferences.folderName || "").trim();
   const hasLocalAccount = Boolean(authProfile?.enabled);
   const isSignedIn = isLocalAuthSessionValid(authProfile, authSession);
   const accountName = hasLocalAccount ? localAuthDisplayName(authProfile) : "";
@@ -14086,18 +14477,6 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   const weatherStatusMessage = statusScope === "weather"
     ? statusMessage
     : `Počasie sa teraz synchronizuje pre ${currentWeatherPlace}.`;
-  const eBirdStatusMessage = statusScope === "ebird"
-    ? statusMessage
-    : (hasApiKey
-      ? "eBird kľúč je uložený a pripravený na použitie."
-      : "Keď kľúč doplníš sem, pri vtákoch už len zvolíš zdroj eBird a vyberieš druh zo zoznamu.");
-  const storageStatusMessage = statusScope === "storage"
-    ? statusMessage
-    : (folderStorageSupported
-      ? (folderStorageEnabled
-        ? `Dočasné ukladanie ide do priečinka ${currentFolderName || "moja zahrada"}.`
-        : "Zatiaľ sa ukladá len do prehliadača. Pri veľa fotkách si vieš zapnúť dočasný priečinok.")
-      : "Tento prehliadač zatiaľ nepodporuje dočasné ukladanie do priečinka.");
   const accountStatusMessage = statusScope === "account"
     ? statusMessage
     : (hasLocalAccount
@@ -14130,8 +14509,6 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
         ? "Najprv sa prihlás do cloud účtu a potom spusti prvý ručný sync."
         : "Najprv si ulož Supabase projekt, potom sem doplníme prvý sync."));
   const weatherTone = statusScope === "weather" ? tone : "";
-  const eBirdTone = statusScope === "ebird" ? tone : "";
-  const storageTone = statusScope === "storage" ? tone : "";
   const accountTone = statusScope === "account" ? tone : "";
   const backupTone = statusScope === "backup" ? tone : "";
   const supabaseTone = statusScope === "supabase" ? tone : "";
@@ -14341,60 +14718,14 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
             <p class="settings-panel__status ${accountTone ? `is-${accountTone}` : ""}" data-settings-account-status>${escapeHtml(accountStatusMessage)}</p>
           </form>
         </section>
-        <section class="settings-panel settings-panel--soft settings-panel--secondary">
-          <div class="settings-panel__head">
-            <div>
-              <p class="eyebrow">Fallback</p>
-              <h3>Priečinok pre dáta</h3>
-            </div>
-          </div>
-          <div class="settings-form">
-            <p class="settings-panel__help">Toto nechávame ako poistku, keď by samotný prehliadač nestačil.</p>
-            <div class="settings-panel__storage-meta">
-              <span>Priečinok</span>
-              <strong>${escapeHtml(folderStorageEnabled ? (currentFolderName || "vybraný priečinok") : "zatiaľ nie je vybraný")}</strong>
-              <span>Súbor</span>
-              <strong>${escapeHtml(folderStoragePreferences.fileName || FOLDER_STORAGE_FILE_NAME)}</strong>
-            </div>
-            <div class="settings-panel__actions">
-              <button class="button" type="button" data-pick-storage-folder ${folderStorageSupported ? "" : "disabled"}>${folderStorageEnabled ? "Zmeniť priečinok" : "Vybrať priečinok"}</button>
-              <button class="button button--ghost" type="button" data-restore-storage-now ${folderStorageEnabled ? "" : "hidden"}>Načítať z priečinka</button>
-              <button class="button button--ghost" type="button" data-save-storage-now ${folderStorageEnabled ? "" : "hidden"}>Uložiť tam hneď</button>
-              <button class="button button--ghost" type="button" data-disable-storage ${folderStorageEnabled ? "" : "hidden"}>Vypnúť priečinok</button>
-            </div>
-            <p class="settings-panel__status ${storageTone ? `is-${storageTone}` : ""}" data-settings-storage-status>${escapeHtml(storageStatusMessage)}</p>
-          </div>
-        </section>
-        <section class="settings-panel settings-panel--soft settings-panel--secondary">
-          <div class="settings-panel__head">
-            <div>
-              <p class="eyebrow">Integrácia</p>
-              <h3>eBird kľúč</h3>
-            </div>
-          </div>
-          <form id="settings-ebird-form" class="settings-form">
-            <label class="field-block field-block--full">
-              <span>eBird API kľúč</span>
-              <input name="ebirdApiKey" type="text" value="${escapeAttribute(currentApiKey)}" placeholder="Sem vlož svoj eBird kľúč" autocomplete="off" spellcheck="false">
-            </label>
-            <p class="settings-panel__help">Použije sa až vtedy, keď pri vtákoch zvolíš zdroj eBird.</p>
-            <div class="settings-panel__actions">
-              <button class="button" type="submit">Uložiť eBird kľúč</button>
-              <button class="button button--ghost" type="button" data-clear-ebird-key ${hasApiKey ? "" : "hidden"}>Vymazať kľúč</button>
-            </div>
-            <p class="settings-panel__status ${eBirdTone ? `is-${eBirdTone}` : ""}" data-settings-ebird-status>${escapeHtml(eBirdStatusMessage)}</p>
-          </form>
-        </section>
       </div>
     </div>
   `;
 
   const settingsWeatherFormEl = document.getElementById("settings-weather-form");
   const settingsSupabaseFormEl = document.getElementById("settings-supabase-form");
-  const settingsEbirdFormEl = document.getElementById("settings-ebird-form");
   const settingsAccountFormEl = document.getElementById("settings-account-form");
   const settingsCloudAccountFormEl = document.getElementById("settings-cloud-account-form");
-  const clearEbirdKeyButton = detailContent.querySelector("[data-clear-ebird-key]");
   const clearSupabaseButton = detailContent.querySelector("[data-clear-supabase]");
   const testSupabaseButton = detailContent.querySelector("[data-test-supabase]");
   const cloudSignupButton = detailContent.querySelector("[data-cloud-signup]");
@@ -14404,10 +14735,6 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   const cloudSyncUploadButton = detailContent.querySelector("[data-cloud-sync-upload]");
   const cloudSyncDownloadButton = detailContent.querySelector("[data-cloud-sync-download]");
   const resetWeatherPlaceButton = detailContent.querySelector("[data-reset-weather-place]");
-  const pickStorageFolderButton = detailContent.querySelector("[data-pick-storage-folder]");
-  const restoreStorageNowButton = detailContent.querySelector("[data-restore-storage-now]");
-  const saveStorageNowButton = detailContent.querySelector("[data-save-storage-now]");
-  const disableStorageButton = detailContent.querySelector("[data-disable-storage]");
   const lockLocalAccountButton = detailContent.querySelector("[data-lock-local-account]");
   const logoutLocalAccountButton = detailContent.querySelector("[data-logout-local-account]");
   const exportStateButton = detailContent.querySelector("[data-export-state]");
@@ -14460,67 +14787,6 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     } catch (error) {
       openSettingsManager("Predvolené miesto pre počasie sa teraz nepodarilo obnoviť.", "error", "weather");
     }
-  });
-
-  pickStorageFolderButton?.addEventListener("click", async () => {
-    try {
-      await enableFolderStorageFromPicker();
-      openSettingsManager(`Dočasné ukladanie ide odteraz do priečinka ${loadFolderStoragePreferences().folderName || "moja zahrada"}.`, "success", "storage");
-    } catch (error) {
-      if (error && typeof error === "object" && error.name === "AbortError") {
-        return;
-      }
-      openSettingsManager(error instanceof Error ? error.message : "Priečinok pre dočasné úložisko sa nepodarilo nastaviť.", "error", "storage");
-    }
-  });
-
-  saveStorageNowButton?.addEventListener("click", async () => {
-    try {
-      await writeStateToFolderStorage(JSON.stringify(serializeStateSnapshot()));
-      openSettingsManager("Aktuálny stav som hneď uložila aj do priečinka na disku.", "success", "storage");
-    } catch (error) {
-      openSettingsManager(error instanceof Error ? error.message : "Nepodarilo sa uložiť aktuálny stav do priečinka.", "error", "storage");
-    }
-  });
-
-  restoreStorageNowButton?.addEventListener("click", async () => {
-    try {
-      await loadStateFromFolderStorage({ requestAccess: true });
-      openSettingsManager("Dáta som znova načítala priamo z priečinka na disku.", "success", "storage");
-    } catch (error) {
-      openSettingsManager(error instanceof Error ? error.message : "Nepodarilo sa načítať dáta z priečinka.", "error", "storage");
-    }
-  });
-
-  disableStorageButton?.addEventListener("click", async () => {
-    try {
-      await disableFolderStorage();
-      openSettingsManager("Dočasné ukladanie do priečinka som vypla. Appka je späť len na úložisku prehliadača.", "success", "storage");
-    } catch (error) {
-      openSettingsManager(error instanceof Error ? error.message : "Dočasné úložisko sa teraz nepodarilo vypnúť.", "error", "storage");
-    }
-  });
-
-  settingsEbirdFormEl?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const nextKey = String(new FormData(settingsEbirdFormEl).get("ebirdApiKey") || "").trim();
-    if (!nextKey) {
-      openSettingsManager("Najprv sem vlož eBird API kľúč alebo použi vymazanie.", "error", "ebird");
-      return;
-    }
-    if (saveEbirdPreferences({ apiKey: nextKey })) {
-      openSettingsManager("eBird API kľúč je uložený. Pri vtákoch sa teraz zoznam načíta jedným klikom.", "success", "ebird");
-      return;
-    }
-    openSettingsManager("Nepodarilo sa uložiť eBird API kľúč.", "error", "ebird");
-  });
-
-  clearEbirdKeyButton?.addEventListener("click", () => {
-    if (saveEbirdPreferences({ apiKey: "" })) {
-      openSettingsManager("eBird API kľúč som vymazala z tohto prehliadača.", "success", "ebird");
-      return;
-    }
-    openSettingsManager("Kľúč sa nepodarilo vymazať.", "error", "ebird");
   });
 
   settingsSupabaseFormEl?.addEventListener("submit", (event) => {
@@ -14840,10 +15106,6 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   openDetailModalDialog();
 }
 
-function getStoredEbirdApiKey() {
-  return loadEbirdPreferences().apiKey;
-}
-
 function normalizeBirdLookupText(value) {
   return String(value || "")
     .toLowerCase()
@@ -14860,7 +15122,7 @@ function birdEbirdSpeciesUrl(speciesCode) {
 }
 
 async function ensureEbirdApiKey() {
-  return String(getStoredEbirdApiKey() || "").trim();
+  return String(EMBEDDED_EBIRD_API_KEY || "").trim();
 }
 
 async function loadEbirdTaxonomy(apiKey, forceReload = false) {
@@ -15598,7 +15860,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     birdEbirdMatchButton?.addEventListener("click", async () => {
       const apiKey = await ensureEbirdApiKey();
       if (!apiKey) {
-        setBirdEbirdStatus("Najprv si ulož eBird API kľúč v Nastaveniach, potom sa zoznam načíta jedným klikom.", "error");
+        setBirdEbirdStatus("eBird integrácia teraz nemá pripravený vstavaný kľúč.", "error");
         return;
       }
 
@@ -16100,25 +16362,11 @@ function persist() {
   const serializedState = JSON.stringify(serializeStateSnapshot());
   try {
     localStorage.removeItem(RESET_BACKUP_KEY);
-    const folderStorage = loadFolderStoragePreferences();
-    if (folderStorage.enabled) {
-      try {
-        localStorage.setItem(STORAGE_KEY, serializedState);
-      } catch (browserStorageError) {
-        console.warn("Nepodarilo sa ponechať browserovú poistku stavu.", browserStorageError);
-      }
-      queueFolderStorageWrite(serializedState);
-      invalidateDerivedDataCaches();
-      return true;
-    }
     localStorage.setItem(STORAGE_KEY, serializedState);
     invalidateDerivedDataCaches();
     return true;
   } catch (error) {
-    const folderStorageHint = supportsFolderStorage()
-      ? " V Nastaveniach si môžeš dočasne zapnúť ukladanie do priečinka v počítači."
-      : "";
-    alert(`Uloženie sa nepodarilo. Dáta sú už asi príliš veľké pre úložisko prehliadača. Najčastejšie to robia fotky.${folderStorageHint}`);
+    alert("Uloženie sa nepodarilo. Dáta sú už asi príliš veľké pre úložisko prehliadača. Najčastejšie to robia fotky.");
     return false;
   }
 }
@@ -16223,6 +16471,50 @@ function renderJournalManagerCard(entry, deleteAttr = "data-delete-worklog-journ
   const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
   const chips = journalDisplayChips(normalizedEntry);
   const deleteAttribute = deleteAttr ? `${deleteAttr}="${escapeAttribute(rawId)}"` : "";
+  const headerWeatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry));
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+
+  if (isMobileShell) {
+    return `
+      <article class="journal-item journal-item--manager-compact ${images.length ? "journal-item--with-image" : ""}">
+        <div class="journal-item__header">
+          <div class="journal-item__header-main">
+            <div class="journal-item__topline">
+              <span class="journal-item__date-badge">${escapeHtml(journalDateLabel(rawDate))}</span>
+              ${headerWeatherWidgets}
+            </div>
+            <div class="journal-item__title-wrap">
+              <strong class="journal-item__title">${escapeHtml(rawTitle)}</strong>
+              ${renderMoodBadge(normalizedEntry.mood)}
+            </div>
+          </div>
+          <div class="task-item__side journal-item__actions">
+            <button class="button button--ghost journal-item__action journal-item__action--danger" type="button" ${deleteAttribute} aria-label="Vymazať záznam" title="Vymazať">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 7h14"></path>
+                <path d="M9 7V5h6v2"></path>
+                <path d="M8 7l1 12h6l1-12"></path>
+                <path d="M10 10v6"></path>
+                <path d="M14 10v6"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        ${previewText ? `<p class="task-item__meta journal-item__meta">${escapeHtml(previewText)}</p>` : ""}
+        ${walkMarkup}
+        ${renderJournalVideoPlayer(video, `Video zápisu ${rawTitle}`)}
+        ${images[0] ? `
+          <div class="journal-item__gallery journal-item__gallery--manager-compact">
+            <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(rawId)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(rawTitle)}">
+              ${renderJournalImageTag(images[0], rawTitle, { entryId: rawId, index: 0 })}
+            </button>
+            ${images.length > 1 ? `<span class="journal-item__more">+${images.length - 1}</span>` : ""}
+          </div>
+        ` : ""}
+        ${chips.length ? `<div class="journal-item__chips">${chips.map(renderJournalChip).join("")}</div>` : ""}
+      </article>
+    `;
+  }
 
   return `
     <article style="display:grid;gap:10px;padding:16px 18px;border:1px solid rgba(122,103,74,0.14);border-radius:22px;background:linear-gradient(180deg, rgba(255,252,247,0.98), rgba(245,239,227,0.98));box-shadow:0 8px 18px rgba(39,32,19,0.05);">
@@ -16381,7 +16673,7 @@ function bindMiniVarietyOpen(container) {
       const varietyId = item.dataset.openMiniVariety;
       if (!varietyId) return;
       if (detailModal.open) detailModal.close();
-      openStoredCardEditor(varietyId);
+      openStoredCardView(varietyId);
     };
 
     item.addEventListener("click", openMiniVariety);
@@ -16391,6 +16683,302 @@ function bindMiniVarietyOpen(container) {
       openMiniVariety();
     });
   });
+}
+
+function cardViewChipMarkup(label, tone = "neutral") {
+  const safeLabel = String(label || "").trim();
+  if (!safeLabel) return "";
+  return `<span class="card-view-chip card-view-chip--${escapeAttribute(tone)}">${escapeHtml(safeLabel)}</span>`;
+}
+
+function cardViewRowMarkup(label, value) {
+  const safeValue = String(value || "").trim();
+  if (!safeValue) return "";
+  return `
+    <div class="card-view-row">
+      <span>${escapeHtml(`${label}:`)}</span>
+      <strong>${escapeHtml(safeValue)}</strong>
+    </div>
+  `;
+}
+
+function cardViewSectionMarkup(title, bodyMarkup = "", className = "") {
+  const body = String(bodyMarkup || "").trim();
+  const safeClassName = String(className || "").trim();
+  if (!body) return "";
+  return `
+    <section class="card-view-panel${safeClassName ? ` ${safeClassName}` : ""}">
+      ${title ? `<h4>${escapeHtml(title)}</h4>` : ""}
+      <div class="card-view-panel__body">${body}</div>
+    </section>
+  `;
+}
+
+function cardViewCategoryNames(categoryIds = []) {
+  return normalizeIdList(categoryIds)
+    .map((categoryId) => categoryName(categoryId))
+    .filter(Boolean);
+}
+
+function cardViewRelatedCardName(varietyId = "") {
+  const resolvedId = String(varietyId || "").trim();
+  if (!resolvedId) return "";
+  const existing = state.varieties.find((item) => item.id === resolvedId);
+  return existing ? entryDisplayName(existing) : "";
+}
+
+function cardViewRatingText(item) {
+  const ratingValue = Math.max(0, Math.min(5, Number(item?.rating) || 0));
+  return ratingValue > 0 ? `${ratingValue}/5` : "";
+}
+
+function cardViewSummaryChipsMarkup(item) {
+  const chips = [];
+  const resolvedType = cardType(item);
+
+  if (entryKind(item) !== "detail") {
+    chips.push(cardViewChipMarkup(entryKindLabel(item) || "Záznam", "sky"));
+  }
+
+  if (resolvedType === "variety") {
+    if (item.avoidNextYear) chips.push(cardViewChipMarkup("neodporúčam", "rose"));
+    if (!item.avoidNextYear && item.neverGrown) chips.push(cardViewChipMarkup("ešte som nepestovala", "violet-soft"));
+    if (!item.avoidNextYear && !item.neverGrown && item.notGrowingThisYear) chips.push(cardViewChipMarkup("tento rok nepestujem", "sand"));
+    if (item.top) chips.push(cardViewChipMarkup("top odroda", "gold"));
+    if (!item.sowedAt) {
+      const primaryStatus = varietyStatusValues(item).map((statusValue) => statusLabel(statusValue)).find(Boolean);
+      if (primaryStatus) chips.push(cardViewChipMarkup(primaryStatus, "green"));
+    }
+  } else if (resolvedType === "mushroom") {
+    const edibility = normalizeTagList(item.mushroomEdibilityValues?.length ? item.mushroomEdibilityValues : item.mushroomEdibility)
+      .map((value) => mushroomEdibilityLabel(value))
+      .find(Boolean);
+    const gathering = normalizeTagList(item.mushroomGatheringValues?.length ? item.mushroomGatheringValues : item.mushroomGathering)
+      .map((value) => mushroomGatheringLabel(value))
+      .find(Boolean);
+    if (edibility) chips.push(cardViewChipMarkup(edibility, edibility === "jedovatá" ? "rose" : "green"));
+    if (gathering) chips.push(cardViewChipMarkup(gathering, "sand"));
+  } else if (resolvedType === "wild-plant") {
+    if (item.isMedicinal) chips.push(cardViewChipMarkup("liečivá", "green"));
+    if (item.isPoisonous) chips.push(cardViewChipMarkup("jedovatá", "rose"));
+  } else if (resolvedType === "bird") {
+    const sourceLabel = birdSourceLabel(item.birdSource || ((item.birdSpeciesCode || item.birdExternalUrl) ? "ebird" : "manual"));
+    const contactLabel = birdContactLabel(item.birdContact || "");
+    if (sourceLabel) chips.push(cardViewChipMarkup(sourceLabel, "sky"));
+    if (contactLabel) chips.push(cardViewChipMarkup(contactLabel, "green"));
+  }
+
+  return chips.filter(Boolean).slice(0, 2).join("");
+}
+
+function cardViewSectionsMarkup(item) {
+  const resolvedType = cardType(item);
+  const categoryId = String(item.categoryId || "").trim();
+  if (resolvedType === "variety") {
+    const sections = [];
+    const rows = [];
+    if (item.sowedAt) {
+      if (item.transplantedAt) rows.push(cardViewRowMarkup("Vysadené", formatDate(item.transplantedAt)));
+      if (item.harvestedAt) rows.push(cardViewRowMarkup("Zber", formatDate(item.harvestedAt)));
+    } else if (item.transplantedAt) {
+      if (item.harvestedAt) rows.push(cardViewRowMarkup("Zber", formatDate(item.harvestedAt)));
+    }
+    if (rows.length) {
+      sections.push(cardViewSectionMarkup("", rows.join(""), "card-view-panel--facts"));
+    }
+    const safeNotes = String(item.notes || "").trim();
+    if (safeNotes) {
+      sections.push(cardViewSectionMarkup(
+        "Poznámka",
+        `<p class="card-view-note">${escapeHtml(safeNotes).replace(/\n/g, "<br>")}</p>`,
+        "card-view-panel--note"
+      ));
+    }
+    return sections.join("");
+  }
+
+  const sections = [];
+
+  if (resolvedType === "bird") {
+    const birdRows = [
+      cardViewRowMarkup("Latinský názov", item.birdLatinName || ""),
+      cardViewRowMarkup("Zachytenie", birdContactLabel(item.birdContact || "")),
+      cardViewRowMarkup("Zdroj", birdSourceLabel(item.birdSource || ((item.birdSpeciesCode || item.birdExternalUrl) ? "ebird" : "manual")))
+    ].join("");
+    const birdLink = String(item.birdExternalUrl || "").trim()
+      ? `<a class="card-view-link" href="${escapeAttribute(item.birdExternalUrl)}" target="_blank" rel="noreferrer noopener">Otvoriť eBird</a>`
+      : "";
+    sections.push(cardViewSectionMarkup("Pozorovanie", `${birdRows}${birdLink}`));
+  }
+
+  if (resolvedType === "mushroom") {
+    const edibility = normalizeTagList(item.mushroomEdibilityValues?.length ? item.mushroomEdibilityValues : item.mushroomEdibility)
+      .map((value) => mushroomEdibilityLabel(value))
+      .filter(Boolean)
+      .join(", ");
+    const gathering = normalizeTagList(item.mushroomGatheringValues?.length ? item.mushroomGatheringValues : item.mushroomGathering)
+      .map((value) => mushroomGatheringLabel(value))
+      .filter(Boolean)
+      .join(", ");
+    sections.push(cardViewSectionMarkup("Určenie", [
+      cardViewRowMarkup("Jedlosť", edibility),
+      cardViewRowMarkup("Zber", gathering)
+    ].join("")));
+  }
+
+  if (resolvedType === "wild-plant") {
+    const features = [
+      item.isMedicinal ? "liečivá" : "",
+      item.isPoisonous ? "jedovatá" : ""
+    ].filter(Boolean).join(", ");
+    sections.push(cardViewSectionMarkup("Vlastnosti", cardViewRowMarkup("Popis", features)));
+  }
+
+  if (resolvedType === "pest-problem") {
+    sections.push(cardViewSectionMarkup("Súvislosti", [
+      cardViewRowMarkup("Týka sa kategórií", cardViewCategoryNames(item.affectedCategoryIds || item.affectedCategoryId).join(", ")),
+      cardViewRowMarkup("Týka sa karty", cardViewRelatedCardName(item.affectedVarietyId))
+    ].join("")));
+  }
+
+  if (resolvedType === "processing-recipe") {
+    sections.push(cardViewSectionMarkup("Súvislosti", [
+      cardViewRowMarkup("Súvisí s kategóriami", cardViewCategoryNames(item.relatedCategoryIds || item.relatedCategoryId).join(", ")),
+      cardViewRowMarkup("Súvisí s kartou", cardViewRelatedCardName(item.relatedVarietyId))
+    ].join("")));
+  }
+
+  const safeNotes = String(item.notes || "").trim();
+  if (safeNotes) {
+    sections.push(cardViewSectionMarkup(
+      "Poznámka",
+      `<p class="card-view-note">${escapeHtml(safeNotes).replace(/\n/g, "<br>")}</p>`,
+      "card-view-panel--note"
+    ));
+  }
+
+  return sections.filter(Boolean).join("");
+}
+
+function cardViewHeaderMetaMarkup(item) {
+  const resolvedType = cardType(item);
+  const parts = [];
+  const ratingText = cardViewRatingText(item);
+  if (resolvedType === "variety") {
+    const sowedAt = String(item.sowedAt || "").trim();
+    const transplantedAt = String(item.transplantedAt || "").trim();
+    const harvestedAt = String(item.harvestedAt || "").trim();
+    if (sowedAt) parts.push(`Vysiate ${formatDate(sowedAt)}`);
+    else if (transplantedAt) parts.push(`Vysadené ${formatDate(transplantedAt)}`);
+    else if (harvestedAt) parts.push(`Zber ${formatDate(harvestedAt)}`);
+    else {
+      const primaryStatus = varietyStatusValues(item).map((statusValue) => statusLabel(statusValue)).find(Boolean);
+      if (primaryStatus) parts.push(primaryStatus.charAt(0).toUpperCase() + primaryStatus.slice(1));
+    }
+  } else {
+    const recordedAt = String(item.recordedAt || "").trim();
+    if (recordedAt) parts.push(`${cardDateLabel(resolvedType)} ${formatDate(recordedAt)}`);
+  }
+  if (ratingText) parts.push(`Hodnotenie ${ratingText}`);
+  return parts.length ? `<p class="card-view-head__summary">${parts.map((part) => escapeHtml(part)).join(" • ")}</p>` : "";
+}
+
+function openStoredCardView(varietyId) {
+  const source = state.varieties.find((item) => item.id === varietyId);
+  if (!source) return;
+  const existing = normalizeVarietyRecord(source);
+  const resolvedType = cardType(existing);
+  const images = normalizeVarietyImages(existing);
+  const displayImages = images.length ? images : [cardPlaceholderImage(resolvedType)];
+  const headerCategory = String(existing.categoryId || "").trim() && String(existing.categoryId || "").trim() !== FALLBACK_CATEGORY_ID
+    ? categoryName(existing.categoryId)
+    : cardTypeLabel(resolvedType);
+  const headerMetaMarkup = cardViewHeaderMetaMarkup(existing);
+  const summaryChipsMarkup = cardViewSummaryChipsMarkup(existing);
+  const titleBadgeMarkup = resolvedType === "variety" && inferBreedingType(existing) === "hybrid"
+    ? cardViewChipMarkup("F1", "violet")
+    : "";
+  let activeImageIndex = 0;
+
+  resetDetailModalClasses();
+  detailModal.classList.add("detail-modal--card-view");
+  detailContent.innerHTML = `
+    <div class="detail-layout detail-layout--card-view">
+      <div class="detail-image detail-image--card-view">
+        <div class="card-view-hero-bar">
+          <button class="button" id="card-view-edit" type="button">Upraviť</button>
+        </div>
+        <button class="card-view-hero${images.length ? " is-clickable" : ""}" id="card-view-hero-button" type="button" ${images.length ? "" : "disabled"}>
+          <img id="card-view-hero-image" src="${escapeAttribute(displayImages[0])}" alt="${escapeAttribute(entryDisplayName(existing))}">
+        </button>
+        ${displayImages.length > 1 ? `<div class="card-view-hero__count" id="card-view-hero-count">1 / ${displayImages.length}</div>` : ""}
+        ${displayImages.length > 1 ? `
+          <div class="card-view-gallery" id="card-view-gallery">
+            ${displayImages.map((image, index) => `
+              <button class="card-view-gallery__thumb ${index === 0 ? "is-active" : ""}" type="button" data-card-view-image-index="${index}" aria-label="Zobraziť fotku ${index + 1}">
+                <img src="${escapeAttribute(image)}" alt="Fotka ${index + 1}" loading="lazy" decoding="async" fetchpriority="low">
+              </button>
+            `).join("")}
+          </div>
+        ` : ""}
+      </div>
+      <div class="detail-copy detail-copy--wide detail-copy--card-view">
+        <div class="card-view-head">
+          <div class="card-view-head__eyebrow">
+            <span>${escapeHtml(headerCategory)}</span>
+          </div>
+          <div class="card-view-head__topline">
+            <div class="card-view-head__title-line">
+              <h3>${escapeHtml(entryDisplayName(existing))}</h3>
+              ${titleBadgeMarkup}
+            </div>
+          </div>
+          ${headerMetaMarkup}
+          ${summaryChipsMarkup ? `<div class="card-view-chip-list card-view-chip-list--summary">${summaryChipsMarkup}</div>` : ""}
+        </div>
+        <div class="card-view-sections">
+          ${cardViewSectionsMarkup(existing)}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const heroButton = document.getElementById("card-view-hero-button");
+  const heroImage = document.getElementById("card-view-hero-image");
+  const heroCount = document.getElementById("card-view-hero-count");
+  const syncGallery = () => {
+    activeImageIndex = Math.max(0, Math.min(activeImageIndex, displayImages.length - 1));
+    if (heroImage instanceof HTMLImageElement) {
+      heroImage.src = displayImages[activeImageIndex];
+      heroImage.alt = `${entryDisplayName(existing)} • fotka ${activeImageIndex + 1}`;
+    }
+    if (heroCount) {
+      heroCount.textContent = `${activeImageIndex + 1} / ${displayImages.length}`;
+    }
+    detailContent.querySelectorAll("[data-card-view-image-index]").forEach((button) => {
+      const index = Number(button.getAttribute("data-card-view-image-index") || 0);
+      button.classList.toggle("is-active", index === activeImageIndex);
+    });
+  };
+
+  detailContent.querySelectorAll("[data-card-view-image-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeImageIndex = Number(button.getAttribute("data-card-view-image-index") || 0);
+      syncGallery();
+    });
+  });
+
+  heroButton?.addEventListener("click", () => {
+    if (!images.length) return;
+    openImageLightbox(images, activeImageIndex, entryDisplayName(existing));
+  });
+
+  document.getElementById("card-view-edit")?.addEventListener("click", () => {
+    openStoredCardEditor(varietyId);
+  });
+
+  syncGallery();
+  openDetailModalDialog();
 }
 
 function openStoredCardEditor(varietyId) {
@@ -16677,6 +17265,25 @@ function renderRelationDisclosure({
         </div>
       </details>
     </div>
+  `;
+}
+
+function renderTaskRelationFields(categoryValue = "", cardValue = "") {
+  return `
+    <label class="field-block field-block--full">
+      <span>Kategória</span>
+      <select name="linkedCategoryIds">
+        <option value="">Bez kategórie</option>
+        ${categoryOptions(categoryValue)}
+      </select>
+    </label>
+    <label class="field-block field-block--full" data-linked-variety-wrap="task">
+      <span>Karta</span>
+      <select name="linkedVarietyId">
+        <option value="">Bez karty</option>
+        ${linkedVarietyOptions(cardValue, categoryValue ? [categoryValue] : [])}
+      </select>
+    </label>
   `;
 }
 
@@ -18383,6 +18990,7 @@ function updateMenuVisibility() {
   if (typeof document !== "undefined") {
     document.body.classList.toggle("app-main-menu-mode", !isFocusedView);
     document.body.classList.toggle("app-focused-mode", isFocusedView);
+    document.body.classList.toggle("app-main-menu-categories-preview", !isFocusedView && mainMenuCategoriesPreviewVisible);
   }
   menuPanelEl.classList.toggle("is-hidden", isFocusedView);
   if (workspaceMainEl) {
@@ -18401,6 +19009,7 @@ function updateMenuVisibility() {
     batchMoveQuickEl.hidden = !state.varieties.length;
   }
   updateCatalogHeader();
+  syncMobileTopStripVisibility();
   syncMobileToolbarScrollState();
 }
 
@@ -18410,306 +19019,6 @@ function closeUtilityDrawers() {
   if (searchResults) {
     searchResults.hidden = true;
   }
-}
-
-function supportsFolderStorage() {
-  return typeof window !== "undefined"
-    && typeof window.showDirectoryPicker === "function"
-    && typeof indexedDB !== "undefined";
-}
-
-function loadFolderStoragePreferences() {
-  try {
-    const raw = localStorage.getItem(FOLDER_STORAGE_META_KEY);
-    if (!raw) {
-      return {
-        enabled: false,
-        folderName: "",
-        fileName: FOLDER_STORAGE_FILE_NAME,
-        lastSavedAt: ""
-      };
-    }
-    const parsed = JSON.parse(raw);
-    return {
-      enabled: Boolean(parsed?.enabled),
-      folderName: String(parsed?.folderName || "").trim(),
-      fileName: String(parsed?.fileName || FOLDER_STORAGE_FILE_NAME).trim() || FOLDER_STORAGE_FILE_NAME,
-      lastSavedAt: String(parsed?.lastSavedAt || "").trim()
-    };
-  } catch (error) {
-    return {
-      enabled: false,
-      folderName: "",
-      fileName: FOLDER_STORAGE_FILE_NAME,
-      lastSavedAt: ""
-    };
-  }
-}
-
-function saveFolderStoragePreferences(nextPreferences = {}) {
-  const current = loadFolderStoragePreferences();
-  try {
-    localStorage.setItem(FOLDER_STORAGE_META_KEY, JSON.stringify({
-      enabled: Boolean(nextPreferences?.enabled ?? current.enabled),
-      folderName: String(nextPreferences?.folderName ?? current.folderName ?? "").trim(),
-      fileName: String(nextPreferences?.fileName ?? current.fileName ?? FOLDER_STORAGE_FILE_NAME).trim() || FOLDER_STORAGE_FILE_NAME,
-      lastSavedAt: String(nextPreferences?.lastSavedAt ?? current.lastSavedAt ?? "").trim()
-    }));
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-function clearFolderStoragePreferences() {
-  try {
-    localStorage.removeItem(FOLDER_STORAGE_META_KEY);
-  } catch (error) {
-    return;
-  }
-}
-
-function openFolderStorageDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(FOLDER_STORAGE_DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(FOLDER_STORAGE_DB_STORE)) {
-        database.createObjectStore(FOLDER_STORAGE_DB_STORE);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("Databázu pre diskové úložisko sa nepodarilo otvoriť."));
-  });
-}
-
-async function getFolderStorageHandle() {
-  if (!supportsFolderStorage()) return null;
-  const database = await openFolderStorageDb();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(FOLDER_STORAGE_DB_STORE, "readonly");
-    const store = transaction.objectStore(FOLDER_STORAGE_DB_STORE);
-    const request = store.get(FOLDER_STORAGE_HANDLE_ID);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error || new Error("Priečinok úložiska sa nepodarilo načítať."));
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error || new Error("Čítanie priečinka úložiska zlyhalo."));
-    };
-  });
-}
-
-async function setFolderStorageHandle(directoryHandle) {
-  if (!supportsFolderStorage()) return false;
-  const database = await openFolderStorageDb();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(FOLDER_STORAGE_DB_STORE, "readwrite");
-    const store = transaction.objectStore(FOLDER_STORAGE_DB_STORE);
-    const request = store.put(directoryHandle, FOLDER_STORAGE_HANDLE_ID);
-    request.onsuccess = () => resolve(true);
-    request.onerror = () => reject(request.error || new Error("Priečinok úložiska sa nepodarilo uložiť."));
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error || new Error("Uloženie priečinka úložiska zlyhalo."));
-    };
-  });
-}
-
-async function clearFolderStorageHandle() {
-  if (!supportsFolderStorage()) return;
-  const database = await openFolderStorageDb();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(FOLDER_STORAGE_DB_STORE, "readwrite");
-    const store = transaction.objectStore(FOLDER_STORAGE_DB_STORE);
-    const request = store.delete(FOLDER_STORAGE_HANDLE_ID);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error || new Error("Priečinok úložiska sa nepodarilo odpojiť."));
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error || new Error("Odpojenie priečinka úložiska zlyhalo."));
-    };
-  });
-}
-
-async function ensureFolderStoragePermission(directoryHandle, mode = "read", requestAccess = false) {
-  if (!directoryHandle) return false;
-  if (typeof directoryHandle.queryPermission === "function") {
-    const currentPermission = await directoryHandle.queryPermission({ mode }).catch(() => "prompt");
-    if (currentPermission === "granted") return true;
-    if (!requestAccess || typeof directoryHandle.requestPermission !== "function") return false;
-    const requestedPermission = await directoryHandle.requestPermission({ mode }).catch(() => "denied");
-    return requestedPermission === "granted";
-  }
-  return true;
-}
-
-async function writeStateToFolderStorage(serializedState) {
-  const preferences = loadFolderStoragePreferences();
-  const directoryHandle = await getFolderStorageHandle();
-  if (!preferences.enabled || !directoryHandle) {
-    throw new Error("Najprv vyber priečinok pre dočasné diskové úložisko.");
-  }
-  const granted = await ensureFolderStoragePermission(directoryHandle, "readwrite", true);
-  if (!granted) {
-    throw new Error("Prehliadač nedostal povolenie zapisovať do zvoleného priečinka.");
-  }
-  const fileHandle = await directoryHandle.getFileHandle(preferences.fileName || FOLDER_STORAGE_FILE_NAME, { create: true });
-  const existingFile = await fileHandle.getFile().catch(() => null);
-  const existingRaw = existingFile ? await existingFile.text().catch(() => "") : "";
-  if (String(existingRaw || "").trim() && isFolderStateShrinkSuspicious(serializedState, existingRaw)) {
-    throw new Error("Zastavila som uloženie, lebo nový stav vyzerá podozrivo menší než dáta v priečinku. Najprv skús Načítať z priečinka, aby sa nič neprepísalo.");
-  }
-  const writable = await fileHandle.createWritable();
-  await writable.write(serializedState);
-  await writable.close();
-  const backupFileHandle = await directoryHandle.getFileHandle(FOLDER_STORAGE_BACKUP_FILE_NAME, { create: true });
-  const backupWritable = await backupFileHandle.createWritable();
-  await backupWritable.write(serializedState);
-  await backupWritable.close();
-  saveFolderStoragePreferences({
-    enabled: true,
-    folderName: String(directoryHandle.name || preferences.folderName || "").trim(),
-    fileName: preferences.fileName || FOLDER_STORAGE_FILE_NAME,
-    lastSavedAt: new Date().toISOString()
-  });
-}
-
-function queueFolderStorageWrite(serializedState) {
-  folderStorageWriteQueue = folderStorageWriteQueue
-    .catch(() => null)
-    .then(() => writeStateToFolderStorage(serializedState))
-    .then(() => {
-      folderStorageWriteAlertShown = false;
-    })
-    .catch((error) => {
-      console.warn("Dočasné diskové úložisko zlyhalo.", error);
-      try {
-        localStorage.setItem(STORAGE_KEY, serializedState);
-      } catch (browserStorageError) {
-        if (!folderStorageWriteAlertShown) {
-          folderStorageWriteAlertShown = true;
-          alert("Nepodarilo sa uložiť dáta ani do priečinka, ani do prehliadača. Otvor Nastavenia a znovu pripoj dočasné úložisko.");
-        }
-      }
-    });
-  return folderStorageWriteQueue;
-}
-
-function folderStateSnapshotMetrics(raw = "") {
-  try {
-    const parsed = JSON.parse(String(raw || ""));
-    return {
-      varieties: Array.isArray(parsed?.varieties) ? parsed.varieties.length : 0,
-      tasks: Array.isArray(parsed?.customTasks) ? parsed.customTasks.length : 0,
-      journal: Array.isArray(parsed?.journal) ? parsed.journal.length : 0,
-      images: Array.isArray(parsed?.journal)
-        ? parsed.journal.filter((entry) => Boolean(entry?.image) || (Array.isArray(entry?.images) && entry.images.length)).length
-        : 0,
-      size: String(raw || "").length
-    };
-  } catch (error) {
-    return {
-      varieties: 0,
-      tasks: 0,
-      journal: 0,
-      images: 0,
-      size: String(raw || "").length
-    };
-  }
-}
-
-function isFolderStateShrinkSuspicious(nextRaw = "", existingRaw = "") {
-  const nextMetrics = folderStateSnapshotMetrics(nextRaw);
-  const existingMetrics = folderStateSnapshotMetrics(existingRaw);
-  if (!existingMetrics.size || !nextMetrics.size) return false;
-
-  const sizeCollapsed = existingMetrics.size > 250000 && nextMetrics.size < existingMetrics.size * 0.45;
-  const journalCollapsed = existingMetrics.journal >= 3 && nextMetrics.journal < existingMetrics.journal * 0.5;
-  const imagesCollapsed = existingMetrics.images >= 2 && nextMetrics.images < existingMetrics.images * 0.5;
-  const tasksCollapsed = existingMetrics.tasks >= 2 && nextMetrics.tasks < existingMetrics.tasks * 0.5;
-
-  return sizeCollapsed && (journalCollapsed || imagesCollapsed || tasksCollapsed);
-}
-
-async function loadStateFromFolderStorage({ requestAccess = false } = {}) {
-  const preferences = loadFolderStoragePreferences();
-  if (!preferences.enabled) {
-    throw new Error("Dočasné úložisko v priečinku zatiaľ nie je zapnuté.");
-  }
-  const directoryHandle = await getFolderStorageHandle().catch(() => null);
-  if (!directoryHandle) {
-    throw new Error("Prístup k priečinku sa po reštarte stratil. Klikni na Zmeniť priečinok a vyber znova svoju zložku moja zahrada.");
-  }
-  const granted = await ensureFolderStoragePermission(directoryHandle, "read", requestAccess);
-  if (!granted) {
-    throw new Error("Prehliadač nedostal povolenie čítať z vybraného priečinka.");
-  }
-  let fileHandle = await directoryHandle.getFileHandle(preferences.fileName || FOLDER_STORAGE_FILE_NAME).catch(() => null);
-  if (!fileHandle) {
-    fileHandle = await directoryHandle.getFileHandle(FOLDER_STORAGE_BACKUP_FILE_NAME).catch(() => null);
-  }
-  if (!fileHandle) {
-    throw new Error("V zvolenom priečinku sa nepodarilo nájsť súbor s dátami.");
-  }
-  const file = await fileHandle.getFile();
-  const raw = await file.text();
-  if (!String(raw || "").trim()) {
-    throw new Error("Súbor s dátami je zatiaľ prázdny.");
-  }
-  state = normalizePersistedState(JSON.parse(raw));
-  invalidateDerivedDataCaches();
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeStateSnapshot()));
-  } catch (error) {
-    console.warn("Nepodarilo sa obnoviť browserovú poistku po načítaní z priečinka.", error);
-  }
-  if (!state.categories.some((item) => item.id === activeCategoryId)) {
-    activeCategoryId = state.categories[0]?.id || null;
-  }
-  render();
-  return true;
-}
-
-async function hydrateStateFromFolderStorage() {
-  await loadStateFromFolderStorage({ requestAccess: false }).catch(() => null);
-}
-
-async function enableFolderStorageFromPicker() {
-  if (!supportsFolderStorage()) {
-    throw new Error("Tento prehliadač zatiaľ nevie zapisovať do priečinka v počítači.");
-  }
-  const directoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
-  const granted = await ensureFolderStoragePermission(directoryHandle, "readwrite", true);
-  if (!granted) {
-    throw new Error("Bez povolenia zapisovať sa priečinok nedá použiť.");
-  }
-  await setFolderStorageHandle(directoryHandle);
-  saveFolderStoragePreferences({
-    enabled: true,
-    folderName: String(directoryHandle.name || "").trim(),
-    fileName: FOLDER_STORAGE_FILE_NAME,
-    lastSavedAt: ""
-  });
-  await writeStateToFolderStorage(JSON.stringify(serializeStateSnapshot()));
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    return;
-  }
-}
-
-async function disableFolderStorage() {
-  const serializedState = JSON.stringify(serializeStateSnapshot());
-  try {
-    localStorage.setItem(STORAGE_KEY, serializedState);
-  } catch (error) {
-    throw new Error("Aktuálne dáta sú už príliš veľké pre samotný prehliadač. Priečinok zatiaľ nechaj zapnutý.");
-  }
-  await clearFolderStorageHandle();
-  clearFolderStoragePreferences();
 }
 
 function normalizeLocalAuthProfile(profile = {}) {
@@ -20535,6 +20844,69 @@ function buildWeatherAlerts(days = []) {
 
 function renderWeatherWeekCard(week) {
   const summary = week.summary || {};
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  if (isMobileShell) {
+    const summaryLine = [
+      summary.totalRain ? `zrážky ${summary.totalRain}` : "",
+      summary.maxWind ? `vietor ${summary.maxWind}` : "",
+      summary.totalSunshine ? `slnko ${summary.totalSunshine}` : ""
+    ].filter(Boolean).join(" • ");
+
+    return `
+      <section class="weather-week-card weather-week-card--compact-list">
+        <div class="weather-week-card__head weather-week-card__head--compact-list">
+          <div>
+            <p class="eyebrow">${escapeHtml(week.label)}</p>
+            <h4>${escapeHtml(week.rangeLabel || "")}</h4>
+          </div>
+          ${summaryLine ? `<p class="weather-week-card__inline-summary">${escapeHtml(summaryLine)}</p>` : ""}
+        </div>
+        <div class="weather-week-rows">
+          ${week.days.map((day) => {
+            const flags = [
+              day.hardFrost ? { label: "Mráz", tone: "frost" } : null,
+              !day.hardFrost && day.groundFrostRisk ? { label: "Prízemný mráz", tone: "frost" } : null,
+              day.hail ? { label: "Krúpy", tone: "storm" } : null,
+              !day.hail && day.storm ? { label: "Búrky", tone: "storm" } : null,
+              day.snow ? { label: day.heavyRain ? "Výdatné sneženie" : "Sneženie", tone: "frost" } : null,
+              !day.snow && day.heavyRain ? { label: "Výdatný dážď", tone: "rain" } : null,
+              day.veryHotDay ? { label: "Horúčava", tone: "heat" } : null,
+              day.strongWind ? { label: "Silný vietor", tone: "wind" } : null
+            ].filter(Boolean);
+            const meta = [
+              day.rain || "0 mm",
+              day.wind || "",
+              formatSunshineHours(day.sunshineHours)
+            ].filter(Boolean).join(" • ");
+            const minTemp = Number.isFinite(day.minTempC) ? `${Math.round(day.minTempC)}°` : "—";
+            const maxTemp = Number.isFinite(day.maxTempC) ? `${Math.round(day.maxTempC)}°` : "—";
+            return `
+              <article class="weather-week-row ${day.isToday ? "is-today" : ""} ${day.isPast ? "is-past" : ""}">
+                <div class="weather-week-row__top">
+                  <div class="weather-week-row__day">
+                    <strong>${escapeHtml(capitalizeLabel(day.label))}</strong>
+                    <span>${escapeHtml(day.calendarLabel)}</span>
+                    ${day.isToday ? '<span class="weather-week-row__today">Dnes</span>' : ""}
+                  </div>
+                  <div class="weather-week-row__main">
+                    <span class="weather-week-row__icon" aria-hidden="true">${escapeHtml(day.icon || ICONS.weatherPartly)}</span>
+                    <strong class="weather-week-row__temps">${escapeHtml(`${minTemp} / ${maxTemp}`)}</strong>
+                  </div>
+                </div>
+                <div class="weather-week-row__meta">${escapeHtml(meta)}</div>
+                ${flags.length ? `
+                  <div class="weather-week-row__flags">
+                    ${flags.map((flag) => `<span class="weather-week-row__flag weather-week-row__flag--${escapeAttribute(flag.tone)}">${escapeHtml(flag.label)}</span>`).join("")}
+                  </div>
+                ` : ""}
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  }
+
   return `
     <section class="weather-week-card">
       <div class="weather-week-card__head">
@@ -20914,12 +21286,13 @@ function renderWeatherTrendMarkup(days = []) {
 }
 
 function renderHomeWeatherCardMarkup(snapshot, trendDays = []) {
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
   return `
     <div class="main-menu-weather-mini main-menu-weather-mini--home">
       ${renderMainMenuWeatherMini(snapshot, {
-        showTrend: true,
+        showTrend: !isMobileShell,
         trendDays,
-        compactTrend: false
+        compactTrend: isMobileShell
       })}
     </div>
   `;
