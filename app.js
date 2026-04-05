@@ -37,6 +37,7 @@ const CATEGORY_IMAGE_MAX_DIMENSION = 1280;
 const CATEGORY_IMAGE_QUALITY = 0.8;
 const LIST_IMAGE_PREVIEW_MAX_DIMENSION = 420;
 const JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION = 520;
+const JOURNAL_SIDEBAR_MEDIA_ASPECT_RATIO = 92 / 65;
 const SUPABASE_IMAGE_BUCKET = "mojazahrada-images";
 const SUPABASE_VIDEO_FILE_LIMIT_BYTES = 100 * 1024 * 1024;
 const GARDEN_WEATHER_PLACE = "Zákopčie, Slovensko";
@@ -136,6 +137,7 @@ const ICONS = {
   cardInsect: "\uD83E\uDD8B",
   cardPest: "\uD83D\uDC1B",
   cardRecipe: "\uD83C\uDF72",
+  journal: "\uD83D\uDCD3",
   lightning: "\u26A1\uFE0F",
   frost: "\u2744\uFE0F",
   heat: "\uD83C\uDF21\uFE0F",
@@ -550,6 +552,21 @@ function journalDisplayTitle(entry = {}) {
   return fallbackTitle;
 }
 
+function journalPreviewTitleInfo(entry = {}, maxLength = 72) {
+  const normalizedEntry = entry && typeof entry === "object" ? entry : {};
+  const displayTitle = String(journalDisplayTitle(normalizedEntry) || "").trim();
+  const typeLabel = String(journalEntryTypeLabel(normalizedEntry.entryType || "note") || "Zápis").trim();
+  const noteTitle = trimText(String(normalizedEntry.text || "").replace(/\s+/g, " ").trim(), maxLength);
+  const normalizedDisplayTitle = displayTitle.toLocaleLowerCase("sk-SK");
+  const normalizedTypeLabel = typeLabel.toLocaleLowerCase("sk-SK");
+  const shouldUseNoteTitle = Boolean(noteTitle) && (!normalizedDisplayTitle || normalizedDisplayTitle === normalizedTypeLabel);
+
+  return {
+    title: shouldUseNoteTitle ? noteTitle : (displayTitle || typeLabel || "Zápis"),
+    usesNoteTitle: shouldUseNoteTitle
+  };
+}
+
 function journalHeaderWeather(entry = {}) {
   const normalizedEntry = entry && typeof entry === "object" ? entry : {};
   const directWeather = normalizeWeatherSnapshot(normalizedEntry.weather);
@@ -917,7 +934,7 @@ function normalizeJournalEntry(entry = {}, varieties = []) {
     linkedVarietyId,
     linkedEntityName: String(entry.linkedEntityName || "").trim(),
     place: "",
-    mood: String(entry.mood || "").trim(),
+    mood: serializeMoodValues(entry.mood),
     weather: normalizeWeatherSnapshot(entry.weather),
     walk: normalizeJournalWalk(entry, normalizeWeatherSnapshot(entry.weather)),
     video,
@@ -2703,7 +2720,13 @@ function isMobileCameraPickerOpen() {
 
 function inferVisibleOverlayHistoryKind() {
   if (imageLightboxEl?.open) return "lightbox";
-  if (journalOverlayRoot()) return "journal";
+  const journalRoot = journalOverlayRoot();
+  if (journalRoot) {
+    const overlayView = String(journalRoot.dataset.journalOverlayView || "").trim();
+    if (overlayView === "compose") return "journal-compose";
+    if (overlayView === "entry") return "journal-entry";
+    return "journal";
+  }
   if (detailModal?.open) return "detail";
   if (isMobileCameraPickerOpen()) return "mobile-camera";
   if (toolbarAddMenuEl?.open) return "toolbar-add";
@@ -2896,6 +2919,8 @@ const imageLightboxState = { images: [], index: 0, label: "Fotka" };
 let deferredCategoryCardImageObserver = null;
 let deferredJournalImageObserver = null;
 let deferredVarietyCardImageObserver = null;
+let deferredCardImageActivationRaf = 0;
+const deferredCardImageActivationQueue = [];
 let mainMenuCategoriesPreviewVisible = false;
 let toolbarSearchQuery = "";
 let toolbarSearchLastResults = [];
@@ -3046,13 +3071,12 @@ scheduleGlobalViewportMaintenance({ scroll: true });
 scheduleImageBackgroundCleanup();
 
 function closeToolbarAddMenu({ skipHistory = true } = {}) {
-  if (toolbarAddMenuEl?.open) {
-    if (skipHistory) {
-      toolbarAddMenuEl.dataset.skipHistoryClose = "true";
-    }
-    toolbarAddMenuEl.open = false;
-  }
   restoreToolbarAddMenuOverlay();
+  if (!toolbarAddMenuEl?.open) return;
+  if (skipHistory) {
+    toolbarAddMenuEl.dataset.skipHistoryClose = "true";
+  }
+  toolbarAddMenuEl.open = false;
 }
 
 function ensureToolbarAddMenuOverlayHost() {
@@ -3177,7 +3201,7 @@ function normalizedJournalList() {
           linkedVarietyId: String(entry?.linkedVarietyId || "").trim(),
           linkedEntityName: String(entry?.linkedEntityName || "").trim(),
           place: "",
-          mood: String(entry?.mood || "").trim(),
+          mood: serializeMoodValues(entry?.mood),
           weather: normalizeWeatherSnapshot(entry?.weather),
           walk: normalizeJournalWalk(entry, normalizeWeatherSnapshot(entry?.weather))
         };
@@ -3213,7 +3237,8 @@ function closeJournalOverlay(options = {}) {
   syncMobileOverlayBottomNavPlacement();
 }
 
-function ensureJournalOverlayRoot() {
+function ensureJournalOverlayRoot(options = {}) {
+  const skipHistoryPush = Boolean(options?.skipHistoryPush);
   let root = journalOverlayRoot();
   if (!root) {
     root = document.createElement("div");
@@ -3231,7 +3256,7 @@ function ensureJournalOverlayRoot() {
   lockBodyScroll("journal");
   document.removeEventListener("keydown", handleJournalOverlayEscape);
   document.addEventListener("keydown", handleJournalOverlayEscape);
-  pushOverlayHistory("journal");
+  if (!skipHistoryPush) pushOverlayHistory("journal");
   return root;
 }
 
@@ -3262,28 +3287,58 @@ function journalOverlayFrame(title, bodyHtml, actionsHtml = "", topbarHtml = "")
   `;
 }
 
-function renderJournalOverlayCard(entry) {
+function renderJournalOverlayCard(entry, options = {}) {
   const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
   const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
-  const safeTitle = journalDisplayTitle(normalizedEntry);
+  const forceExpanded = Boolean(options?.forceExpanded);
   const safeText = String(normalizedEntry.text || "").trim();
+  const titleInfo = journalPreviewTitleInfo(normalizedEntry, 72);
+  const expandedUsesNoteTitle = forceExpanded && titleInfo.usesNoteTitle && Boolean(safeText);
+  const safeTitle = expandedUsesNoteTitle
+    ? safeText
+    : (titleInfo.title || journalDisplayTitle(normalizedEntry));
   const safeId = String(normalizedEntry.id || "").trim() || makeId("journal");
   const dateLabel = journalDateLabel(normalizedEntry.date);
   const chips = journalDisplayChips(normalizedEntry);
-  const weatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry));
-  const headerWeatherWidgets = weatherWidgets;
   const footerChips = chips;
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const showActions = options?.showActions !== false;
+  const showBodyText = Boolean(safeText) && !expandedUsesNoteTitle;
+  const headerWeatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry), {
+    singlePill: isMobileShell
+  });
 
-  if (isMobileShell) {
-    const previewText = trimText(safeText, 180);
+  if (isMobileShell && !forceExpanded) {
+    const compactGalleryPreviewCount = 4;
+    const compactFooterChips = footerChips.slice(0, 2);
+    const compactMediaMarkup = images.length || video
+      ? `
+          <div class="journal-overlay-card__compact-media">
+            ${images.length ? `
+              <div class="journal-overlay-card__gallery journal-overlay-card__gallery--compact-list journal-overlay-card__gallery--compact-inline" aria-hidden="true">
+                ${images.slice(0, compactGalleryPreviewCount).map((image, index) => `
+                  <div class="journal-item__image" aria-hidden="true">
+                    ${renderJournalImageTag(image, safeTitle, { entryId: safeId, index })}
+                  </div>
+                `).join("")}
+                ${images.length > compactGalleryPreviewCount ? `<span class="journal-item__more">+${images.length - compactGalleryPreviewCount}</span>` : ""}
+              </div>
+            ` : ""}
+            ${video ? `
+              <div class="journal-item__video journal-item__video--compact-list" aria-hidden="true">
+                <video muted playsinline preload="metadata" src="${escapeAttribute(video)}" aria-label="${escapeAttribute(`Video zápisu ${safeTitle}`)}"></video>
+              </div>
+            ` : ""}
+          </div>
+        `
+      : "";
     return `
-      <article class="journal-overlay-card journal-overlay-card--compact-list ${images.length ? "journal-overlay-card--with-image" : ""}" data-journal-entry-id="${escapeAttribute(safeId)}">
-        <div class="journal-overlay-card__header">
-          <div class="journal-overlay-card__meta">
-            <div class="journal-overlay-card__topline">
+      <article class="journal-overlay-card journal-overlay-card--compact-list ${images.length ? "journal-overlay-card--with-image" : ""}" data-journal-entry-id="${escapeAttribute(safeId)}" data-open-journal-overlay-entry="${escapeAttribute(safeId)}" role="button" tabindex="0" aria-label="Otvoriť zápis ${escapeAttribute(safeTitle)}">
+        <div class="journal-overlay-card__compact-shell">
+          <div class="journal-overlay-card__compact-main">
+            <div class="journal-overlay-card__compact-topline">
               <span class="journal-item__date-badge">${escapeHtml(dateLabel)}</span>
               ${headerWeatherWidgets}
             </div>
@@ -3291,37 +3346,10 @@ function renderJournalOverlayCard(entry) {
               <strong class="journal-overlay-card__title">${escapeHtml(safeTitle)}</strong>
               ${renderMoodBadge(normalizedEntry.mood, "journal-overlay-card__mood")}
             </div>
-          </div>
-          <div class="journal-overlay-card__actions">
-            <button class="button button--ghost journal-item__action" type="button" data-edit-journal-overlay="${escapeAttribute(safeId)}" aria-label="Upraviť záznam" title="Upraviť">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 20h4l10-10-4-4L4 16v4z"></path>
-                <path d="M13 7l4 4"></path>
-              </svg>
-            </button>
-            <button class="button button--ghost journal-item__action journal-item__action--danger" type="button" data-delete-journal-overlay="${escapeAttribute(safeId)}" aria-label="Vymazať záznam" title="Vymazať">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 7h14"></path>
-                <path d="M9 7V5h6v2"></path>
-                <path d="M8 7l1 12h6l1-12"></path>
-                <path d="M10 10v6"></path>
-                <path d="M14 10v6"></path>
-              </svg>
-            </button>
+            ${compactFooterChips.length ? `<div class="journal-item__chips journal-overlay-card__chips journal-overlay-card__chips--compact-inline">${compactFooterChips.map(renderJournalChip).join("")}</div>` : ""}
+            ${compactMediaMarkup}
           </div>
         </div>
-        ${previewText ? `<p class="journal-overlay-card__text">${escapeHtml(previewText)}</p>` : ""}
-        ${walkMarkup}
-        ${renderJournalVideoPlayer(video, `Video zápisu ${safeTitle}`, "journal-item__video")}
-        ${images[0] ? `
-          <div class="journal-overlay-card__gallery journal-overlay-card__gallery--compact-list">
-            <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(safeId)}" data-journal-image-index="0" aria-label="Otvoriť fotku zápisu ${escapeAttribute(safeTitle)}">
-              ${renderJournalImageTag(images[0], safeTitle, { entryId: safeId, index: 0 })}
-            </button>
-            ${images.length > 1 ? `<span class="journal-item__more">+${images.length - 1}</span>` : ""}
-          </div>
-        ` : ""}
-        ${footerChips.length ? `<div class="journal-overlay-card__footer"><div class="journal-item__chips journal-overlay-card__chips">${footerChips.map(renderJournalChip).join("")}</div></div>` : ""}
       </article>
     `;
   }
@@ -3339,25 +3367,27 @@ function renderJournalOverlayCard(entry) {
             ${renderMoodBadge(normalizedEntry.mood, "journal-overlay-card__mood")}
           </div>
         </div>
-        <div class="journal-overlay-card__actions">
-          <button class="button button--ghost journal-item__action" type="button" data-edit-journal-overlay="${escapeAttribute(safeId)}" aria-label="Upraviť záznam" title="Upraviť">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 20h4l10-10-4-4L4 16v4z"></path>
-              <path d="M13 7l4 4"></path>
-            </svg>
-          </button>
-          <button class="button button--ghost journal-item__action journal-item__action--danger" type="button" data-delete-journal-overlay="${escapeAttribute(safeId)}" aria-label="Vymazať záznam" title="Vymazať">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5 7h14"></path>
-              <path d="M9 7V5h6v2"></path>
-              <path d="M8 7l1 12h6l1-12"></path>
-              <path d="M10 10v6"></path>
-              <path d="M14 10v6"></path>
-            </svg>
-          </button>
-        </div>
+        ${showActions ? `
+          <div class="journal-overlay-card__actions">
+            <button class="button button--ghost journal-item__action" type="button" data-edit-journal-overlay="${escapeAttribute(safeId)}" aria-label="Upraviť záznam" title="Upraviť">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 20h4l10-10-4-4L4 16v4z"></path>
+                <path d="M13 7l4 4"></path>
+              </svg>
+            </button>
+            <button class="button button--ghost journal-item__action journal-item__action--danger" type="button" data-delete-journal-overlay="${escapeAttribute(safeId)}" aria-label="Vymazať záznam" title="Vymazať">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 7h14"></path>
+                <path d="M9 7V5h6v2"></path>
+                <path d="M8 7l1 12h6l1-12"></path>
+                <path d="M10 10v6"></path>
+                <path d="M14 10v6"></path>
+              </svg>
+            </button>
+          </div>
+        ` : ""}
       </div>
-      ${safeText ? `<p class="journal-overlay-card__text">${escapeHtml(safeText)}</p>` : ""}
+      ${showBodyText ? `<p class="journal-overlay-card__text">${escapeHtml(safeText)}</p>` : ""}
       ${walkMarkup}
       ${renderJournalVideoPlayer(video, `Video zápisu ${safeTitle}`, "journal-item__video")}
       ${images.length ? `
@@ -3426,6 +3456,28 @@ function bindJournalOverlayCardActions(container) {
   bindThingLinks(container);
   syncDeferredJournalImages(container, { eagerCount: 2 });
 
+  container.querySelectorAll("[data-open-journal-overlay-entry]").forEach((card) => {
+    if (!(card instanceof HTMLElement)) return;
+    const entryId = String(card.getAttribute("data-open-journal-overlay-entry") || "").trim();
+    if (!entryId) return;
+    card.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (
+        target
+        && target !== card
+        && target.closest("button, a, input, select, textarea, summary, .tag--interactive, .tag--link-category, .tag--link-variety, .tag--link-tag, .tag--link-entry-type")
+      ) {
+        return;
+      }
+      openJournalOverlayEntry(entryId, String(container.dataset.journalActiveTagKey || "").trim());
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openJournalOverlayEntry(entryId, String(container.dataset.journalActiveTagKey || "").trim());
+    });
+  });
+
   container.querySelectorAll("[data-open-journal-image]").forEach((button) => {
     button.addEventListener("click", () => {
       const entry = normalizedJournalList().find((item) => item.id === button.dataset.openJournalImage);
@@ -3440,37 +3492,58 @@ function bindJournalOverlayCardActions(container) {
       state.journal = state.journal.filter((entry) => String(entry?.id || "") !== button.dataset.deleteJournalOverlay);
       if (!persist()) return;
       render();
-      openJournalOverlayList();
+      openJournalOverlayList(String(container.dataset.journalActiveTagKey || "").trim(), { historyMode: "preserve" });
     });
   });
 
   container.querySelectorAll("[data-edit-journal-overlay]").forEach((button) => {
     button.addEventListener("click", () => {
-      openJournalComposer(button.dataset.editJournalOverlay || "");
+      openJournalComposer(button.dataset.editJournalOverlay || "", "", {
+        returnToTagKey: String(container.dataset.journalActiveTagKey || "").trim()
+      });
     });
   });
 
   bindWalkMapActivators(container);
 }
 
-function openJournalOverlayList(initialTagKey = "") {
+function openJournalOverlayList(initialTagKey = "", options = {}) {
+  const historyMode = String(options?.historyMode || "").trim() || "auto";
   const entries = normalizedJournalList();
-  const root = ensureJournalOverlayRoot();
+  const hadExistingRoot = Boolean(journalOverlayRoot());
+  const root = ensureJournalOverlayRoot({
+    skipHistoryPush: historyMode === "preserve" || (hadExistingRoot && activeOverlayHistoryKind !== "journal")
+  });
+  if (historyMode === "preserve") {
+    activeOverlayHistoryKind = "journal";
+  }
   let activeTagKey = String(initialTagKey || "").trim();
 
   const renderOverlay = () => {
     const showMobileQuickActionsTopbar = document.body.classList.contains("app-mobile-shell");
-    const journalQuickActionsTopbar = "";
+    const journalQuickActionsTopbar = showMobileQuickActionsTopbar
+      ? `
+        <div class="journal-overlay-list-topbar">
+          <h3 id="journal-overlay-title">Denník</h3>
+          <button class="button button--ghost journal-overlay-list-topbar__add" type="button" id="journal-overlay-add" aria-label="Pridať zápis" title="Pridať zápis">+</button>
+        </div>
+      `
+      : "";
     const journalQuickActionsInline = showMobileQuickActionsTopbar ? "" : openJournalQuickActions();
+    const overlayFrameTitle = showMobileQuickActionsTopbar ? "" : "Denník";
+    const overlayFrameActions = showMobileQuickActionsTopbar
+      ? ""
+      : `<button class="button" type="button" id="journal-overlay-add">Pridať zápis</button>`;
     const activeRecords = journalTagRecords(entries);
-    if (activeTagKey && !activeRecords.some((item) => item.themeKey === activeTagKey)) {
+    const hasExplicitMatches = activeTagKey ? journalEntriesForTag(entries, activeTagKey).length > 0 : false;
+    if (activeTagKey && !activeRecords.some((item) => item.themeKey === activeTagKey) && !hasExplicitMatches) {
       activeTagKey = "";
     }
     const filteredEntries = journalEntriesForTag(entries, activeTagKey);
 
     try {
       root.innerHTML = journalOverlayFrame(
-        "Denník",
+        overlayFrameTitle,
         entries.length
           ? `
             <div class="journal-overlay-stack">
@@ -3487,34 +3560,54 @@ function openJournalOverlayList(initialTagKey = "") {
               <div class="empty-state empty-state--compact">Denník je pripravený. Pridaj prvý zápis a začne žiť.</div>
             </div>
           `,
-        `
-          <button class="button" type="button" id="journal-overlay-add">Pridať zápis</button>
-        `,
+        overlayFrameActions,
         journalQuickActionsTopbar
       );
     } catch (error) {
       console.error("Denníkový overlay sa nepodarilo vykresliť", error);
       root.innerHTML = journalOverlayFrame(
-        "Denník",
+        overlayFrameTitle,
         `
           <div class="empty-state empty-state--compact">
             Denník sa teraz nepodarilo celé vykresliť, ale jadro appky ostalo v poriadku.
           </div>
         `,
-        `<button class="button" type="button" id="journal-overlay-add">Pridať zápis</button>`
+        overlayFrameActions,
+        journalQuickActionsTopbar
       );
     }
 
+    if (showMobileQuickActionsTopbar) {
+      root.setAttribute("data-journal-overlay-layout", "mobile-list");
+    } else {
+      root.removeAttribute("data-journal-overlay-layout");
+    }
+    root.dataset.journalOverlayView = "list";
+    root.dataset.journalActiveTagKey = activeTagKey;
+    root.dataset.journalReturnTagKey = "";
+    root.dataset.journalReturnEntryId = "";
+    root.dataset.journalEntryId = "";
+
     root.querySelector("#journal-overlay-close")?.addEventListener("click", closeJournalOverlay);
     root.querySelector("#journal-overlay-back")?.addEventListener("click", closeJournalOverlay);
-    root.querySelector("#journal-overlay-add")?.addEventListener("click", () => openJournalComposer());
+    root.querySelector("#journal-overlay-add")?.addEventListener("click", () => {
+      openJournalComposer("", "", { returnToTagKey: activeTagKey });
+    });
     root.querySelectorAll("[data-open-journal-type]").forEach((button) => {
       button.addEventListener("click", () => {
-        openJournalComposer("", String(button.getAttribute("data-open-journal-type") || "").trim() || "note");
+        openJournalComposer(
+          "",
+          String(button.getAttribute("data-open-journal-type") || "").trim() || "note",
+          { returnToTagKey: activeTagKey }
+        );
       });
     });
     root.querySelectorAll("[data-journal-filter-tag]").forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", (event) => {
+        if (button.classList.contains("journal-tag-filter__summary-clear")) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
         const nextTagKey = String(button.getAttribute("data-journal-filter-tag") || "").trim();
         activeTagKey = nextTagKey === activeTagKey ? "" : nextTagKey;
         renderOverlay();
@@ -3528,33 +3621,118 @@ function openJournalOverlayList(initialTagKey = "") {
   renderOverlay();
 }
 
-function openJournalOverlayEntry(entryId = "") {
+function openJournalOverlayEntry(entryId = "", returnTagKey = "", options = {}) {
+  const historyMode = String(options?.historyMode || "").trim() || "auto";
   const normalizedEntryId = String(entryId || "").trim();
   if (!normalizedEntryId) {
-    openJournalOverlayList();
+    openJournalOverlayList("", { historyMode });
     return;
   }
 
-  openJournalOverlayList();
+  const isMobileJournalShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  if (!isMobileJournalShell) {
+    openJournalOverlayList("", { historyMode });
 
-  const scrollToEntry = () => {
-    const root = ensureJournalOverlayRoot();
-    const escapedEntryId = typeof CSS !== "undefined" && typeof CSS.escape === "function"
-      ? CSS.escape(normalizedEntryId)
-      : normalizedEntryId.replace(/["\\]/g, "\\$&");
-    const targetCard = root.querySelector(`[data-journal-entry-id="${escapedEntryId}"]`);
-    if (!targetCard) return;
-    targetCard.scrollIntoView({ block: "start", behavior: navigationScrollBehavior() });
-  };
+    const scrollToEntry = () => {
+      const root = ensureJournalOverlayRoot();
+      const escapedEntryId = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape(normalizedEntryId)
+        : normalizedEntryId.replace(/["\\]/g, "\\$&");
+      const targetCard = root.querySelector(`[data-journal-entry-id="${escapedEntryId}"]`);
+      if (!targetCard) return;
+      targetCard.scrollIntoView({ block: "start", behavior: navigationScrollBehavior() });
+    };
 
-  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(scrollToEntry);
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(scrollToEntry);
+      });
+      return;
+    }
+
+    scrollToEntry();
+    return;
+  }
+
+  const normalizedReturnTagKey = String(returnTagKey || "").trim();
+  const entry = normalizedJournalList().find((item) => String(item?.id || "").trim() === normalizedEntryId);
+  if (!entry) {
+    openJournalOverlayList(normalizedReturnTagKey, { historyMode });
+    return;
+  }
+
+  const hadExistingRoot = Boolean(journalOverlayRoot());
+  const root = ensureJournalOverlayRoot({
+    skipHistoryPush: historyMode === "preserve" || hadExistingRoot
+  });
+  if (historyMode === "preserve") {
+    activeOverlayHistoryKind = "journal-entry";
+  }
+  if (historyMode !== "preserve") {
+    pushOverlayHistory("journal-entry");
+  }
+  const detailTopbar = `
+    <div class="journal-overlay-list-topbar">
+      <h3 id="journal-overlay-title">Denník</h3>
+      <div class="journal-overlay-list-topbar__actions">
+        <button class="button button--ghost journal-overlay-list-topbar__action" type="button" id="journal-overlay-edit" aria-label="Upraviť zápis" title="Upraviť zápis">✎</button>
+        <button class="button button--ghost journal-overlay-list-topbar__action journal-overlay-list-topbar__action--danger" type="button" id="journal-overlay-delete-entry" aria-label="Vymazať zápis" title="Vymazať zápis">🗑</button>
+      </div>
+    </div>
+  `;
+
+  root.innerHTML = journalOverlayFrame(
+    "",
+    `
+      <div class="journal-overlay-stack journal-overlay-stack--entry">
+        ${renderJournalOverlayCard(entry, { forceExpanded: true, showActions: false })}
+      </div>
+    `,
+    "",
+    detailTopbar
+  );
+  root.setAttribute("data-journal-overlay-layout", "mobile-list");
+  root.dataset.journalOverlayView = "entry";
+  root.dataset.journalActiveTagKey = normalizedReturnTagKey;
+  root.dataset.journalReturnTagKey = normalizedReturnTagKey;
+  root.dataset.journalReturnEntryId = normalizedEntryId;
+  root.dataset.journalEntryId = normalizedEntryId;
+  root.querySelector("#journal-overlay-close")?.addEventListener("click", closeJournalOverlay);
+  root.querySelector("#journal-overlay-back")?.addEventListener("click", () => {
+    if (activeOverlayHistoryKind === "journal-entry" && typeof window !== "undefined" && window.history?.back) {
+      window.history.back();
+      return;
+    }
+    openJournalOverlayList(normalizedReturnTagKey, { historyMode: "preserve" });
+  });
+  root.querySelector("#journal-overlay-edit")?.addEventListener("click", () => {
+    openJournalComposer(normalizedEntryId, "", {
+      returnToEntryId: normalizedEntryId,
+      returnToTagKey: normalizedReturnTagKey
     });
-    return;
-  }
-
-  scrollToEntry();
+  });
+  root.querySelector("#journal-overlay-delete-entry")?.addEventListener("click", () => {
+    state.journal = state.journal.filter((item) => String(item?.id || "") !== normalizedEntryId);
+    if (!persist()) return;
+    render();
+    if (activeOverlayHistoryKind === "journal-entry" && typeof window !== "undefined" && window.history?.back) {
+      window.history.back();
+      return;
+    }
+    openJournalOverlayList(normalizedReturnTagKey, { historyMode: "preserve" });
+  });
+  root.querySelectorAll("[data-journal-filter-tag]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const nextTagKey = String(button.getAttribute("data-journal-filter-tag") || "").trim();
+      if (!nextTagKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openJournalOverlayList(nextTagKey, { historyMode: "preserve" });
+    });
+  });
+  bindJournalOverlayCardActions(root);
+  hydrateWalkMaps(root);
+  syncMobileOverlayBottomNavPlacement();
 }
 
 function renderJournalComposerImagePreview(existingImages, pendingUrls, existingVideo = "", pendingVideoUrl = "") {
@@ -3650,12 +3828,42 @@ function openJournalQuickActions(activeType = "") {
 
 function openJournalComposer(editingEntryId = "", preferredEntryType = "", options = {}) {
   const composerOptions = options && typeof options === "object" ? options : {};
+  const returnToEntryId = String(composerOptions.returnToEntryId || "").trim();
+  const fallbackReturnTagKey = String(journalOverlayRoot()?.dataset.journalActiveTagKey || "").trim();
+  const returnToTagKey = String(composerOptions.returnToTagKey || fallbackReturnTagKey).trim();
+  const historyMode = String(composerOptions.historyMode || "").trim() || "auto";
+  const openJournalReturnView = () => {
+    if (activeOverlayHistoryKind === "journal-compose" && typeof window !== "undefined" && window.history?.back) {
+      window.history.back();
+      return;
+    }
+    if (returnToEntryId) {
+      openJournalOverlayEntry(returnToEntryId, returnToTagKey, { historyMode: "preserve" });
+      return;
+    }
+    openJournalOverlayList(returnToTagKey, { historyMode: "preserve" });
+  };
   const editingEntry = editingEntryId
     ? normalizedJournalList().find((entry) => entry.id === editingEntryId) || null
     : null;
   const initialEntryType = String(editingEntry?.entryType || preferredEntryType || "note").trim() || "note";
   const isMobileJournalShell = document.body.classList.contains("app-mobile-shell");
-  const root = ensureJournalOverlayRoot();
+  const hadExistingRoot = Boolean(journalOverlayRoot());
+  const root = ensureJournalOverlayRoot({
+    skipHistoryPush: historyMode === "preserve" || hadExistingRoot
+  });
+  if (isMobileJournalShell && historyMode === "preserve") {
+    activeOverlayHistoryKind = "journal-compose";
+  }
+  root.removeAttribute("data-journal-overlay-layout");
+  root.dataset.journalOverlayView = "compose";
+  root.dataset.journalActiveTagKey = returnToTagKey;
+  root.dataset.journalReturnTagKey = returnToTagKey;
+  root.dataset.journalReturnEntryId = returnToEntryId;
+  root.dataset.journalEntryId = editingEntry?.id || "";
+  if (isMobileJournalShell && historyMode !== "preserve") {
+    pushOverlayHistory("journal-compose");
+  }
   let existingImages = editingEntry ? [...journalImages(editingEntry)] : [];
   let pendingFiles = Array.isArray(composerOptions.imageFiles)
     ? composerOptions.imageFiles.filter((file) => file instanceof File && file.size)
@@ -3745,30 +3953,42 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           <input name="mood" type="hidden" value="${escapeAttribute(editingEntry?.mood || "")}">
         </div>
         ${renderJournalWalkFields(editingEntry?.walk || null)}
-        ${renderMediaUploadField({
-          label: "Fotky k zápisu",
-          inputName: "imageFiles",
-          accept: IMAGE_FILE_ACCEPT,
-          multiple: true,
-          captureAction: "capture-photo",
-          captureLabel: "Odfotiť",
-          pickAction: "pick-photo",
-          pickLabel: "Vybrať fotky",
-          fieldClassName: "upload-field--journal-media upload-field--journal-media-image",
-          ariaLabel: "Pridať fotky k zápisu"
-        })}
-        ${renderMediaUploadField({
-          label: "Video k zápisu",
-          inputName: "videoFile",
-          accept: VIDEO_FILE_ACCEPT,
-          multiple: false,
-          captureAction: "capture-video",
-          captureLabel: "Natočiť",
-          pickAction: "pick-video",
-          pickLabel: "Vybrať video",
-          fieldClassName: "upload-field--journal-media upload-field--journal-media-video",
-          ariaLabel: "Pridať video k zápisu"
-        })}
+        ${isMobileJournalShell ? `
+          <div class="upload-field upload-field--compact upload-field--journal-media upload-field--journal-media-combined">
+            <span class="upload-field__label">Médiá k zápisu</span>
+            <div class="upload-field__mobile-actions" aria-label="Pridať fotku alebo video k zápisu">
+              <button class="button button--ghost upload-field__mobile-button" type="button" data-open-journal-media-picker>Pridať médium</button>
+            </div>
+            <input name="journalMediaFiles" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" multiple>
+            <input name="imageFiles" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple hidden tabindex="-1" aria-hidden="true">
+            <input name="videoFile" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" hidden tabindex="-1" aria-hidden="true">
+          </div>
+        ` : `
+          ${renderMediaUploadField({
+            label: "Fotky k zápisu",
+            inputName: "imageFiles",
+            accept: IMAGE_FILE_ACCEPT,
+            multiple: true,
+            captureAction: "capture-photo",
+            captureLabel: "Odfotiť",
+            pickAction: "pick-photo",
+            pickLabel: "Vybrať fotky",
+            fieldClassName: "upload-field--journal-media upload-field--journal-media-image",
+            ariaLabel: "Pridať fotky k zápisu"
+          })}
+          ${renderMediaUploadField({
+            label: "Video k zápisu",
+            inputName: "videoFile",
+            accept: VIDEO_FILE_ACCEPT,
+            multiple: false,
+            captureAction: "capture-video",
+            captureLabel: "Natočiť",
+            pickAction: "pick-video",
+            pickLabel: "Vybrať video",
+            fieldClassName: "upload-field--journal-media upload-field--journal-media-video",
+            ariaLabel: "Pridať video k zápisu"
+          })}
+        `}
         <div id="journal-overlay-video-status" class="journal-upload-status" hidden>
           <div class="journal-upload-status__topline">
             <div class="journal-upload-status__title-wrap">
@@ -3788,17 +4008,28 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           <div class="entry-advanced__content">
             <input name="tags" type="text" placeholder="Tagy oddelené čiarkou" value="${escapeAttribute((editingEntry?.tags || []).join(", "))}">
             <div class="journal-tag-picker" data-journal-tag-picker hidden></div>
-            ${renderRelationDisclosure({
-              summaryLabel: "Súvisí s kategóriami a kartou",
-              categoryLabel: "Kategórie",
-              categoryInputName: "linkedCategoryIds",
-              categoryValues: editingEntry?.linkedCategoryIds?.length ? editingEntry.linkedCategoryIds : editingEntry?.linkedCategoryId,
-              cardLabel: "Súvisí s kartou",
-              cardInputName: "linkedVarietyId",
-              cardValue: editingEntry?.linkedVarietyId || "",
-              cardWrapKey: "journal-overlay",
-              cardCategoryIds: editingEntry?.linkedCategoryIds?.length ? editingEntry.linkedCategoryIds : editingEntry?.linkedCategoryId
-            })}
+            ${isMobileJournalShell
+              ? renderSimpleRelationFields({
+                categoryLabel: "Kategórie",
+                categoryInputName: "linkedCategoryIds",
+                categoryValues: editingEntry?.linkedCategoryIds?.length ? editingEntry.linkedCategoryIds : editingEntry?.linkedCategoryId,
+                cardLabel: "Súvisí s kartou",
+                cardInputName: "linkedVarietyId",
+                cardValue: editingEntry?.linkedVarietyId || "",
+                cardWrapKey: "journal-overlay",
+                cardCategoryIds: editingEntry?.linkedCategoryIds?.length ? editingEntry.linkedCategoryIds : editingEntry?.linkedCategoryId
+              })
+              : renderRelationDisclosure({
+                summaryLabel: "Súvisí s kategóriami a kartou",
+                categoryLabel: "Kategórie",
+                categoryInputName: "linkedCategoryIds",
+                categoryValues: editingEntry?.linkedCategoryIds?.length ? editingEntry.linkedCategoryIds : editingEntry?.linkedCategoryId,
+                cardLabel: "Súvisí s kartou",
+                cardInputName: "linkedVarietyId",
+                cardValue: editingEntry?.linkedVarietyId || "",
+                cardWrapKey: "journal-overlay",
+                cardCategoryIds: editingEntry?.linkedCategoryIds?.length ? editingEntry.linkedCategoryIds : editingEntry?.linkedCategoryId
+              })}
           </div>
         </details>
       </form>
@@ -3817,6 +4048,8 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const timeInput = formEl?.elements.time;
   const imageInput = formEl?.elements.imageFiles;
   const videoInput = formEl?.elements.videoFile;
+  const mediaInput = formEl?.elements.journalMediaFiles;
+  const openMediaPickerButton = formEl?.querySelector("[data-open-journal-media-picker]");
   const titleInput = formEl?.elements.title;
   const textInput = formEl?.elements.text;
   const imagePreviewEl = root.querySelector("#journal-overlay-image-preview");
@@ -3827,8 +4060,22 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const videoStatusDetailEl = root.querySelector("#journal-overlay-video-status-detail");
 
   bindEditorImageUploadShortcuts(root);
-  enableMobileMediaPickerForInput(imageInput, { multiple: true });
-  enableMobileMediaPickerForInput(videoInput);
+  if (isMobileJournalShell && mediaInput instanceof HTMLInputElement) {
+    enableMobileMediaPickerForInput(mediaInput, {
+      accept: `${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`,
+      multiple: true
+    });
+  } else {
+    enableMobileMediaPickerForInput(imageInput, { multiple: true });
+    enableMobileMediaPickerForInput(videoInput);
+  }
+
+  const isJournalVideoMediaFile = (file) => {
+    if (!(file instanceof File)) return false;
+    const fileType = String(file.type || "").trim().toLowerCase();
+    const fileName = String(file.name || "").trim().toLowerCase();
+    return fileType.startsWith("video/") || /\.(mp4|mov|m4v|webm|3gp)$/i.test(fileName);
+  };
   const moodPickerEl = root.querySelector("#add-entry-mood-picker");
   const weatherMountEl = root.querySelector("#journal-overlay-header-weather");
   const walkFieldsEl = root.querySelector("#journal-overlay-walk-fields");
@@ -3849,6 +4096,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const walkAutoHiddenSections = [...root.querySelectorAll("[data-walk-auto-hidden]")];
   const titleFieldSections = [...root.querySelectorAll("[data-title-field]")];
   const linkedCategoryInputs = [...(formEl?.querySelectorAll('input[name="linkedCategoryIds"]') || [])];
+  const linkedCategorySelect = formEl?.querySelector('select[name="linkedCategoryIds"]') || null;
   const linkedVarietySelect = formEl?.elements.linkedVarietyId;
   const linkedVarietyWrap = formEl?.querySelector('[data-linked-variety-wrap="journal-overlay"]');
   const relationDisclosure = formEl?.querySelector("[data-relation-disclosure]") || null;
@@ -3917,7 +4165,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
       }
       walkGpsTone = walkGpsPoints.length ? "good" : "neutral";
       walkGpsMessage = walkGpsPoints.length
-        ? `Prechádzka je ukončená. Uložené máš ${countedLabel(walkGpsPoints.length, "bod", "body", "bodov")}.`
+        ? "Prechádzka je ukončená."
         : "GPS je zastavené.";
     }
   };
@@ -3941,11 +4189,11 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   });
   root.querySelector("#journal-overlay-back")?.addEventListener("click", () => {
     cleanupJournalComposer();
-    openJournalOverlayList();
+    openJournalReturnView();
   });
   root.querySelector("#journal-overlay-cancel")?.addEventListener("click", () => {
     cleanupJournalComposer();
-    openJournalOverlayList();
+    openJournalReturnView();
   });
 
   const setVideoUploadStatus = ({
@@ -4134,12 +4382,12 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     ensureWalkGpsTicker();
     const statusText = walkGpsMessage
       || (isTracking
-        ? `Prechádzka práve beží. GPS zbiera body a čas sa počíta automaticky.`
+        ? "Prechádzka beží."
         : isPaused
-          ? "Prechádzka je pozastavená. Môžeš fotiť a potom dať Pokračovať."
+          ? "Prechádzka je pozastavená."
         : walkGpsPoints.length
-          ? `Prechádzka je pripravená na uloženie. Máš ${countedLabel(walkGpsPoints.length, "GPS bod", "GPS body", "GPS bodov")}.`
-          : "GPS body sa zatiaľ neukladajú.");
+          ? "Prechádzka je pripravená na uloženie."
+          : "GPS sa ešte neukladá.");
     if (walkGpsStatusEl) {
       walkGpsStatusEl.textContent = statusText;
       walkGpsStatusEl.dataset.tone = walkGpsTone || "neutral";
@@ -4164,12 +4412,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     }
     if (walkGpsSummaryEl) {
       const pills = [
-        walkGpsPoints.length ? countedLabel(walkGpsPoints.length, "GPS bod", "GPS body", "GPS bodov") : "",
-        gpsDistance !== null ? formatJournalWalkDistance(gpsDistance) : "",
-        gpsDuration !== null ? formatJournalWalkDuration(gpsDuration) : "",
-        walkStartedAt ? `Štart ${formatWalkDateTime(walkStartedAt)}` : "",
-        walkPausedAt ? `Pauza ${formatWalkDateTime(walkPausedAt)}` : "",
-        walkEndedAt ? `Koniec ${formatWalkDateTime(walkEndedAt)}` : "",
+        walkGpsPoints.length ? countedLabel(walkGpsPoints.length, "1 GPS bod", "GPS body", "GPS bodov") : "",
         lastPoint && Number.isFinite(Number(lastPoint.accuracyMeters)) ? `Presnosť ±${Math.round(Number(lastPoint.accuracyMeters))} m` : ""
       ].filter(Boolean);
       walkGpsSummaryEl.innerHTML = pills.length
@@ -4178,15 +4421,32 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
       walkGpsSummaryEl.hidden = !pills.length;
     }
     if (walkGpsPointsEl) {
-      const previewPoints = walkGpsPoints.slice(-4);
-      walkGpsPointsEl.innerHTML = previewPoints.length
-        ? previewPoints.map((point, index) => `<span class="journal-walk-gps__point">${escapeHtml(formatWalkGpsPointLabel(point, walkGpsPoints.length - previewPoints.length + index, walkGpsPoints.length))}</span>`).join("")
-        : "";
-      walkGpsPointsEl.hidden = !previewPoints.length;
+      walkGpsPointsEl.innerHTML = "";
+      walkGpsPointsEl.hidden = true;
     }
     renderWalkGpsLiveMap();
     walkGpsActionButtons.forEach((button) => {
       const action = String(button.getAttribute("data-walk-gps-action") || "").trim();
+      if (action === "toggle") {
+        const buttonState = isTracking ? "live" : isPaused ? "paused" : walkEndedAt ? "ended" : "idle";
+        const label = isTracking
+          ? "Ukončiť prechádzku"
+          : isPaused
+            ? "Pokračovať"
+            : "Spustiť prechádzku";
+        const icon = isTracking
+          ? ICONS.walkStop
+          : isPaused
+            ? ICONS.walkResume
+            : ICONS.walkStart;
+        button.disabled = walkGpsBusy;
+        button.dataset.state = buttonState;
+        const iconEl = button.querySelector(".journal-walk-gps__button-icon");
+        const labelEl = button.querySelector(".journal-walk-gps__button-label");
+        if (iconEl) iconEl.innerHTML = icon;
+        if (labelEl) labelEl.textContent = label;
+        return;
+      }
       if (action === "start") button.disabled = walkGpsBusy || isTracking;
       if (action === "pause") button.disabled = walkGpsBusy || !isTracking;
       if (action === "resume") button.disabled = walkGpsBusy || !isPaused;
@@ -4219,8 +4479,8 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     walkGpsPoints = [...walkGpsPoints, point];
     walkGpsTone = "good";
     walkGpsMessage = source === "manual"
-      ? "Aktuálna poloha sa pridala do trasy."
-      : "GPS pridalo ďalší bod trasy.";
+      ? "Bod je pridaný."
+      : "GPS pridalo bod.";
     renderWalkGpsState();
     return true;
   };
@@ -4239,8 +4499,12 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
 
   walkGpsActionButtons.forEach((button) => {
     button.addEventListener("click", async () => {
-      const action = String(button.getAttribute("data-walk-gps-action") || "").trim();
+      let action = String(button.getAttribute("data-walk-gps-action") || "").trim();
       try {
+        if (action === "toggle") {
+          action = walkGpsWatchId !== null ? "stop" : (walkPausedAt ? "resume" : "start");
+        }
+
         if (action === "stop") {
           stopWalkGpsTracking();
           renderWalkGpsState();
@@ -4258,7 +4522,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           }
           walkPausedAt = new Date().toISOString();
           walkGpsTone = "good";
-          walkGpsMessage = "Prechádzka je pozastavená. Môžeš si odfotiť čo potrebuješ a potom pokračovať.";
+          walkGpsMessage = "Prechádzka je pozastavená.";
           renderWalkGpsState();
           return;
         }
@@ -4276,7 +4540,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           }
           walkGpsBusy = true;
           walkGpsTone = "live";
-          walkGpsMessage = "Pokračujem v prechádzke a GPS znovu sleduje trasu.";
+          walkGpsMessage = "Pokračujem v prechádzke.";
           renderWalkGpsState();
           const resumedPosition = await readCurrentGpsPosition();
           appendWalkGpsPoint(resumedPosition, "gps");
@@ -4300,7 +4564,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
 
         walkGpsBusy = true;
         walkGpsTone = "live";
-        walkGpsMessage = "Spúšťam prechádzku a GPS sledovanie trasy...";
+        walkGpsMessage = "Spúšťam prechádzku...";
         renderWalkGpsState();
 
         if (action === "start") {
@@ -4336,7 +4600,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
             maximumAge: 4000
           });
           walkGpsTone = "live";
-          walkGpsMessage = "Prechádzka beží. GPS sleduje trasu a dĺžka aj čas sa rátajú samy.";
+          walkGpsMessage = "Prechádzka beží.";
           renderWalkGpsState();
         }
       } catch (error) {
@@ -4429,10 +4693,20 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     });
   };
 
-  const selectedJournalCategoryIds = () => linkedCategoryInputs
-    .filter((input) => input.checked)
-    .map((input) => String(input.value || "").trim())
-    .filter(Boolean);
+  const selectedJournalCategoryIds = () => {
+    if (linkedCategoryInputs.length) {
+      return linkedCategoryInputs
+        .filter((input) => input.checked)
+        .map((input) => String(input.value || "").trim())
+        .filter(Boolean);
+    }
+    if (linkedCategorySelect instanceof HTMLSelectElement) {
+      return [...linkedCategorySelect.selectedOptions]
+        .map((option) => String(option.value || "").trim())
+        .filter(Boolean);
+    }
+    return [];
+  };
 
   const syncJournalRelationSummary = () => {
     const linkedCategoryIds = selectedJournalCategoryIds();
@@ -4467,9 +4741,10 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
 
   const syncMoodPicker = (selectedValue) => {
     if (!formEl) return;
-    formEl.elements.mood.value = selectedValue;
+    const serializedValue = serializeMoodValues(selectedValue);
+    formEl.elements.mood.value = serializedValue;
     moodPickerEl?.querySelectorAll("[data-mood-value]").forEach((button) => {
-      const isSelected = button.dataset.moodValue === selectedValue;
+      const isSelected = normalizeMoodValues(serializedValue).includes(String(button.dataset.moodValue || "").trim());
       button.classList.toggle("is-selected", isSelected);
       button.setAttribute("aria-pressed", isSelected ? "true" : "false");
     });
@@ -4575,6 +4850,9 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
       renderLinkedVarietyOptions();
     });
   });
+  linkedCategorySelect?.addEventListener("change", () => {
+    renderLinkedVarietyOptions();
+  });
   linkedVarietySelect?.addEventListener("change", () => {
     syncJournalRelationSummary();
   });
@@ -4601,11 +4879,38 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     renderPreview();
   });
 
+  openMediaPickerButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (mediaInput instanceof HTMLInputElement) {
+      mediaInput.click();
+    }
+  });
+
+  mediaInput?.addEventListener("change", () => {
+    const files = Array.from(mediaInput.files || []).filter((file) => file instanceof File && file.size);
+    if (!files.length) return;
+    const nextVideoFile = files.find((file) => isJournalVideoMediaFile(file)) || null;
+    if (nextVideoFile && nextVideoFile.size > SUPABASE_VIDEO_FILE_LIMIT_BYTES) {
+      alert(`Video je zatiaľ príliš veľké. Skús prosím kratšie video do približne ${formatReadableFileSize(SUPABASE_VIDEO_FILE_LIMIT_BYTES)}.`);
+      mediaInput.value = "";
+      return;
+    }
+    const nextImageFiles = files.filter((file) => !isJournalVideoMediaFile(file));
+    if (nextImageFiles.length) {
+      pendingFiles = [...pendingFiles, ...nextImageFiles];
+    }
+    if (nextVideoFile) {
+      pendingVideoFile = nextVideoFile;
+    }
+    mediaInput.value = "";
+    renderPreview();
+  });
+
   moodPickerEl?.querySelectorAll("[data-mood-value]").forEach((button) => {
     button.addEventListener("click", () => {
       const nextValue = button.dataset.moodValue || "";
       const currentValue = String(formEl.elements.mood.value || "");
-      syncMoodPicker(currentValue === nextValue ? "" : nextValue);
+      syncMoodPicker(toggleMoodValue(currentValue, nextValue));
     });
   });
 
@@ -4795,7 +5100,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
         linkedCategoryIds: normalizedLinkedCategoryIds,
         linkedCategoryId,
         linkedVarietyId,
-        mood: String(form.get("mood") || "").trim(),
+        mood: serializeMoodValues(form.get("mood")),
         weather: weatherSnapshot,
         walk,
         video,
@@ -4834,7 +5139,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
 
       stopWalkGpsTracking({ silent: true });
       render();
-      openJournalOverlayList();
+      openJournalReturnView();
     } catch (error) {
       setVideoUploadStatus({
         hidden: !pendingVideoFile && !existingVideo && !existingVideoPath,
@@ -5001,6 +5306,17 @@ function bindCatalogDelegatedActions() {
   catalogEl.addEventListener("click", (event) => {
     if (event.target.closest("[data-stop-card-open]")) {
       event.stopPropagation();
+      return;
+    }
+
+    const categoryBackTrigger = event.target.closest("[data-category-back]");
+    if (categoryBackTrigger) {
+      event.preventDefault();
+      const activeCategory = currentCategory();
+      const parentCategoryId = String(activeCategory?.parentCategoryId || "").trim();
+      if (parentCategoryId) {
+        openFocusedCategoryNavigation(parentCategoryId);
+      }
       return;
     }
 
@@ -5460,7 +5776,7 @@ function wireStaticEvents() {
 
   if (detailModalBackEl) {
     detailModalBackEl.addEventListener("click", () => {
-      if (typeof detailModalBackOverride === "function" && detailModalBackOverride()) {
+      if (typeof detailModalBackOverride === "function" && detailModalBackOverride({ fromHistory: false })) {
         return;
       }
       if (activeOverlayHistoryKind === "detail" && typeof window !== "undefined" && window.history?.back) {
@@ -5480,6 +5796,34 @@ function wireStaticEvents() {
       }, 0);
       return;
     }
+    if (activeOverlayHistoryKind === "journal-compose" && journalOverlayRoot()) {
+      overlayHistoryNavigating = true;
+      const root = journalOverlayRoot();
+      const returnEntryId = String(root?.dataset.journalReturnEntryId || "").trim();
+      const returnTagKey = String(root?.dataset.journalReturnTagKey || "").trim();
+      if (returnEntryId) {
+        activeOverlayHistoryKind = "journal-entry";
+        openJournalOverlayEntry(returnEntryId, returnTagKey, { historyMode: "preserve" });
+      } else {
+        activeOverlayHistoryKind = "journal";
+        openJournalOverlayList(returnTagKey, { historyMode: "preserve" });
+      }
+      window.setTimeout(() => {
+        overlayHistoryNavigating = false;
+      }, 0);
+      return;
+    }
+    if (activeOverlayHistoryKind === "journal-entry" && journalOverlayRoot()) {
+      overlayHistoryNavigating = true;
+      const root = journalOverlayRoot();
+      const returnTagKey = String(root?.dataset.journalReturnTagKey || "").trim();
+      activeOverlayHistoryKind = "journal";
+      openJournalOverlayList(returnTagKey, { historyMode: "preserve" });
+      window.setTimeout(() => {
+        overlayHistoryNavigating = false;
+      }, 0);
+      return;
+    }
     if (activeOverlayHistoryKind === "journal" && journalOverlayRoot()) {
       overlayHistoryNavigating = true;
       closeJournalOverlay({ fromHistory: true });
@@ -5490,6 +5834,12 @@ function wireStaticEvents() {
     }
     if (activeOverlayHistoryKind === "detail" && detailModal.open) {
       overlayHistoryNavigating = true;
+      if (typeof detailModalBackOverride === "function" && detailModalBackOverride({ fromHistory: true })) {
+        window.setTimeout(() => {
+          overlayHistoryNavigating = false;
+        }, 0);
+        return;
+      }
       activeOverlayHistoryKind = "";
       detailModal.close();
       window.setTimeout(() => {
@@ -6093,6 +6443,17 @@ function renderMainMenu() {
   }
 }
 
+function bindSettingsToolbarButton(button) {
+  if (!(button instanceof HTMLButtonElement) || button.dataset.boundSettings === "true") return button;
+  button.dataset.boundSettings = "true";
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    closeToolbarAddMenu();
+    openSettingsManager();
+  });
+  return button;
+}
+
 function ensureSettingsToolbarButton() {
   if (isTopStripResetMode() && !isHomeFloatingTopBarMode()) {
     document.getElementById("open-settings-panel")?.remove();
@@ -6109,18 +6470,11 @@ function ensureSettingsToolbarButton() {
     if (button.parentElement !== targetParent) {
       targetParent.appendChild(button);
     }
-  button.setAttribute("aria-label", "Nastavenia");
-  button.setAttribute("title", "Nastavenia");
-  button.dataset.toolbarEmoji = "\u2699\uFE0F";
-  if (button.dataset.boundSettings !== "true") {
-    button.dataset.boundSettings = "true";
-    button.addEventListener("click", () => {
-      closeToolbarAddMenu();
-      openSettingsManager();
-    });
+    button.setAttribute("aria-label", "Nastavenia");
+    button.setAttribute("title", "Nastavenia");
+    button.dataset.toolbarEmoji = "\u2699\uFE0F";
+    return bindSettingsToolbarButton(button);
   }
-  return button;
-}
 
   button = document.createElement("button");
   button.className = "button button--ghost button--toolbar-utility";
@@ -6131,7 +6485,7 @@ function ensureSettingsToolbarButton() {
   button.setAttribute("title", "Nastavenia");
   button.dataset.toolbarEmoji = "\u2699\uFE0F";
   targetParent.appendChild(button);
-  return button;
+  return bindSettingsToolbarButton(button);
 }
 
 function ensureMobilePreviewButton() {
@@ -6168,6 +6522,23 @@ function ensureMobilePreviewButton() {
   return button;
 }
 
+function bindMobileWeatherSoundButton(button) {
+  if (!(button instanceof HTMLButtonElement) || button.dataset.bound === "true") return button;
+  button.dataset.bound = "true";
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (activatePendingMobileWeatherSound()) {
+      setMobileWeatherSoundPanelOpen(false);
+      return;
+    }
+    const nextEnabled = !mobileWeatherSoundEnabled;
+    setMobileWeatherSoundEnabled(nextEnabled, { activate: nextEnabled });
+    setMobileWeatherSoundPanelOpen(false);
+  });
+  window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
+  return button;
+}
+
 function ensureMobileWeatherSoundButton() {
   if (isTopStripResetMode() && !isHomeFloatingTopBarMode()) {
     document.getElementById("toggle-weather-sound")?.remove();
@@ -6192,6 +6563,7 @@ function ensureMobileWeatherSoundButton() {
       targetParent.insertBefore(button, settingsButton);
     }
     button.hidden = !isMobileShell;
+    bindMobileWeatherSoundButton(button);
     syncMobileWeatherSoundButton();
     return button;
   }
@@ -6206,20 +6578,7 @@ function ensureMobileWeatherSoundButton() {
   } else {
     targetParent.appendChild(button);
   }
-  if (button.dataset.bound !== "true") {
-    button.dataset.bound = "true";
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (activatePendingMobileWeatherSound()) {
-        setMobileWeatherSoundPanelOpen(false);
-        return;
-      }
-      const nextEnabled = !mobileWeatherSoundEnabled;
-      setMobileWeatherSoundEnabled(nextEnabled, { activate: nextEnabled });
-      setMobileWeatherSoundPanelOpen(false);
-    });
-    window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
-  }
+  bindMobileWeatherSoundButton(button);
   syncMobileWeatherSoundButton();
   return button;
 }
@@ -6266,13 +6625,26 @@ function isMobileWeatherSoundWaitingForGesture(audioState = null) {
   );
 }
 
+function requestMobileWeatherSoundActivation() {
+  const finalizeActivation = () => {
+    applyMobileWeatherTheme();
+    syncMobileWeatherSoundButton();
+    updateMainMenuWeatherAudioDebugPanel();
+    syncMainMenuWeatherAudioControls();
+    scheduleEmbeddedMobilePreviewMetricsPush();
+  };
+  const activationPromise = window.weatherAudioEngine?.handleUserActivation?.();
+  if (activationPromise && typeof activationPromise.then === "function") {
+    activationPromise.then(finalizeActivation).catch(finalizeActivation);
+    return activationPromise;
+  }
+  finalizeActivation();
+  return activationPromise;
+}
+
 function activatePendingMobileWeatherSound() {
   if (!isMobileWeatherSoundWaitingForGesture()) return false;
-  window.weatherAudioEngine?.handleUserActivation?.();
-  syncMobileWeatherSoundButton();
-  updateMainMenuWeatherAudioDebugPanel();
-  syncMainMenuWeatherAudioControls();
-  scheduleEmbeddedMobilePreviewMetricsPush();
+  requestMobileWeatherSoundActivation();
   return true;
 }
 
@@ -6298,7 +6670,7 @@ function setMobileWeatherSoundEnabled(enabled, { persist = true, activate = fals
   }
   applyMobileWeatherTheme();
   if (mobileWeatherSoundEnabled && activate) {
-    window.weatherAudioEngine?.handleUserActivation?.();
+    requestMobileWeatherSoundActivation();
   }
   syncMobileWeatherSoundButton();
   updateMainMenuWeatherAudioDebugPanel();
@@ -6348,7 +6720,7 @@ function mobileBottomNavMarkup() {
     </button>
     <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="camera">
       <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--photo" aria-hidden="true">📷</span>
-      <span class="mobile-bottom-nav__label">Foťák</span>
+      <span class="mobile-bottom-nav__label">Foto</span>
     </button>
   `;
 }
@@ -6453,10 +6825,10 @@ function ensureBottomNavMediaInput() {
   if (input.dataset.bound !== "true") {
     input.dataset.bound = "true";
     input.addEventListener("change", () => {
-      const file = Array.from(input.files || []).find((item) => item instanceof File && item.size) || null;
+      const files = Array.from(input.files || []).filter((item) => item instanceof File && item.size);
       input.value = "";
-      if (!file) return;
-      handleGenericMobileMediaFile(file);
+      if (!files.length) return;
+      handleGenericMobileMediaFiles(files);
     });
   }
 
@@ -6466,36 +6838,23 @@ function ensureBottomNavMediaInput() {
 
   input.accept = `${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`;
   input.removeAttribute("capture");
-  input.removeAttribute("multiple");
+  input.setAttribute("multiple", "");
   return input;
 }
 
 function openBottomNavMediaChooser() {
-  if (!shouldUseDirectBottomNavMediaChooser()) {
-    openMobileCameraPicker();
-    return;
-  }
-
-  const input = ensureBottomNavMediaInput();
-  if (!(input instanceof HTMLInputElement)) {
-    openMobileCameraPicker();
-    return;
-  }
-
-  closeMobileCameraPicker();
-  mobileCameraPickerTargetInputEl = null;
-  mobileCameraPickerTargetOptions = null;
-
-  input.value = "";
-  try {
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
+  const host = ensureMobileCameraPicker();
+  const captureInput = host?.querySelector("#mobile-camera-capture-input");
+  if (captureInput instanceof HTMLInputElement) {
+    captureInput.value = "";
+    captureInput.setAttribute("accept", IMAGE_FILE_ACCEPT);
+    captureInput.setAttribute("capture", "environment");
+    captureInput.setAttribute("multiple", "");
+    if (openNativeFilePicker(captureInput)) {
       return;
     }
-  } catch (error) {
-    console.debug("Natívny media picker sa otvorí cez klik namiesto showPicker().", error);
   }
-  input.click();
+  openMobileCameraPicker();
 }
 
 function bindMobileBottomNav(slot) {
@@ -6695,6 +7054,30 @@ function configureMobileCameraPickerHost(host, options = {}) {
   });
 }
 
+function openNativeFilePicker(input) {
+  if (!(input instanceof HTMLInputElement) || input.type !== "file") return false;
+  try {
+    input.focus({ preventScroll: true });
+  } catch (error) {
+    // Some mobile browsers reject focusing invisible file inputs.
+  }
+  try {
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return true;
+    }
+  } catch (error) {
+    console.debug("Natívny file picker sa otvorí cez klik namiesto showPicker().", error);
+  }
+  try {
+    input.click();
+    return true;
+  } catch (error) {
+    console.warn("Natívny file picker sa teraz nepodarilo otvoriť.", error);
+  }
+  return false;
+}
+
 function triggerMobileMediaInputAction(input, action, options = {}) {
   if (!(input instanceof HTMLInputElement)) return;
   const normalizedAction = String(action || "").trim();
@@ -6722,7 +7105,7 @@ function triggerMobileMediaInputAction(input, action, options = {}) {
       delete input.dataset.mobileMediaPickerBypass;
     }
   }, 0);
-  input.click();
+  openNativeFilePicker(input);
 }
 
 function enableMobileMediaPickerForInput(input, options = {}) {
@@ -6763,21 +7146,45 @@ function closeMobileCameraPicker({ fromHistory = false, skipHistory = true } = {
   clearOverlayHistory("mobile-camera");
 }
 
-function handleGenericMobileMediaFile(file) {
-  if (!(file instanceof File) || !file.size) return;
+function normalizeIncomingMediaFiles(value) {
+  if (value instanceof File) {
+    return value.size ? [value] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.filter((item) => item instanceof File && item.size);
+  }
+  if (value && typeof value === "object" && typeof value.length === "number") {
+    return Array.from(value).filter((item) => item instanceof File && item.size);
+  }
+  return [];
+}
+
+function isVideoMediaFile(file) {
+  if (!(file instanceof File)) return false;
   const fileType = String(file.type || "").trim().toLowerCase();
   const fileName = String(file.name || "").trim().toLowerCase();
-  const isVideo = fileType.startsWith("video/")
+  return fileType.startsWith("video/")
     || /\.(mp4|mov|m4v|webm|avi|mkv|3gp)$/i.test(fileName);
+}
 
-  if (isVideo) {
-    openJournalComposer("", "note", { videoFile: file });
+function handleGenericMobileMediaFiles(files) {
+  const normalizedFiles = normalizeIncomingMediaFiles(files);
+  if (!normalizedFiles.length) return;
+  const imageFiles = normalizedFiles.filter((file) => !isVideoMediaFile(file));
+  if (imageFiles.length) {
+    openQuickPhotoEntryFlow(imageFiles).catch((error) => {
+      console.error("Rýchly fotozápis sa teraz nepodarilo otvoriť.", error);
+    });
     return;
   }
+  const firstVideo = normalizedFiles.find((file) => isVideoMediaFile(file));
+  if (firstVideo) {
+    openJournalComposer("", "note", { videoFile: firstVideo });
+  }
+}
 
-  openQuickPhotoEntryFlow(file).catch((error) => {
-    console.error("Rýchly fotozápis sa teraz nepodarilo otvoriť.", error);
-  });
+function handleGenericMobileMediaFile(file) {
+  handleGenericMobileMediaFiles(file);
 }
 
 function ensureMobileCameraPicker() {
@@ -6803,12 +7210,12 @@ function ensureMobileCameraPicker() {
           <button class="mobile-camera-picker__button mobile-camera-picker__button--ghost" type="button" data-mobile-camera-close>Zrušiť</button>
         </div>
       </div>
-      <input id="mobile-camera-capture-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" capture="environment" hidden>
-      <input id="mobile-camera-gallery-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" hidden>
-      <input id="mobile-video-capture-input" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" capture="environment" hidden>
-      <input id="mobile-video-gallery-input" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" hidden>
-      <input id="mobile-media-capture-input" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" capture="environment" hidden>
-      <input id="mobile-media-gallery-input" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" hidden>
+      <input class="mobile-camera-picker__native-input" id="mobile-camera-capture-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" capture="environment" multiple tabindex="-1" aria-hidden="true">
+      <input class="mobile-camera-picker__native-input" id="mobile-camera-gallery-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple tabindex="-1" aria-hidden="true">
+      <input class="mobile-camera-picker__native-input" id="mobile-video-capture-input" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" capture="environment" tabindex="-1" aria-hidden="true">
+      <input class="mobile-camera-picker__native-input" id="mobile-video-gallery-input" type="file" accept="${escapeAttribute(VIDEO_FILE_ACCEPT)}" tabindex="-1" aria-hidden="true">
+      <input class="mobile-camera-picker__native-input" id="mobile-media-capture-input" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" capture="environment" multiple tabindex="-1" aria-hidden="true">
+      <input class="mobile-camera-picker__native-input" id="mobile-media-gallery-input" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" multiple tabindex="-1" aria-hidden="true">
     `;
     document.body.appendChild(host);
   }
@@ -6823,7 +7230,7 @@ function ensureMobileCameraPicker() {
       const input = host.querySelector(selector);
       if (input instanceof HTMLInputElement) {
         input.value = "";
-        input.click();
+        openNativeFilePicker(input);
       }
     };
     host.addEventListener("click", (event) => {
@@ -6863,19 +7270,19 @@ function ensureMobileCameraPicker() {
     const bindFileInput = (selector, kind = "image") => {
       const input = host.querySelector(selector);
       input?.addEventListener("change", () => {
-        const file = Array.from(input.files || []).find((item) => item instanceof File && item.size) || null;
+        const files = Array.from(input.files || []).filter((item) => item instanceof File && item.size);
         input.value = "";
         closeMobileCameraPicker();
-        if (!file) return;
+        if (!files.length) return;
         if (kind === "generic") {
-          handleGenericMobileMediaFile(file);
+          handleGenericMobileMediaFiles(files);
           return;
         }
         if (kind === "video") {
-          openJournalComposer("", "note", { videoFile: file });
+          openJournalComposer("", "note", { videoFile: files[0] });
           return;
         }
-        openQuickPhotoEntryFlow(file).catch((error) => {
+        openQuickPhotoEntryFlow(files).catch((error) => {
           console.error("Rýchly fotozápis sa teraz nepodarilo otvoriť.", error);
         });
       });
@@ -6925,50 +7332,68 @@ function openMobileCameraPicker() {
   pushOverlayHistory("mobile-camera");
 }
 
-async function openQuickPhotoEntryFlow(photoFile) {
-  if (!(photoFile instanceof File) || !photoFile.size) return;
+async function openQuickPhotoEntryFlow(photoFiles) {
+  let pendingFiles = normalizeIncomingMediaFiles(photoFiles).filter((file) => !isVideoMediaFile(file));
+  if (!pendingFiles.length) return;
 
-  let previewUrl = "";
-  try {
-    previewUrl = await fileToOptimizedDataUrl(photoFile, QUICK_CAPTURE_PREVIEW_MAX_DIMENSION, QUICK_CAPTURE_PREVIEW_QUALITY);
-  } catch (error) {
-    previewUrl = URL.createObjectURL(photoFile);
-  }
-  if (!previewUrl) {
-    previewUrl = URL.createObjectURL(photoFile);
-  }
-  const shouldRevokePreviewUrl = String(previewUrl || "").startsWith("blob:");
+  let previewUrls = [];
   const defaultEntryType = "note";
+  const isMobilePhotoQuickShell = document.body.classList.contains("app-mobile-shell");
   let currentWeatherSnapshot = homeWeatherSnapshot || null;
+  const quickPhotoTypePickerMarkup = isMobilePhotoQuickShell
+    ? `
+        ${openJournalQuickActions(defaultEntryType)}
+        ${renderJournalEntryTypePicker(defaultEntryType, { mobileMinimal: true })}
+      `
+    : `
+        <div class="photo-quick-sheet__type">
+          <p class="journal-entry-type-field__label">Typ zápisu</p>
+          <div class="choice-group choice-group--compact-meta choice-group--journal-entry-type">
+            ${singleChoiceChipOptions("entryType", JOURNAL_ENTRY_TYPE_OPTIONS, defaultEntryType)}
+          </div>
+        </div>
+      `;
 
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--editor", "detail-modal--photo-quick");
   detailContent.innerHTML = `
     <div class="detail-layout detail-layout--compact detail-layout--photo-quick-layout">
       <div class="detail-copy detail-copy--wide detail-copy--editor photo-quick-sheet">
-        <div class="detail-copy__headline photo-quick-sheet__headline">
-          <div class="photo-quick-sheet__headline-copy">
-            <p class="eyebrow">Rýchly fotozápis</p>
-            <h3>Pridať moment</h3>
-            <p>Fotka je pripravená. Doplň len krátku poznámku a typ.</p>
-          </div>
-          <div class="detail-copy__actions">
-            <button class="button" type="submit" form="quick-photo-entry-form">Uložiť</button>
+        <div class="photo-quick-sheet__topbar journal-overlay-shell__topline has-topbar">
+          <button class="back-button photo-quick-sheet__back journal-overlay-shell__back" type="button" id="quick-photo-entry-back">Späť</button>
+          <div class="journal-overlay-shell__topline-main">
+            <div class="journal-overlay-list-topbar">
+              <h3 id="quick-photo-entry-title">Pridať moment</h3>
+              <div class="journal-overlay-list-topbar__actions photo-quick-sheet__topbar-actions">
+                <button class="button photo-quick-sheet__save" id="quick-photo-entry-save" type="submit" form="quick-photo-entry-form">Uložiť</button>
+              </div>
+            </div>
           </div>
         </div>
+        <div class="photo-quick-sheet__intro">
+          <p class="eyebrow">Rýchly fotozápis</p>
+          <p id="quick-photo-intro-copy">Fotka je pripravená. Doplň len krátku poznámku a typ.</p>
+        </div>
         <form id="quick-photo-entry-form" class="detail-form detail-form--editor photo-quick-sheet__form">
-          <div class="photo-quick-sheet__media">
-            <img src="${escapeAttribute(previewUrl)}" alt="Nová fotka do denníka">
+          ${quickPhotoTypePickerMarkup}
+          <div class="photo-quick-sheet__media-shell">
+            <div class="photo-quick-sheet__media">
+              <img id="quick-photo-preview-image" src="" alt="Nová fotka do denníka">
+            </div>
+            <div id="quick-photo-preview-list" class="journal-form__image-list photo-quick-sheet__preview-list" hidden></div>
+            <div class="upload-field upload-field--compact upload-field--editor-media photo-quick-sheet__upload">
+              <span class="upload-field__label">Foto</span>
+              <div class="upload-field__mobile-actions" aria-label="Pridať ďalšie fotky">
+                <button class="button button--ghost upload-field__mobile-button" type="button" id="quick-photo-add-capture">Odfotiť</button>
+                <button class="button button--ghost upload-field__mobile-button" type="button" id="quick-photo-add-gallery">Vybrať fotky</button>
+              </div>
+              <input id="quick-photo-capture-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" capture="environment" multiple hidden tabindex="-1" aria-hidden="true">
+              <input id="quick-photo-gallery-input" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" multiple hidden tabindex="-1" aria-hidden="true">
+            </div>
           </div>
           <div class="photo-quick-sheet__weather" id="quick-photo-weather" hidden></div>
           <div class="photo-quick-sheet__core">
-            <div class="journal-entry-type-field photo-quick-sheet__type">
-              <p class="journal-entry-type-field__label">Typ zápisu</p>
-              <div class="choice-group choice-group--compact-meta choice-group--journal-entry-type">
-                ${singleChoiceChipOptions("entryType", JOURNAL_ENTRY_TYPE_OPTIONS, defaultEntryType)}
-              </div>
-            </div>
-            <label class="field-block field-block--full photo-quick-sheet__field">
+            <label class="photo-quick-sheet__field">
               <span>Poznámka</span>
               <textarea name="text" rows="3" placeholder="Krátko, čo sa stalo alebo čo si si všimla..."></textarea>
             </label>
@@ -6980,15 +7405,62 @@ async function openQuickPhotoEntryFlow(photoFile) {
 
   const formEl = document.getElementById("quick-photo-entry-form");
   const weatherMountEl = document.getElementById("quick-photo-weather");
+  const previewImageEl = document.getElementById("quick-photo-preview-image");
+  const previewListEl = document.getElementById("quick-photo-preview-list");
+  const introCopyEl = document.getElementById("quick-photo-intro-copy");
+  const saveButtonEl = document.getElementById("quick-photo-entry-save");
+  const captureInput = document.getElementById("quick-photo-capture-input");
+  const galleryInput = document.getElementById("quick-photo-gallery-input");
   const textInput = formEl?.elements.text;
 
   const cleanupQuickPhotoFlow = () => {
-    if (shouldRevokePreviewUrl && previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls = [];
   };
 
   detailModal.addEventListener("close", cleanupQuickPhotoFlow, { once: true });
+
+  const renderPreview = () => {
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls = pendingFiles.map((file) => URL.createObjectURL(file));
+    const leadImage = previewUrls[0] || "";
+    if (previewImageEl instanceof HTMLImageElement) {
+      previewImageEl.src = leadImage;
+      previewImageEl.alt = pendingFiles.length > 1 ? `Vybrané fotky do denníka (${pendingFiles.length})` : "Nová fotka do denníka";
+    }
+    if (introCopyEl) {
+      introCopyEl.textContent = pendingFiles.length > 1
+        ? `Pripravené sú ${countedLabel(pendingFiles.length, "fotka", "fotky", "fotiek")}. Doplň len krátku poznámku a typ.`
+        : "Fotka je pripravená. Doplň len krátku poznámku a typ.";
+    }
+    if (previewListEl) {
+      previewListEl.innerHTML = renderJournalComposerImagePreview([], previewUrls);
+      previewListEl.hidden = previewUrls.length <= 1;
+      previewListEl.querySelectorAll("[data-remove-new-image]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const index = Number(button.getAttribute("data-remove-new-image") || 0);
+          pendingFiles = pendingFiles.filter((_, fileIndex) => fileIndex !== index);
+          if (!pendingFiles.length) {
+            if (detailModal?.open && typeof detailModal.close === "function") {
+              detailModal.close();
+            }
+            return;
+          }
+          renderPreview();
+        });
+      });
+    }
+    if (saveButtonEl instanceof HTMLButtonElement) {
+      saveButtonEl.disabled = !pendingFiles.length;
+    }
+  };
+
+  const appendSelectedPhotos = (files) => {
+    const nextFiles = normalizeIncomingMediaFiles(files).filter((file) => !isVideoMediaFile(file));
+    if (!nextFiles.length) return;
+    pendingFiles = [...pendingFiles, ...nextFiles];
+    renderPreview();
+  };
 
   const renderWeatherSummary = (snapshot) => {
     if (!weatherMountEl) return;
@@ -7015,19 +7487,88 @@ async function openQuickPhotoEntryFlow(photoFile) {
     renderWeatherSummary(currentWeatherSnapshot);
   };
 
+  const syncQuickPhotoEntryTypeUi = () => {
+    if (!formEl) return;
+    const selectedType = String(formEl.querySelector('input[name="entryType"]:checked')?.value || defaultEntryType).trim() || defaultEntryType;
+    detailContent.querySelectorAll("[data-open-journal-type]").forEach((button) => {
+      const isActive = String(button.getAttribute("data-open-journal-type") || "").trim() === selectedType;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  };
+
   if (textInput) {
     textInput.focus();
   }
 
+  document.getElementById("quick-photo-entry-back")?.addEventListener("click", () => {
+    detailModalBackEl?.click();
+  });
+
+  document.getElementById("quick-photo-add-capture")?.addEventListener("click", () => {
+    if (captureInput instanceof HTMLInputElement) {
+      captureInput.value = "";
+      captureInput.setAttribute("multiple", "");
+      captureInput.setAttribute("capture", "environment");
+      openNativeFilePicker(captureInput);
+    }
+  });
+
+  document.getElementById("quick-photo-add-gallery")?.addEventListener("click", () => {
+    if (galleryInput instanceof HTMLInputElement) {
+      galleryInput.value = "";
+      galleryInput.setAttribute("multiple", "");
+      galleryInput.removeAttribute("capture");
+      openNativeFilePicker(galleryInput);
+    }
+  });
+
+  captureInput?.addEventListener("change", () => {
+    appendSelectedPhotos(captureInput.files);
+    captureInput.value = "";
+  });
+
+  galleryInput?.addEventListener("change", () => {
+    appendSelectedPhotos(galleryInput.files);
+    galleryInput.value = "";
+  });
+
+  detailContent.querySelectorAll("[data-open-journal-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!formEl) return;
+      const nextType = String(button.getAttribute("data-open-journal-type") || "").trim() || defaultEntryType;
+      const targetInput = [...formEl.querySelectorAll('input[name="entryType"]')]
+        .find((input) => String(input.value || "").trim() === nextType);
+      if (!targetInput) return;
+      if (!targetInput.checked) {
+        targetInput.checked = true;
+        targetInput.dispatchEvent(new Event("change", { bubbles: true }));
+        return;
+      }
+      syncQuickPhotoEntryTypeUi();
+    });
+  });
+
+  formEl?.querySelectorAll('input[name="entryType"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      syncQuickPhotoEntryTypeUi();
+    });
+  });
+
+  renderPreview();
   fillWeatherSnapshot().catch(() => {});
+  syncQuickPhotoEntryTypeUi();
 
   formEl?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!pendingFiles.length) return;
     const form = new FormData(formEl);
     const selectedEntryType = String(form.get("entryType") || defaultEntryType).trim() || defaultEntryType;
-    const optimizedImage = await fileToOptimizedDataUrl(photoFile, JOURNAL_IMAGE_MAX_DIMENSION, JOURNAL_IMAGE_QUALITY);
-    const linkedCategoryIds = activeCategoryId ? normalizeIdList([activeCategoryId]) : [];
-    const linkedCategoryId = linkedCategoryIds[0] || "";
+    const optimizedImages = await Promise.all(
+      pendingFiles.map((file) => fileToOptimizedDataUrl(file, JOURNAL_IMAGE_MAX_DIMENSION, JOURNAL_IMAGE_QUALITY))
+    );
+    const linkedCategoryIds = [];
+    const linkedCategoryId = "";
     const weatherSnapshot = currentWeatherSnapshot || homeWeatherSnapshot || await loadHomeWeatherSnapshot().catch(() => null);
     const entry = normalizeJournalEntry({
       id: makeId("journal"),
@@ -7036,8 +7577,8 @@ async function openQuickPhotoEntryFlow(photoFile) {
       }),
       date: stampJournalDate(todayISO(), currentTimeValue()),
       text: String(form.get("text") || "").trim(),
-      images: [optimizedImage],
-      image: optimizedImage,
+      images: optimizedImages,
+      image: optimizedImages[0] || "",
       entryType: selectedEntryType,
       tags: [],
       linkedCategoryIds,
@@ -7326,6 +7867,11 @@ function renderCatalog() {
   const showBreedingChips = categoryLineage.has("root-zahrada");
   const useCompactCategorySummary = !inheritedNotes && !inheritedSowingWindow;
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const categoryJournalThemeKey = `category:${category.id}`;
+  const categoryJournalCount = journalEntriesForTag(normalizedJournalList(), categoryJournalThemeKey).length;
+  const categoryJournalButtonMarkup = categoryJournalCount
+    ? `<button class="category-panel__journal-shortcut" type="button" id="open-category-journal" aria-label="${escapeAttribute(`Zobraziť ${countedLabel(categoryJournalCount, "denníkový zápis", "denníkové zápisy", "denníkových zápisov")} pre ${category.name}`)}" title="${escapeAttribute(`Denník: ${countedLabel(categoryJournalCount, "zápis", "zápisy", "zápisov")}`)}">${ICONS.journal}</button>`
+    : "";
   const breadcrumb = categoryBreadcrumb(category.id);
   const previousCategory = breadcrumb.length > 1 ? breadcrumb[breadcrumb.length - 2] : null;
   const previousCategoryId = previousCategory?.id || "";
@@ -7359,8 +7905,8 @@ function renderCatalog() {
           <button
             class="back-button category-shell__back"
             type="button"
-            ${previousCategoryId ? `data-open-category="${escapeAttribute(previousCategoryId)}"` : "data-open-main-menu-filter"}
-            aria-label="${escapeAttribute(previousCategoryId ? `Späť do ${previousCategory?.name || "nadradenej kategórie"}` : "Späť do hlavného menu")}"
+            data-category-back
+            aria-label="${escapeAttribute(previousCategoryId ? `Späť do ${previousCategory?.name || "nadradenej kategórie"}` : "Späť o jednu úroveň")}"
           >
             Späť
           </button>
@@ -7391,7 +7937,7 @@ function renderCatalog() {
             <div class="category-panel__intro-copy">
               <div class="category-panel__title-row">
                 <h3>${escapeHtml(category.name)}${scopedCategoryVarieties.length ? ` <span class="category-panel__title-count">(${scopedCategoryVarieties.length})</span>` : ""}</h3>
-                ${inheritedSowingWindow ? `<div class="category-panel__hero-side"><span class="tag category-panel__hero-tag">Odporúčaný výsev: ${escapeHtml(inheritedSowingWindow)}</span></div>` : ""}
+                ${inheritedSowingWindow || categoryJournalButtonMarkup ? `<div class="category-panel__hero-side">${categoryJournalButtonMarkup}${inheritedSowingWindow ? `<span class="tag category-panel__hero-tag">Odporúčaný výsev: ${escapeHtml(inheritedSowingWindow)}</span>` : ""}</div>` : ""}
               </div>
               ${inheritedNotes ? `<p class="category-panel__notes">${escapeHtml(inheritedNotes)}</p>` : ""}
             </div>
@@ -7549,6 +8095,13 @@ function renderCatalog() {
         emptyMessage: "V tejto kategórii zatiaľ nemáš nič označené ako hybridnú F1.",
         detailBuilder: (item) => categoryName(item.categoryId)
       });
+    });
+  }
+
+  const openCategoryJournalButton = document.getElementById("open-category-journal");
+  if (openCategoryJournalButton) {
+    openCategoryJournalButton.addEventListener("click", () => {
+      openJournalOverlayList(categoryJournalThemeKey);
     });
   }
 
@@ -9871,18 +10424,54 @@ function renderMainMenuWeatherMini(weather, options = {}) {
 }
 
 function moodOption(value) {
-  return MOOD_OPTIONS.find((item) => item.value === value) || null;
+  const normalizedValue = String(Array.isArray(value) ? value[0] || "" : value || "").trim();
+  return MOOD_OPTIONS.find((item) => item.value === normalizedValue) || null;
+}
+
+function normalizeMoodValues(value = "") {
+  const rawValues = Array.isArray(value)
+    ? value
+    : String(value || "").split(",");
+  const seen = new Set();
+  return rawValues
+    .map((item) => String(item || "").trim())
+    .filter((item) => {
+      if (!item || seen.has(item) || !moodOption(item)) return false;
+      seen.add(item);
+      return true;
+    });
+}
+
+function serializeMoodValues(value = "") {
+  return normalizeMoodValues(value).join(",");
+}
+
+function moodLabels(value = "") {
+  return normalizeMoodValues(value)
+    .map((item) => moodOption(item)?.label || "")
+    .filter(Boolean);
+}
+
+function toggleMoodValue(currentValue = "", toggledValue = "") {
+  const normalizedToggle = String(toggledValue || "").trim();
+  if (!normalizedToggle) return serializeMoodValues(currentValue);
+  const values = normalizeMoodValues(currentValue);
+  const nextValues = values.includes(normalizedToggle)
+    ? values.filter((item) => item !== normalizedToggle)
+    : [...values, normalizedToggle];
+  return serializeMoodValues(nextValues);
 }
 
 function renderMoodPicker(selectedMood = "") {
+  const selectedSet = new Set(normalizeMoodValues(selectedMood));
   return `
     <div class="mood-picker" id="add-entry-mood-picker" role="group" aria-label="Pocit pri zápise">
       ${MOOD_OPTIONS.map((item) => `
         <button
-          class="mood-picker__option ${selectedMood === item.value ? "is-selected" : ""}"
+          class="mood-picker__option ${selectedSet.has(item.value) ? "is-selected" : ""}"
           type="button"
           data-mood-value="${escapeAttribute(item.value)}"
-          aria-pressed="${selectedMood === item.value ? "true" : "false"}"
+          aria-pressed="${selectedSet.has(item.value) ? "true" : "false"}"
           title="${escapeAttribute(item.label)}"
         >
           <span class="mood-picker__emoji" aria-hidden="true">${item.emoji}</span>
@@ -9893,9 +10482,22 @@ function renderMoodPicker(selectedMood = "") {
 }
 
 function renderMoodBadge(moodValue, className = "journal-mood-badge") {
-  const mood = moodOption(moodValue);
+  const normalizedMoodValues = normalizeMoodValues(moodValue);
+  const mood = moodOption(normalizedMoodValues[0] || "");
   if (!mood) return "";
-  return `<span class="${escapeAttribute(className)}" title="${escapeAttribute(mood.label)}" aria-label="${escapeAttribute(mood.label)}">${mood.emoji}</span>`;
+  const moodTitle = moodLabels(normalizedMoodValues).join(", ") || mood.label;
+  const visibleMoodOptions = normalizedMoodValues
+    .slice(0, 2)
+    .map((value) => moodOption(value))
+    .filter(Boolean);
+  const remainingCount = Math.max(0, normalizedMoodValues.length - visibleMoodOptions.length);
+  const multiClass = normalizedMoodValues.length > 1 ? " journal-mood-badge--multi" : "";
+  return `
+    <span class="${escapeAttribute(className)} journal-mood-badge-render${multiClass}" title="${escapeAttribute(moodTitle)}" aria-label="${escapeAttribute(moodTitle)}">
+      ${visibleMoodOptions.map((item) => `<span class="journal-mood-badge-render__emoji" aria-hidden="true">${item.emoji}</span>`).join("")}
+      ${remainingCount ? `<span class="journal-mood-badge-render__more" aria-hidden="true">+${remainingCount}</span>` : ""}
+    </span>
+  `;
 }
 
 function journalEntryTypeRecord(value = "") {
@@ -9973,24 +10575,23 @@ function renderJournalWalkFields(walkValue = null) {
     <section id="journal-overlay-walk-fields" class="journal-walk-editor" hidden>
       <div class="journal-walk-editor__head">
         <div>
-          <p class="journal-entry-type-field__label">Prechádzka a trasa</p>
-          <p class="journal-walk-editor__hint">Ťukni Štart, choď, foť a na konci daj Koniec. Čo vieme, to sa zapíše samo.</p>
+          <p class="journal-entry-type-field__label">Prechádzka</p>
+          <p class="journal-walk-editor__hint">Spusti a na konci ukonči. Trasa sa uloží sama.</p>
         </div>
       </div>
       <section class="journal-walk-gps">
         <div class="journal-walk-gps__head">
           <div>
-            <p class="journal-entry-type-field__label">Štart a stop prechádzky</p>
-            <p class="journal-walk-gps__hint">Ťukni Štart prechádzky, choď a foť. GPS bude priebežne zbierať body a čas aj dĺžka sa spočítajú samy.</p>
+            <p class="journal-walk-gps__hint journal-walk-gps__hint--compact">Čas aj dĺžka sa počítajú automaticky.</p>
           </div>
-          <div class="journal-walk-gps__actions">
-            <button class="button journal-walk-gps__button journal-walk-gps__button--start" type="button" data-walk-gps-action="start"><span aria-hidden="true">${ICONS.walkStart}</span><span>Štart</span></button>
-            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--pause" type="button" data-walk-gps-action="pause"><span aria-hidden="true">${ICONS.walkPause}</span><span>Pauza</span></button>
-            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--resume" type="button" data-walk-gps-action="resume"><span aria-hidden="true">${ICONS.walkResume}</span><span>Pokračovať</span></button>
-            <button class="button button--ghost journal-walk-gps__button journal-walk-gps__button--stop" type="button" data-walk-gps-action="stop"><span aria-hidden="true">${ICONS.walkStop}</span><span>Koniec</span></button>
+          <div class="journal-walk-gps__actions journal-walk-gps__actions--single">
+            <button class="button journal-walk-gps__button journal-walk-gps__button--start journal-walk-gps__button--toggle" type="button" data-walk-gps-action="toggle" data-state="idle">
+              <span class="journal-walk-gps__button-icon" aria-hidden="true">${ICONS.walkStart}</span>
+              <span class="journal-walk-gps__button-label">Spustiť prechádzku</span>
+            </button>
           </div>
         </div>
-        <div class="journal-walk-gps__auto" id="journal-overlay-gps-auto">
+        <div class="journal-walk-gps__auto journal-walk-gps__auto--compact" id="journal-overlay-gps-auto">
           <div class="journal-walk-gps__auto-card">
             <span>Čas prechádzky</span>
             <strong id="journal-overlay-gps-duration">Zatiaľ nebeží</strong>
@@ -9999,53 +10600,24 @@ function renderJournalWalkFields(walkValue = null) {
             <span>Dĺžka trasy</span>
             <strong id="journal-overlay-gps-distance">Zatiaľ bez trasy</strong>
           </div>
-          <div class="journal-walk-gps__auto-card">
-            <span>Stav</span>
-            <strong id="journal-overlay-gps-mode">Pripravené</strong>
-          </div>
         </div>
-        <p class="journal-walk-gps__status" id="journal-overlay-gps-status">GPS body sa zatiaľ neukladajú.</p>
+        <p class="journal-walk-gps__status" id="journal-overlay-gps-status">GPS sa ešte neukladá.</p>
+        <strong id="journal-overlay-gps-mode" hidden>Pripravené</strong>
         <div class="journal-walk-gps__summary" id="journal-overlay-gps-summary"></div>
         <div class="journal-walk-gps__points" id="journal-overlay-gps-points" hidden></div>
         <div id="journal-overlay-gps-map-wrap" hidden>
           ${renderWalkMapMarkup(walk, { compact: false, live: true })}
         </div>
       </section>
-      <details class="entry-advanced journal-walk-editor__optional">
-        <summary class="entry-advanced__summary">Doplniť ručne, len ak chceš</summary>
-        <div class="entry-advanced__content">
-          <div class="journal-walk-editor__grid">
-            <label class="field-block journal-walk-editor__field">
-              <span>Štart</span>
-              <input name="walkStartPlace" type="text" placeholder="Kde prechádzka začala" value="${escapeAttribute(walk.startPlace)}">
-            </label>
-            <label class="field-block journal-walk-editor__field">
-              <span>Koniec</span>
-              <input name="walkEndPlace" type="text" placeholder="Kde prechádzka skončila" value="${escapeAttribute(walk.endPlace)}">
-            </label>
-            <label class="field-block journal-walk-editor__field">
-              <span>Teplota po trase</span>
-              <input name="walkTemperature" type="text" placeholder="Napr. 12 °C" value="${escapeAttribute(walk.temperature)}">
-            </label>
-            <label class="field-block journal-walk-editor__field">
-              <span>Vietor</span>
-              <input name="walkWind" type="text" placeholder="Napr. 7 km/h" value="${escapeAttribute(walk.wind)}">
-            </label>
-            <label class="field-block journal-walk-editor__field">
-              <span>Zrážky</span>
-              <input name="walkPrecipitation" type="text" placeholder="Napr. 0 mm" value="${escapeAttribute(walk.precipitation)}">
-            </label>
-            <label class="field-block journal-walk-editor__field">
-              <span>Podmienky</span>
-              <input name="walkConditions" type="text" placeholder="Napr. polooblačno, prehánky, búrka v diaľke" value="${escapeAttribute(walk.conditions)}">
-            </label>
-            <label class="field-block field-block--full journal-walk-editor__field journal-walk-editor__field--full">
-              <span>Body trasy</span>
-              <textarea name="walkRoutePoints" rows="4" placeholder="Každý bod trasy na nový riadok, napríklad&#10;Dom&#10;Lúka pri potoku&#10;Lesná cesta&#10;Vyhliadka">${escapeHtml(walkRoutePointsText(walk))}</textarea>
-            </label>
-          </div>
-        </div>
-      </details>
+      <div class="journal-walk-editor__manual-values" hidden aria-hidden="true">
+        <input name="walkStartPlace" type="hidden" value="${escapeAttribute(walk.startPlace)}">
+        <input name="walkEndPlace" type="hidden" value="${escapeAttribute(walk.endPlace)}">
+        <input name="walkTemperature" type="hidden" value="${escapeAttribute(walk.temperature)}">
+        <input name="walkWind" type="hidden" value="${escapeAttribute(walk.wind)}">
+        <input name="walkPrecipitation" type="hidden" value="${escapeAttribute(walk.precipitation)}">
+        <input name="walkConditions" type="hidden" value="${escapeAttribute(walk.conditions)}">
+        <textarea name="walkRoutePoints" hidden aria-hidden="true">${escapeHtml(walkRoutePointsText(walk))}</textarea>
+      </div>
     </section>
   `;
 }
@@ -10136,7 +10708,7 @@ function renderJournalPhenomenaPicker(records = [], currentValue = "") {
   `;
 }
 
-function renderJournalWeatherWidgets(weather) {
+function renderJournalWeatherWidgets(weather, options = {}) {
   if (!weather || (!weather.condition && !weather.temperature && !weather.rain && !weather.wind)) return "";
 
   const parts = [
@@ -10147,6 +10719,19 @@ function renderJournalWeatherWidgets(weather) {
   ].filter(Boolean);
 
   if (!parts.length) return "";
+
+  if (options?.singlePill) {
+    const summaryText = parts.map((item) => item.text).join(" · ");
+    const compactVisibleText = String(weather.temperature || "").trim() || parts[0]?.text || "";
+    return `
+      <div class="journal-weather journal-weather--single-line">
+        <span class="journal-weather__pill journal-weather__pill--summary" title="${escapeAttribute(summaryText)}">
+          <span class="journal-weather__icon" aria-hidden="true">${parts[0].icon}</span>
+          <span class="journal-weather__summary">${escapeHtml(compactVisibleText)}</span>
+        </span>
+      </div>
+    `;
+  }
 
   return `
     <div class="journal-weather">
@@ -10373,6 +10958,29 @@ function journalTagRecords(entries = normalizedJournalList()) {
   return [...tagMap.values()].sort((a, b) => a.order - b.order || b.count - a.count || a.label.localeCompare(b.label, "sk", { sensitivity: "base" }));
 }
 
+function resolveJournalActiveTagRecord(entries = normalizedJournalList(), activeTagKey = "", tagRecords = journalTagRecords(entries)) {
+  const normalizedThemeKey = String(activeTagKey || "").trim();
+  if (!normalizedThemeKey) return null;
+  const directMatch = tagRecords.find((item) => item.themeKey === normalizedThemeKey);
+  if (directMatch) return directMatch;
+
+  const matchedEntry = entries.find((entry) => journalLinkChips(normalizeJournalEntry(entry, state.varieties)).some((chip) => chip.themeKey === normalizedThemeKey));
+  if (!matchedEntry) return null;
+  const matchedChip = journalLinkChips(normalizeJournalEntry(matchedEntry, state.varieties)).find((chip) => chip.themeKey === normalizedThemeKey);
+  if (!matchedChip) return null;
+
+  const [kind = ""] = normalizedThemeKey.split(":");
+  return {
+    key: normalizedThemeKey,
+    label: journalThemeChipTitle(matchedChip),
+    count: journalEntriesForTag(entries, normalizedThemeKey).length,
+    themeKey: normalizedThemeKey,
+    kind,
+    kindLabel: journalThemeKindLabel(kind),
+    order: 99
+  };
+}
+
 function journalFilterSections(tagRecords = []) {
   const groups = [
     { kind: "entry-type", label: "Typ" },
@@ -10391,16 +10999,49 @@ function journalFilterSections(tagRecords = []) {
 function journalEntriesForTag(entries = normalizedJournalList(), themeKey = "") {
   const normalizedThemeKey = String(themeKey || "").trim();
   if (!normalizedThemeKey) return entries;
-  return entries.filter((entry) => journalFilterableChips(entry).some((chip) => chip.themeKey === normalizedThemeKey));
+  return entries.filter((entry) => journalLinkChips(normalizeJournalEntry(entry, state.varieties)).some((chip) => chip.themeKey === normalizedThemeKey));
 }
 
 function renderJournalTagFilterPanel(entries = normalizedJournalList(), activeTagKey = "", filteredCount = entries.length) {
   const tagRecords = journalTagRecords(entries);
   if (!tagRecords.length) return "";
-  const activeRecord = tagRecords.find((item) => item.themeKey === activeTagKey) || null;
+  const activeRecord = resolveJournalActiveTagRecord(entries, activeTagKey, tagRecords);
   const sections = journalFilterSections(tagRecords);
+  const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
+  if (isMobileShell) {
+    return `
+      <section class="journal-tag-filter journal-tag-filter--collapsible ${activeRecord ? "is-filter-active" : ""}">
+        <details class="journal-tag-filter__disclosure">
+          <summary class="journal-tag-filter__summary">
+            <span class="journal-tag-filter__summary-copy">
+              <span class="journal-tag-filter__summary-label">Filtre denníka</span>
+              <span class="journal-tag-filter__summary-value">${escapeHtml(activeRecord ? `${activeRecord.kindLabel}: ${activeRecord.label}` : "Ťukni a vyber filter")}</span>
+            </span>
+            ${activeRecord ? `<button class="journal-tag-filter__summary-clear" type="button" data-journal-filter-tag="" aria-label="Zrušiť filter" title="Zrušiť filter">×</button>` : ""}
+          </summary>
+          <div class="journal-tag-filter__content">
+            <div class="journal-tag-filter__sections">
+              ${sections.map((section) => `
+                <div class="journal-tag-filter__section">
+                  <p class="journal-tag-filter__section-label">${escapeHtml(section.label)}</p>
+                  <div class="journal-tag-filter__chips">
+                    ${section.items.map((item) => `
+                      <button class="tag tag--journal-meta tag--interactive tag--link-${escapeAttribute(item.kind)} journal-tag-filter__chip ${item.themeKey === activeTagKey ? "is-active" : ""}" type="button" data-journal-filter-tag="${escapeAttribute(item.themeKey)}">
+                        <span>${escapeHtml(item.label)}</span>
+                        <span class="journal-tag-filter__chip-count">${item.count}</span>
+                      </button>
+                    `).join("")}
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </details>
+      </section>
+    `;
+  }
   return `
-    <section class="journal-tag-filter">
+    <section class="journal-tag-filter ${activeRecord ? "is-filter-active" : ""}">
       <div class="journal-tag-filter__head">
         <div class="journal-tag-filter__lead">
           ${activeRecord ? `<span class="journal-tag-filter__active">${escapeHtml(activeRecord.kindLabel)}: ${escapeHtml(activeRecord.label)}</span>` : ""}
@@ -10440,10 +11081,6 @@ function renderJournalTagPicker(tagRecords = [], currentValue = "") {
     .slice(0, queryKey ? 8 : 12);
 
   return `
-    <div class="journal-tag-picker__head">
-      <span class="journal-tag-picker__label">${queryKey ? "Nájdené tagy" : "Použité tagy"}</span>
-      <span class="journal-tag-picker__meta">${queryKey ? `Hľadáš: ${escapeHtml(currentToken)}` : "Klikni a tag sa doplní do zápisu"}</span>
-    </div>
     ${selectedRecords.length ? `
       <div class="journal-tag-picker__section">
         <span class="journal-tag-picker__section-label">Vo zápise už máš</span>
@@ -11095,6 +11732,7 @@ function renderJournal() {
         `
         : '<div class="empty-state">Keď pridáš prvý zápis, ukáže sa aj tu.</div>';
     }
+    syncDeferredJournalImages(journalSidebarEl, { eagerCount: 3 });
   }
 
   if (journalListEl) {
@@ -11120,6 +11758,20 @@ function renderJournal() {
       };
     }
 
+    journalSidebarEl.querySelectorAll("[data-open-journal-sidebar-entry]").forEach((card) => {
+      if (!(card instanceof HTMLElement)) return;
+      const entryId = String(card.getAttribute("data-open-journal-sidebar-entry") || "").trim();
+      if (!entryId) return;
+      card.addEventListener("click", () => {
+        openJournalOverlayEntry(entryId);
+      });
+      card.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openJournalOverlayEntry(entryId);
+      });
+    });
+
     bindThingLinks(journalSidebarEl);
   }
 
@@ -11131,12 +11783,11 @@ function renderJournal() {
 function renderJournalSidebarCard(entry) {
   const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
   const chips = journalDisplayChips(normalizedEntry);
-  const previewText = trimText(normalizedEntry.text || "", 120);
-  const isWalkEntry = normalizedEntry.entryType === "walk";
-  const displayTitle = isWalkEntry
-    ? "Prechádzka"
-    : (journalDisplayTitle(normalizedEntry) || "Záhradný zápis");
-  const walkTimeRange = isWalkEntry ? walkTimeRangeLabel(normalizedEntry.walk) : "";
+  const previewText = trimText(normalizedEntry.text || "", 150);
+  const titleInfo = journalPreviewTitleInfo(normalizedEntry, 68);
+  const displayTitle = titleInfo.title || "Záhradný zápis";
+  const safeId = String(normalizedEntry.id || "").trim() || makeId("journal");
+  const walkTimeRange = normalizedEntry.entryType === "walk" ? walkTimeRangeLabel(normalizedEntry.walk) : "";
   const sidebarDateLabel = [formatDate(normalizedEntry.date), walkTimeRange].filter(Boolean).join(" • ");
   const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
 
@@ -11148,24 +11799,30 @@ function renderJournalSidebarCard(entry) {
           ${renderMoodBadge(normalizedEntry.mood, "sidebar-preview-card__mood")}
         </div>
         <p class="sidebar-preview-card__title sidebar-preview-card__title--journal">${escapeHtml(displayTitle)}</p>
-        ${previewText ? `<p class="sidebar-preview-card__excerpt">${escapeHtml(previewText)}</p>` : ""}
+        ${previewText && !titleInfo.usesNoteTitle ? `<p class="sidebar-preview-card__excerpt">${escapeHtml(previewText)}</p>` : ""}
         ${chips.length ? `<div class="sidebar-preview-card__footer"><div class="home-chip-row">${chips.map(renderJournalChip).join("")}</div></div>` : ""}
       </article>
     `;
   }
 
   const leadImage = journalImages(normalizedEntry)[0] || "";
-  const visibleTags = (Array.isArray(normalizedEntry.tags) ? normalizedEntry.tags : [])
-    .map((tag) => String(tag || "").trim())
-    .filter(Boolean)
-    .slice(0, 3);
-  const typeLabel = journalEntryTypeLabel(normalizedEntry.entryType || "note");
+  const mobilePreviewText = previewText && !titleInfo.usesNoteTitle ? previewText : "";
   return `
-    <article class="sidebar-preview-card sidebar-preview-card--journal sidebar-preview-card--journal-mobile ${leadImage ? "sidebar-preview-card--journal-mobile-media" : "sidebar-preview-card--journal-mobile-plain"}">
+    <article
+      class="sidebar-preview-card sidebar-preview-card--journal sidebar-preview-card--journal-mobile ${leadImage ? "sidebar-preview-card--journal-mobile-media" : "sidebar-preview-card--journal-mobile-plain"}"
+      data-open-journal-sidebar-entry="${escapeAttribute(safeId)}"
+      role="button"
+      tabindex="0"
+      aria-label="Otvoriť zápis ${escapeAttribute(displayTitle)}"
+    >
       <div class="sidebar-preview-card__journal-mobile-shell">
         ${leadImage ? `
           <div class="sidebar-preview-card__journal-media">
-            <img src="${escapeAttribute(leadImage)}" alt="${escapeAttribute(displayTitle)}" loading="lazy" decoding="async" fetchpriority="low">
+            ${renderJournalImageTag(leadImage, displayTitle, {
+              entryId: safeId,
+              index: 0,
+              forceDeferred: true
+            })}
           </div>
         ` : ""}
         <div class="sidebar-preview-card__journal-mobile-main">
@@ -11174,15 +11831,7 @@ function renderJournalSidebarCard(entry) {
             ${renderMoodBadge(normalizedEntry.mood, "sidebar-preview-card__mood")}
           </div>
           <p class="sidebar-preview-card__title sidebar-preview-card__title--journal">${escapeHtml(displayTitle)}</p>
-          ${previewText ? `<p class="sidebar-preview-card__excerpt sidebar-preview-card__excerpt--journal-mobile">${escapeHtml(previewText)}</p>` : ""}
-          <div class="sidebar-preview-card__journal-mobile-bottom">
-            <span class="sidebar-preview-card__type-pill">${escapeHtml(`Typ: ${typeLabel}`)}</span>
-            ${visibleTags.length ? `
-              <div class="sidebar-preview-card__tag-row">
-                ${visibleTags.map((tag) => `<span class="sidebar-preview-card__tag-chip">${escapeHtml(tag.startsWith("#") ? tag : `#${tag}`)}</span>`).join("")}
-              </div>
-            ` : ""}
-          </div>
+          ${mobilePreviewText ? `<p class="sidebar-preview-card__excerpt sidebar-preview-card__excerpt--journal-mobile">${escapeHtml(mobilePreviewText)}</p>` : ""}
         </div>
       </div>
     </article>
@@ -12021,17 +12670,34 @@ function renderJournalManagerList(journalList, journalCount, rerender) {
 
 function openTaskManager() {
   resetDetailModalClasses();
-  detailModal.classList.add("detail-modal--worklog");
+  detailModal.classList.add("detail-modal--worklog", "detail-modal--worklog-manager");
+  const isMobileWorklogShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const mobileTopbarMarkup = isMobileWorklogShell ? `
+    <div class="mobile-compact-modal-topbar mobile-compact-modal-topbar--worklog">
+      <button class="back-button journal-overlay-shell__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
+      <div class="mobile-compact-modal-topbar__main">
+        <div class="mobile-compact-modal-topbar__titleline">
+          <h3 id="worklog-manager-title">Plán práce</h3>
+          <div class="mobile-compact-modal-topbar__actions">
+            <button class="button" type="button" id="open-add-task-from-worklog" aria-expanded="false" aria-label="Pridať úlohu" title="Pridať úlohu">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ` : "";
   detailContent.innerHTML = `
+    ${mobileTopbarMarkup}
     <div class="detail-layout detail-layout--compact detail-layout--worklog">
       <div class="detail-copy detail-copy--wide worklog-manager">
         <section class="worklog-section worklog-section--single">
-          <div class="worklog-section__head">
-            <h4>Plán práce</h4>
-            <div class="catalog-card__actions">
-              <button class="button" type="button" id="open-add-task-from-worklog" aria-expanded="false" aria-label="Pridať úlohu" title="Pridať úlohu">+</button>
+          ${isMobileWorklogShell ? "" : `
+            <div class="worklog-section__head">
+              <h4>Plán práce</h4>
+              <div class="catalog-card__actions">
+                <button class="button" type="button" id="open-add-task-from-worklog" aria-expanded="false" aria-label="Pridať úlohu" title="Pridať úlohu">+</button>
+              </div>
             </div>
-          </div>
+          `}
           <div class="worklog-task-editor" id="worklog-task-editor">
             <form id="worklog-task-form" class="task-form task-form--planner">
               <input name="text" type="text" placeholder="Napríklad: Presadiť papriky do väčších kelímkov" required>
@@ -12367,9 +13033,10 @@ function openAddEntryFlow(editingEntryId = "") {
 
   const syncMoodPicker = (selectedValue) => {
     if (!moodPickerEl) return;
-    formEl.elements.mood.value = selectedValue;
+    const serializedValue = serializeMoodValues(selectedValue);
+    formEl.elements.mood.value = serializedValue;
     moodPickerEl.querySelectorAll("[data-mood-value]").forEach((item) => {
-      const isSelected = item.dataset.moodValue === selectedValue;
+      const isSelected = normalizeMoodValues(serializedValue).includes(String(item.dataset.moodValue || "").trim());
       item.classList.toggle("is-selected", isSelected);
       item.setAttribute("aria-pressed", isSelected ? "true" : "false");
     });
@@ -12379,8 +13046,7 @@ function openAddEntryFlow(editingEntryId = "") {
     button.addEventListener("click", () => {
       const nextValue = button.dataset.moodValue || "";
       const currentValue = String(formEl.elements.mood.value || "");
-      const selectedValue = currentValue === nextValue ? "" : nextValue;
-      syncMoodPicker(selectedValue);
+      syncMoodPicker(toggleMoodValue(currentValue, nextValue));
     });
   });
 
@@ -12551,7 +13217,7 @@ function openAddEntryFlow(editingEntryId = "") {
       linkedCategoryIds: normalizedLinkedCategoryIds,
       linkedCategoryId,
       linkedVarietyId,
-      mood: String(form.get("mood") || "").trim(),
+      mood: serializeMoodValues(form.get("mood")),
       weather: normalizeWeatherSnapshot({
         condition: form.get("weatherCondition"),
         temperature: form.get("weatherTemperature"),
@@ -12624,6 +13290,26 @@ function openThingOverview(thingKey) {
   if (!thingKey) return;
   const record = buildThingRecords().find((item) => item.key === thingKey);
   if (!record) return;
+  let returnToJournal = null;
+  const journalRoot = journalOverlayRoot();
+  if (journalRoot) {
+    const overlayView = String(journalRoot.dataset.journalOverlayView || "").trim();
+    const activeTagKey = String(journalRoot.dataset.journalActiveTagKey || "").trim();
+    const returnTagKey = String(journalRoot.dataset.journalReturnTagKey || activeTagKey).trim();
+    const currentEntryId = String(journalRoot.dataset.journalEntryId || journalRoot.dataset.journalReturnEntryId || "").trim();
+    if (overlayView === "entry" && currentEntryId) {
+      returnToJournal = {
+        mode: "entry",
+        entryId: currentEntryId,
+        returnTagKey
+      };
+    } else {
+      returnToJournal = {
+        mode: "list",
+        activeTagKey
+      };
+    }
+  }
   if (journalOverlayRoot()) {
     closeJournalOverlay({ fromHistory: true });
   }
@@ -12714,6 +13400,26 @@ function openThingOverview(thingKey) {
   bindThingLinks(detailContent);
   bindTaskActions(detailContent);
   syncDeferredJournalImages(detailContent, { eagerCount: 1 });
+  if (returnToJournal) {
+    detailModalBackOverride = ({ fromHistory = false } = {}) => {
+      if (!fromHistory) {
+        if (activeOverlayHistoryKind === "detail" && typeof window !== "undefined" && window.history?.back) {
+          window.history.back();
+          return true;
+        }
+        return false;
+      }
+      if (detailModal.open && typeof detailModal.close === "function") {
+        detailModal.close();
+      }
+      if (returnToJournal.mode === "entry" && returnToJournal.entryId) {
+        openJournalOverlayEntry(returnToJournal.entryId, returnToJournal.returnTagKey, { historyMode: "preserve" });
+        return true;
+      }
+      openJournalOverlayList(returnToJournal.activeTagKey, { historyMode: "preserve" });
+      return true;
+    };
+  }
 
   detailContent.querySelectorAll("[data-open-journal-image]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -12832,9 +13538,22 @@ function openVarietyOverviewModal({ title, items, emptyMessage, detailBuilder })
 
 function openCategoryManager(categoryId = null, forcedParentId = "") {
   resetDetailModalClasses();
-  detailModal.classList.add("detail-modal--editor");
+  detailModal.classList.add("detail-modal--editor", "detail-modal--category");
   const isMobileEditorShell = document.body.classList.contains("app-mobile-shell");
   const existing = categoryId ? state.categories.find((item) => item.id === categoryId) : null;
+  const mobileTopbarMarkup = isMobileEditorShell ? `
+    <div class="mobile-compact-modal-topbar">
+      <button class="back-button journal-overlay-shell__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
+      <div class="mobile-compact-modal-topbar__main">
+        <div class="mobile-compact-modal-topbar__titleline">
+          <h3 id="category-manager-title">${existing ? "Upraviť kategóriu" : "Pridať kategóriu"}</h3>
+          <div class="mobile-compact-modal-topbar__actions">
+            <button class="back-button mobile-compact-modal-topbar__submit" type="submit" form="category-form">${existing ? "Uložiť" : "Pridať"}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ` : "";
   const colorChoices = ["#d45d2c", "#c84136", "#78a24d", "#4f8e4c", "#ea8a2d", "#d2af37", "#4b8f6a", "#7d8c97", "#b06aa0", "#8f806b"];
   const siblingSet = existing ? siblingCategories(existing) : [];
   const siblingIndex = existing ? siblingSet.findIndex((item) => item.id === existing.id) : -1;
@@ -12865,14 +13584,17 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
           `;
 
   detailContent.innerHTML = `
+    ${mobileTopbarMarkup}
     <div class="detail-layout detail-layout--compact">
       <div class="detail-copy detail-copy--wide detail-copy--editor category-manager">
-        <div class="detail-copy__headline">
-          <h3>${existing ? escapeHtml(existing.name) : "Pridať novú kategóriu"}</h3>
-          <div class="detail-copy__actions">
-            <button class="button" type="submit" form="category-form" id="save-category">${existing ? "Uložiť kategóriu" : "Vytvoriť kategóriu"}</button>
+        ${isMobileEditorShell ? "" : `
+          <div class="detail-copy__headline">
+            <h3>${existing ? escapeHtml(existing.name) : "Pridať novú kategóriu"}</h3>
+            <div class="detail-copy__actions">
+              <button class="button" type="submit" form="category-form" id="save-category">${existing ? "Uložiť kategóriu" : "Vytvoriť kategóriu"}</button>
+            </div>
           </div>
-        </div>
+        `}
         <form class="detail-form detail-form--editor" id="category-form">
           <div class="detail-grid category-manager__grid">
             <label class="field-block category-manager__field category-manager__field--name">
@@ -13101,12 +13823,14 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   const existing = varietyId ? state.varieties.find((item) => item.id === varietyId) : null;
   const currentEntryKind = existing ? entryKind(existing) : forcedEntryKind;
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const showMobileEditorTopbar = isMobileShell && (currentEntryKind === "detail" || (!existing && currentEntryKind === "gallery"));
   const showCardTypePicker = !existing && currentEntryKind === "detail";
-  const showMobileAddTypeBar = !existing && currentEntryKind === "detail" && isMobileShell;
+  const showMobileAddTypeBar = isMobileShell && !existing && currentEntryKind === "detail";
   const inlineCreateAction = !existing && isMobileShell;
   const useCompactCategoryLabels = isMobileShell && currentEntryKind === "detail";
   const submitLabel = existing ? "Uložiť" : currentEntryKind === "detail" ? "Pridať odrodu" : currentEntryKind === "quick" ? "Pridať rýchly záznam" : "Pridať galériu";
-  detailModal.classList.toggle("detail-modal--editor-topline", showMobileAddTypeBar);
+  const showInlineCreateAction = inlineCreateAction && !showMobileEditorTopbar;
+  detailModal.classList.toggle("detail-modal--editor-topline", showMobileEditorTopbar);
   const categoryId = forcedCategoryId || existing?.categoryId || activeCategoryId;
   const selectedStatuses = varietyStatusValues(existing);
   let draftImages = normalizeVarietyImages(existing);
@@ -13114,7 +13838,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   let draggedImageIndex = null;
 
   detailContent.innerHTML = `
-    ${showMobileAddTypeBar ? mobileAddCardTypeBarMarkup("variety") : ""}
+    ${showMobileEditorTopbar ? mobileAddCardTypeBarMarkup(showMobileAddTypeBar ? "variety" : "", { formId: "variety-form", submitLabel: existing ? "Uložiť" : "Pridať", withTypeSwitch: showMobileAddTypeBar }) : ""}
     <div class="detail-layout detail-layout--editor">
       <div class="detail-image detail-image--editor">
         <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
@@ -13137,7 +13861,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
           </div>
         ` : ""}
         <form class="detail-form detail-form--editor" id="variety-form">
-          ${inlineCreateAction ? `
+          ${showInlineCreateAction ? `
             <div class="detail-form__lead-action">
               <button class="button" type="submit">${submitLabel}</button>
             </div>
@@ -13147,7 +13871,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
               <div class="detail-top-row field-block--full">
                 <label class="field-block detail-top-row__name">
                   <span>Názov odrody</span>
-                  <input name="name" type="text" value="${escapeAttribute(existing?.name || "")}" placeholder="Názov odrody" required>
+                  <input name="name" type="text" value="${escapeAttribute(existing?.name || "")}" placeholder="" required>
                 </label>
                 <div class="detail-top-row__f1" aria-label="Typ šľachtenia">
                   <label class="choice-chip choice-chip--toggle-inline">
@@ -13502,6 +14226,20 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
 function openBatchSowingManager(categoryId = activeCategoryId) {
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--batch", "detail-modal--editor");
+  const isMobileBatchShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const mobileTopbarMarkup = isMobileBatchShell ? `
+    <div class="mobile-compact-modal-topbar">
+      <button class="back-button journal-overlay-shell__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
+      <div class="mobile-compact-modal-topbar__main">
+        <div class="mobile-compact-modal-topbar__titleline">
+          <h3 id="batch-sowing-title">Hromadný výsev</h3>
+          <div class="mobile-compact-modal-topbar__actions">
+            <button class="back-button mobile-compact-modal-topbar__submit" type="submit" form="batch-sowing-form">Uložiť</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ` : "";
   const sourceCategories = orderedCategories().filter((item) => (
     item.nodeType !== "parent" &&
     varietiesInCategoryTree(item.id).some(isDetailEntry)
@@ -13553,14 +14291,17 @@ function openBatchSowingManager(categoryId = activeCategoryId) {
   let candidateIds = seedSelectionForSource();
 
   detailContent.innerHTML = `
+    ${mobileTopbarMarkup}
     <div class="detail-layout detail-layout--compact">
       <div class="detail-copy detail-copy--wide detail-copy--editor batch-sowing-manager">
-        <div class="detail-copy__headline">
-          <h3>Hromadný výsev</h3>
-          <div class="detail-copy__actions">
-            <button class="button" type="submit" form="batch-sowing-form">Uložiť výsev</button>
+        ${isMobileBatchShell ? "" : `
+          <div class="detail-copy__headline">
+            <h3>Hromadný výsev</h3>
+            <div class="detail-copy__actions">
+              <button class="button" type="submit" form="batch-sowing-form">Uložiť výsev</button>
+            </div>
           </div>
-        </div>
+        `}
         <form class="detail-form detail-form--editor" id="batch-sowing-form">
           <div class="detail-grid batch-sowing-manager__filters">
             <label class="field-block batch-sowing-manager__filter batch-sowing-manager__filter--source">
@@ -13736,6 +14477,20 @@ function openBatchSowingManager(categoryId = activeCategoryId) {
 function openBatchMoveManager(categoryId = activeCategoryId) {
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--batch", "detail-modal--editor");
+  const isMobileBatchShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const mobileTopbarMarkup = isMobileBatchShell ? `
+    <div class="mobile-compact-modal-topbar">
+      <button class="back-button journal-overlay-shell__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
+      <div class="mobile-compact-modal-topbar__main">
+        <div class="mobile-compact-modal-topbar__titleline">
+          <h3 id="batch-move-title">Hromadný presun</h3>
+          <div class="mobile-compact-modal-topbar__actions">
+            <button class="back-button mobile-compact-modal-topbar__submit" type="submit" form="batch-move-form">Uložiť</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ` : "";
   const sourceCategories = orderedCategories().filter((item) => (
     item.nodeType !== "parent" &&
     varietiesInCategoryTree(item.id).length
@@ -13769,14 +14524,17 @@ function openBatchMoveManager(categoryId = activeCategoryId) {
   seedSelectionForSource();
 
   detailContent.innerHTML = `
+    ${mobileTopbarMarkup}
     <div class="detail-layout detail-layout--compact">
       <div class="detail-copy detail-copy--wide detail-copy--editor batch-sowing-manager">
-        <div class="detail-copy__headline">
-          <h3>Hromadný presun kariet</h3>
-          <div class="detail-copy__actions">
-            <button class="button" type="submit" form="batch-move-form">Presunúť vybrané</button>
+        ${isMobileBatchShell ? "" : `
+          <div class="detail-copy__headline">
+            <h3>Hromadný presun kariet</h3>
+            <div class="detail-copy__actions">
+              <button class="button" type="submit" form="batch-move-form">Presunúť vybrané</button>
+            </div>
           </div>
-        </div>
+        `}
         <form class="detail-form detail-form--editor" id="batch-move-form">
           <div class="detail-grid batch-sowing-manager__filters">
             <label class="field-block batch-sowing-manager__filter batch-sowing-manager__filter--source">
@@ -14134,7 +14892,7 @@ function worklogSummaryText(taskCount = state.customTasks.length, journalCount =
 
 function resetDetailModalClasses() {
   detailModalBackOverride = null;
-  detailModal.classList.remove("detail-modal--worklog", "detail-modal--overview", "detail-modal--batch", "detail-modal--weather", "detail-modal--editor", "detail-modal--settings", "detail-modal--editor-topline", "detail-modal--card-view");
+  detailModal.classList.remove("detail-modal--worklog", "detail-modal--worklog-manager", "detail-modal--overview", "detail-modal--batch", "detail-modal--weather", "detail-modal--editor", "detail-modal--settings", "detail-modal--editor-topline", "detail-modal--card-view", "detail-modal--category");
 }
 
 function orderedCategories() {
@@ -14351,13 +15109,22 @@ function cardTypeOptionsMarkup(selectedType, { withIcons = false } = {}) {
   `).join("");
 }
 
-function mobileAddCardTypeBarMarkup(selectedType) {
+function mobileAddCardTypeBarMarkup(selectedType, { formId = "", submitLabel = "Pridať", withTypeSwitch = true } = {}) {
   return `
-    <div class="detail-editor-mobile-switch">
-      <button class="back-button detail-editor-mobile-switch__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
-      <div class="entry-mode-switch entry-mode-switch--topbar" data-card-type-switch="mobile-topbar">
-        ${cardTypeOptionsMarkup(selectedType, { withIcons: true })}
+    <div class="detail-editor-mobile-topbar">
+      <div class="detail-editor-mobile-topbar__row">
+        <button class="back-button journal-overlay-shell__back detail-editor-mobile-switch__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
+        <div class="detail-editor-mobile-topbar__actions">
+          <button class="back-button detail-editor-mobile-topbar__submit" type="submit" form="${escapeAttribute(formId)}">${escapeHtml(submitLabel)}</button>
+        </div>
       </div>
+      ${withTypeSwitch ? `
+        <div class="detail-editor-mobile-switch">
+          <div class="entry-mode-switch entry-mode-switch--topbar" data-card-type-switch="mobile-topbar">
+            ${cardTypeOptionsMarkup(selectedType, { withIcons: true })}
+          </div>
+        </div>
+      ` : ""}
     </div>
   `;
 }
@@ -14461,6 +15228,7 @@ function birdConfidenceLabel(value) {
 function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--settings");
+  const isMobileSettingsShell = document.body.classList.contains("app-mobile-shell");
   const weatherPreferences = loadWeatherPreferences();
   const authProfile = loadLocalAuthProfile();
   const authSession = loadLocalAuthSession();
@@ -14514,9 +15282,18 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   const supabaseTone = statusScope === "supabase" ? tone : "";
   const cloudAccountTone = statusScope === "cloud-account" ? tone : "";
   const cloudSyncTone = statusScope === "cloud-sync" ? tone : "";
-
-  detailContent.innerHTML = `
-    <div class="settings-sheet">
+  const settingsTopbarMarkup = isMobileSettingsShell ? `
+    <div class="settings-topbar-shell journal-overlay-shell__topline has-topbar">
+      <button class="back-button journal-overlay-shell__back settings-topbar__back" type="button" data-settings-back aria-label="Krok späť">Späť</button>
+      <div class="journal-overlay-shell__topline-main">
+        <div class="journal-overlay-list-topbar">
+          <h3 id="settings-modal-title">Nastavenia</h3>
+          <button class="button button--ghost journal-overlay-list-topbar__add settings-topbar__spacer" type="button" aria-hidden="true" tabindex="-1">+</button>
+        </div>
+      </div>
+    </div>
+  ` : "";
+  const settingsHeroMarkup = isMobileSettingsShell ? "" : `
       <section class="settings-hero">
         <div>
           <p class="eyebrow">Nastavenia</p>
@@ -14529,6 +15306,12 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
           <div class="settings-hero__pill">${escapeHtml(supabaseCloudSignedIn ? `Cloud: ${supabaseAuthMirror.email}` : "Cloud: zatiaľ nie")}</div>
         </div>
       </section>
+    `;
+
+  detailContent.innerHTML = `
+    ${settingsTopbarMarkup}
+    <div class="settings-sheet">
+      ${settingsHeroMarkup}
       <div class="settings-grid">
         <section class="settings-panel">
           <div class="settings-panel__head">
@@ -14740,6 +15523,17 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   const exportStateButton = detailContent.querySelector("[data-export-state]");
   const importStateButton = detailContent.querySelector("[data-import-state]");
   const importStateInput = document.getElementById("settings-import-file");
+  const settingsBackButton = detailContent.querySelector("[data-settings-back]");
+
+  settingsBackButton?.addEventListener("click", () => {
+    if (detailModalBackEl && typeof detailModalBackEl.click === "function") {
+      detailModalBackEl.click();
+      return;
+    }
+    if (detailModal?.open && typeof detailModal.close === "function") {
+      detailModal.close();
+    }
+  });
 
   settingsWeatherFormEl?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -15302,6 +16096,7 @@ function linkedVarietyOptions(current, selectedCategoryIds = "") {
 }
 
 function renderUniversalCardSpecificFields(cardTypeValue, existing = {}) {
+  const useMobileSimpleRelationFields = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
   if (cardTypeValue === "mushroom") {
     const selectedEdibilityValues = normalizeTagList(existing.mushroomEdibilityValues?.length ? existing.mushroomEdibilityValues : existing.mushroomEdibility);
     const selectedGatheringValues = normalizeTagList(existing.mushroomGatheringValues?.length ? existing.mushroomGatheringValues : existing.mushroomGathering);
@@ -15387,33 +16182,55 @@ function renderUniversalCardSpecificFields(cardTypeValue, existing = {}) {
 
   if (cardTypeValue === "pest-problem") {
     return `
-      ${renderRelationDisclosure({
-        summaryLabel: "Týka sa kategórií a karty",
-        categoryLabel: "Kategórie",
-        categoryInputName: "affectedCategoryIds",
-        categoryValues: existing.affectedCategoryIds || existing.affectedCategoryId || "",
-        cardLabel: "Týka sa karty",
-        cardInputName: "affectedVarietyId",
-        cardValue: existing.affectedVarietyId || "",
-        cardWrapKey: "affected",
-        cardCategoryIds: existing.affectedCategoryIds || existing.affectedCategoryId || ""
-      })}
+      ${useMobileSimpleRelationFields
+        ? renderSimpleRelationFields({
+          categoryLabel: "Kategórie",
+          categoryInputName: "affectedCategoryIds",
+          categoryValues: existing.affectedCategoryIds || existing.affectedCategoryId || "",
+          cardLabel: "Týka sa karty",
+          cardInputName: "affectedVarietyId",
+          cardValue: existing.affectedVarietyId || "",
+          cardWrapKey: "affected",
+          cardCategoryIds: existing.affectedCategoryIds || existing.affectedCategoryId || ""
+        })
+        : renderRelationDisclosure({
+          summaryLabel: "Týka sa kategórií a karty",
+          categoryLabel: "Kategórie",
+          categoryInputName: "affectedCategoryIds",
+          categoryValues: existing.affectedCategoryIds || existing.affectedCategoryId || "",
+          cardLabel: "Týka sa karty",
+          cardInputName: "affectedVarietyId",
+          cardValue: existing.affectedVarietyId || "",
+          cardWrapKey: "affected",
+          cardCategoryIds: existing.affectedCategoryIds || existing.affectedCategoryId || ""
+        })}
     `;
   }
 
   if (cardTypeValue === "processing-recipe") {
     return `
-      ${renderRelationDisclosure({
-        summaryLabel: "Súvisí s kategóriami a kartou",
-        categoryLabel: "Kategórie",
-        categoryInputName: "relatedCategoryIds",
-        categoryValues: existing.relatedCategoryIds || existing.relatedCategoryId || "",
-        cardLabel: "Súvisí s kartou",
-        cardInputName: "relatedVarietyId",
-        cardValue: existing.relatedVarietyId || "",
-        cardWrapKey: "related",
-        cardCategoryIds: existing.relatedCategoryIds || existing.relatedCategoryId || ""
-      })}
+      ${useMobileSimpleRelationFields
+        ? renderSimpleRelationFields({
+          categoryLabel: "Kategórie",
+          categoryInputName: "relatedCategoryIds",
+          categoryValues: existing.relatedCategoryIds || existing.relatedCategoryId || "",
+          cardLabel: "Súvisí s kartou",
+          cardInputName: "relatedVarietyId",
+          cardValue: existing.relatedVarietyId || "",
+          cardWrapKey: "related",
+          cardCategoryIds: existing.relatedCategoryIds || existing.relatedCategoryId || ""
+        })
+        : renderRelationDisclosure({
+          summaryLabel: "Súvisí s kategóriami a kartou",
+          categoryLabel: "Kategórie",
+          categoryInputName: "relatedCategoryIds",
+          categoryValues: existing.relatedCategoryIds || existing.relatedCategoryId || "",
+          cardLabel: "Súvisí s kartou",
+          cardInputName: "relatedVarietyId",
+          cardValue: existing.relatedVarietyId || "",
+          cardWrapKey: "related",
+          cardCategoryIds: existing.relatedCategoryIds || existing.relatedCategoryId || ""
+        })}
     `;
   }
 
@@ -15447,12 +16264,13 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       && typeof document !== "undefined"
       && document.body.classList.contains("app-mobile-shell");
     const inlineCreateAction = showMobileAddTypeBar;
+    const showInlineCreateAction = inlineCreateAction && !showMobileAddTypeBar;
     detailModal.classList.toggle("detail-modal--editor-topline", showMobileAddTypeBar);
     const birdTitleLink = selectedType === "bird"
       ? String(existing?.birdExternalUrl || "").trim()
       : "";
     detailContent.innerHTML = `
-      ${showMobileAddTypeBar ? mobileAddCardTypeBarMarkup(selectedType) : ""}
+      ${showMobileAddTypeBar ? mobileAddCardTypeBarMarkup(selectedType, { formId: "universal-card-form", submitLabel: "Pridať" }) : ""}
       <div class="detail-layout detail-layout--editor">
         <div class="detail-image detail-image--editor">
           <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
@@ -15475,7 +16293,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
             </div>
           ` : ""}
           <form class="detail-form detail-form--editor" id="universal-card-form">
-            ${inlineCreateAction ? `
+            ${showInlineCreateAction ? `
               <div class="detail-form__lead-action">
                 <button class="button" type="submit">${existing ? "Uložiť" : cardCreateLabel(selectedType)}</button>
               </div>
@@ -15696,14 +16514,25 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
 
     const syncLinkedVarietySelect = (categoryFieldName, varietyFieldName, wrapKey) => {
       const categoryInputs = [...formEl.querySelectorAll(`input[name="${categoryFieldName}"]`)];
+      const categorySelect = formEl.querySelector(`select[name="${categoryFieldName}"]`);
       const varietySelect = formEl.elements[varietyFieldName];
       const varietyWrap = formEl.querySelector(`[data-linked-variety-wrap="${wrapKey}"]`);
       if (!varietySelect || !varietyWrap) return;
 
-      const selectedCategoryIds = () => categoryInputs
-        .filter((input) => input.checked)
-        .map((input) => String(input.value || "").trim())
-        .filter(Boolean);
+      const selectedCategoryIds = () => {
+        if (categoryInputs.length) {
+          return categoryInputs
+            .filter((input) => input.checked)
+            .map((input) => String(input.value || "").trim())
+            .filter(Boolean);
+        }
+        if (categorySelect instanceof HTMLSelectElement) {
+          return [...categorySelect.selectedOptions]
+            .map((option) => String(option.value || "").trim())
+            .filter(Boolean);
+        }
+        return [];
+      };
 
       const refreshVarietySelect = () => {
         const chosenCategories = selectedCategoryIds();
@@ -15723,6 +16552,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       categoryInputs.forEach((input) => {
         input.addEventListener("change", refreshVarietySelect);
       });
+      categorySelect?.addEventListener("change", refreshVarietySelect);
     };
 
     const setupRelationDisclosures = (rootEl) => {
@@ -15763,6 +16593,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     });
 
     const birdEbirdMatchButton = formEl.querySelector("[data-bird-ebird-match]");
+    const birdEbirdActionsEl = birdEbirdMatchButton?.closest(".bird-ebird-tools__actions") || null;
     const birdEbirdStatusEl = formEl.querySelector("[data-bird-ebird-status]");
     const birdEbirdPickerEl = formEl.querySelector("[data-bird-ebird-picker]");
     const birdEbirdPickerListEl = formEl.querySelector("[data-bird-ebird-picker-list]");
@@ -15834,6 +16665,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
 
     const renderBirdEbirdPicker = () => {
       if (!birdEbirdPickerEl || !birdEbirdPickerListEl) return;
+      if (birdEbirdActionsEl) birdEbirdActionsEl.hidden = birdEbirdPickerOpen;
       birdEbirdPickerEl.hidden = !birdEbirdPickerOpen;
       if (!birdEbirdPickerOpen) return;
 
@@ -16407,8 +17239,10 @@ function renderJournalItem(entry, deleteAttr, editAttr = "") {
   const displayTitle = journalDisplayTitle(normalizedEntry);
   const titleOnlyClass = !images.length && !video && !String(normalizedEntry.text || "").trim() && !walkMarkup ? "journal-item--title-only" : "";
   const chips = journalDisplayChips(normalizedEntry);
-  const weatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry));
-  const headerWeatherWidgets = weatherWidgets;
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const headerWeatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry), {
+    singlePill: isMobileShell
+  });
   const footerChips = chips;
   return `
     <article class="journal-item ${images.length ? "journal-item--with-image" : ""} ${titleOnlyClass}">
@@ -16471,8 +17305,10 @@ function renderJournalManagerCard(entry, deleteAttr = "data-delete-worklog-journ
   const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
   const chips = journalDisplayChips(normalizedEntry);
   const deleteAttribute = deleteAttr ? `${deleteAttr}="${escapeAttribute(rawId)}"` : "";
-  const headerWeatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry));
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const headerWeatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry), {
+    singlePill: isMobileShell
+  });
 
   if (isMobileShell) {
     return `
@@ -16888,6 +17724,7 @@ function openStoredCardView(varietyId) {
   if (!source) return;
   const existing = normalizeVarietyRecord(source);
   const resolvedType = cardType(existing);
+  const isMobileCardViewShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
   const images = normalizeVarietyImages(existing);
   const displayImages = images.length ? images : [cardPlaceholderImage(resolvedType)];
   const headerCategory = String(existing.categoryId || "").trim() && String(existing.categoryId || "").trim() !== FALLBACK_CATEGORY_ID
@@ -16898,16 +17735,36 @@ function openStoredCardView(varietyId) {
   const titleBadgeMarkup = resolvedType === "variety" && inferBreedingType(existing) === "hybrid"
     ? cardViewChipMarkup("F1", "violet")
     : "";
+  const cardJournalThemeKey = `variety:${existing.id}`;
+  const cardJournalCount = journalEntriesForTag(normalizedJournalList(), cardJournalThemeKey).length;
   let activeImageIndex = 0;
+  const mobileTopbarMarkup = isMobileCardViewShell ? `
+    <div class="mobile-compact-modal-topbar mobile-compact-modal-topbar--card-view">
+      <button class="back-button journal-overlay-shell__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
+      <div class="mobile-compact-modal-topbar__main">
+        <div class="mobile-compact-modal-topbar__titleline">
+          <h3 id="card-view-mobile-title" aria-hidden="true"></h3>
+          <div class="mobile-compact-modal-topbar__actions">
+            ${cardJournalCount ? `<button class="button button--ghost card-view-journal-shortcut" id="card-view-open-journal" type="button" aria-label="${escapeAttribute(`Zobraziť ${countedLabel(cardJournalCount, "denníkový zápis", "denníkové zápisy", "denníkových zápisov")} pre kartu ${entryDisplayName(existing)}`)}" title="${escapeAttribute(`Denník: ${countedLabel(cardJournalCount, "zápis", "zápisy", "zápisov")}`)}">${ICONS.journal}</button>` : ""}
+            <button class="back-button mobile-compact-modal-topbar__submit" id="card-view-edit" type="button">Upraviť</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ` : "";
 
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--card-view");
   detailContent.innerHTML = `
+    ${mobileTopbarMarkup}
     <div class="detail-layout detail-layout--card-view">
       <div class="detail-image detail-image--card-view">
-        <div class="card-view-hero-bar">
-          <button class="button" id="card-view-edit" type="button">Upraviť</button>
-        </div>
+        ${isMobileCardViewShell ? "" : `
+          <div class="card-view-hero-bar">
+            <button class="button" id="card-view-edit" type="button">Upraviť</button>
+            ${cardJournalCount ? `<button class="button button--ghost card-view-journal-shortcut" id="card-view-open-journal" type="button" aria-label="${escapeAttribute(`Zobraziť ${countedLabel(cardJournalCount, "denníkový zápis", "denníkové zápisy", "denníkových zápisov")} pre kartu ${entryDisplayName(existing)}`)}" title="${escapeAttribute(`Denník: ${countedLabel(cardJournalCount, "zápis", "zápisy", "zápisov")}`)}">${ICONS.journal}</button>` : ""}
+          </div>
+        `}
         <button class="card-view-hero${images.length ? " is-clickable" : ""}" id="card-view-hero-button" type="button" ${images.length ? "" : "disabled"}>
           <img id="card-view-hero-image" src="${escapeAttribute(displayImages[0])}" alt="${escapeAttribute(entryDisplayName(existing))}">
         </button>
@@ -16975,6 +17832,21 @@ function openStoredCardView(varietyId) {
 
   document.getElementById("card-view-edit")?.addEventListener("click", () => {
     openStoredCardEditor(varietyId);
+  });
+
+  document.getElementById("card-view-open-journal")?.addEventListener("click", () => {
+    const openCardJournal = () => {
+      openJournalOverlayList(cardJournalThemeKey);
+    };
+    if (detailModal?.open && detailModalBackEl) {
+      const handleCardViewClosed = () => {
+        openCardJournal();
+      };
+      detailModal.addEventListener("close", handleCardViewClosed, { once: true });
+      detailModalBackEl.click();
+      return;
+    }
+    openCardJournal();
   });
 
   syncGallery();
@@ -17074,11 +17946,13 @@ function categoryOptions(current, options = {}) {
   ];
   const requestedType = String(options?.cardTypeValue || "").trim();
   const compactLabels = Boolean(options?.compactLabels);
+  const selectedValues = Array.isArray(options?.selectedValues) ? normalizeIdList(options.selectedValues) : [];
+  const selectedSet = selectedValues.length ? new Set(selectedValues) : null;
   const resolvedCurrent = requestedType === "bird" && current === "cat-zvierata" && state.categories.some((item) => item.id === "cat-vtaky")
     ? "cat-vtaky"
     : current;
   if (!requestedType || requestedType === "variety") {
-    return orderedForSelect.map((item) => `<option value="${item.id}" ${item.id === resolvedCurrent ? "selected" : ""}>${escapeHtml(formattedCategoryOptionLabel(item, { compact: compactLabels }))}</option>`).join("");
+    return orderedForSelect.map((item) => `<option value="${item.id}" ${selectedSet ? (selectedSet.has(item.id) ? "selected" : "") : (item.id === resolvedCurrent ? "selected" : "")}>${escapeHtml(formattedCategoryOptionLabel(item, { compact: compactLabels }))}</option>`).join("");
   }
 
   const compatibleCategories = orderedForSelect.filter((item) => item.id !== FALLBACK_CATEGORY_ID && isCategoryCompatibleWithCardType(requestedType, item.id));
@@ -17088,7 +17962,7 @@ function categoryOptions(current, options = {}) {
     : compatibleCategories;
   const categoriesForSelect = filteredCategories.length ? filteredCategories : orderedForSelect;
 
-  return categoriesForSelect.map((item) => `<option value="${item.id}" ${item.id === resolvedCurrent ? "selected" : ""}>${escapeHtml(formattedCategoryOptionLabel(item, { compact: compactLabels }))}</option>`).join("");
+  return categoriesForSelect.map((item) => `<option value="${item.id}" ${selectedSet ? (selectedSet.has(item.id) ? "selected" : "") : (item.id === resolvedCurrent ? "selected" : "")}>${escapeHtml(formattedCategoryOptionLabel(item, { compact: compactLabels }))}</option>`).join("");
 }
 
 function orderedPickerCategories() {
@@ -17284,6 +18158,37 @@ function renderTaskRelationFields(categoryValue = "", cardValue = "") {
         ${linkedVarietyOptions(cardValue, categoryValue ? [categoryValue] : [])}
       </select>
     </label>
+  `;
+}
+
+function renderSimpleRelationFields({
+  categoryLabel,
+  categoryInputName,
+  categoryValues = [],
+  cardLabel,
+  cardInputName,
+  cardValue = "",
+  cardWrapKey,
+  cardCategoryIds = []
+}) {
+  const normalizedCategoryValues = normalizeIdList(categoryValues);
+  const primaryCategoryId = normalizedCategoryValues[0] || "";
+  return `
+    <div class="field-block field-block--full field-block--relation field-block--relation-simple">
+      <label class="field-block field-block--full">
+        <span>${escapeHtml(categoryLabel)}</span>
+        <select class="relation-simple-select" name="${escapeAttribute(categoryInputName)}" multiple size="12">
+          ${categoryOptions("", { selectedValues: normalizedCategoryValues })}
+        </select>
+      </label>
+      <label class="field-block field-block--full" data-linked-variety-wrap="${escapeAttribute(cardWrapKey)}" ${primaryCategoryId ? "" : "hidden"}>
+        <span>${escapeHtml(cardLabel)}</span>
+        <select name="${escapeAttribute(cardInputName)}">
+          <option value="">Bez karty</option>
+          ${linkedVarietyOptions(cardValue, primaryCategoryId ? [primaryCategoryId] : cardCategoryIds)}
+        </select>
+      </label>
+    </div>
   `;
 }
 
@@ -18061,21 +18966,56 @@ function resolveDeferredVarietyCardImageSource(varietyId = "") {
 
 async function activateDeferredVarietyCardImage(img) {
   if (!(img instanceof HTMLImageElement)) return;
-  const varietyId = String(img.getAttribute("data-lazy-variety-image") || "").trim();
-  if (!varietyId) return;
-  const source = resolveDeferredVarietyCardImageSource(varietyId);
-  if (!source) return;
-  const previewSource = await resolvePreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
-  if (!img.isConnected) return;
-  img.src = previewSource || source;
-  img.removeAttribute("data-lazy-variety-image");
-  if (deferredVarietyCardImageObserver) {
-    try {
-      deferredVarietyCardImageObserver.unobserve(img);
-    } catch (error) {
-      // Ignore stale observer detach errors.
+  if (img.dataset.deferredCardActivationPending === "true") return;
+  img.dataset.deferredCardActivationPending = "true";
+  try {
+    const varietyId = String(img.getAttribute("data-lazy-variety-image") || "").trim();
+    if (!varietyId) return;
+    const source = resolveDeferredVarietyCardImageSource(varietyId);
+    if (!source) return;
+    const previewSource = await resolvePreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+    if (!img.isConnected) return;
+    img.src = previewSource || source;
+    img.removeAttribute("data-lazy-variety-image");
+    if (deferredVarietyCardImageObserver) {
+      try {
+        deferredVarietyCardImageObserver.unobserve(img);
+      } catch (error) {
+        // Ignore stale observer detach errors.
+      }
     }
+  } finally {
+    img.removeAttribute("data-deferred-card-activation-queued");
+    img.removeAttribute("data-deferred-card-activation-pending");
   }
+}
+
+function scheduleDeferredCardImageActivation(img, activate) {
+  if (!(img instanceof HTMLImageElement)) return;
+  if (typeof activate !== "function") return;
+  if (!isRealMobileRuntimeMode()) {
+    activate(img);
+    return;
+  }
+  if (img.dataset.deferredCardActivationQueued === "true" || img.dataset.deferredCardActivationPending === "true") return;
+  img.dataset.deferredCardActivationQueued = "true";
+  deferredCardImageActivationQueue.push({ img, activate });
+  if (deferredCardImageActivationRaf) return;
+  const flushNext = () => {
+    deferredCardImageActivationRaf = 0;
+    const next = deferredCardImageActivationQueue.shift();
+    if (!next) return;
+    if (!next.img?.isConnected) {
+      next.img?.removeAttribute?.("data-deferred-card-activation-queued");
+    } else {
+      // Na realnom mobile rozlozime prve preview aktivacie po jednom frame, aby prvy vstup menej sekal.
+      next.activate(next.img);
+    }
+    if (deferredCardImageActivationQueue.length) {
+      deferredCardImageActivationRaf = window.requestAnimationFrame(flushNext);
+    }
+  };
+  deferredCardImageActivationRaf = window.requestAnimationFrame(flushNext);
 }
 
 function syncDeferredVarietyCardImages(root = document) {
@@ -18088,7 +19028,7 @@ function syncDeferredVarietyCardImages(root = document) {
       deferredVarietyCardImageObserver = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
-          activateDeferredVarietyCardImage(entry.target);
+          scheduleDeferredCardImageActivation(entry.target, activateDeferredVarietyCardImage);
         });
       }, {
         root: null,
@@ -18100,7 +19040,7 @@ function syncDeferredVarietyCardImages(root = document) {
     return;
   }
 
-  pendingImages.forEach((img) => activateDeferredVarietyCardImage(img));
+  pendingImages.forEach((img) => scheduleDeferredCardImageActivation(img, activateDeferredVarietyCardImage));
 }
 
 function normalizeVarietyRecord(item) {
@@ -18420,20 +19360,27 @@ function resolveDeferredCategoryCardImageSource(categoryId = "") {
 
 async function activateDeferredCategoryCardImage(img) {
   if (!(img instanceof HTMLImageElement)) return;
-  const categoryId = String(img.getAttribute("data-lazy-category-image") || "").trim();
-  if (!categoryId) return;
-  const source = resolveDeferredCategoryCardImageSource(categoryId);
-  if (!source) return;
-  const previewSource = await resolvePreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
-  if (!img.isConnected) return;
-  img.src = previewSource || source;
-  img.removeAttribute("data-lazy-category-image");
-  if (deferredCategoryCardImageObserver) {
-    try {
-      deferredCategoryCardImageObserver.unobserve(img);
-    } catch (error) {
-      // Ignore stale observer detach errors.
+  if (img.dataset.deferredCardActivationPending === "true") return;
+  img.dataset.deferredCardActivationPending = "true";
+  try {
+    const categoryId = String(img.getAttribute("data-lazy-category-image") || "").trim();
+    if (!categoryId) return;
+    const source = resolveDeferredCategoryCardImageSource(categoryId);
+    if (!source) return;
+    const previewSource = await resolvePreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+    if (!img.isConnected) return;
+    img.src = previewSource || source;
+    img.removeAttribute("data-lazy-category-image");
+    if (deferredCategoryCardImageObserver) {
+      try {
+        deferredCategoryCardImageObserver.unobserve(img);
+      } catch (error) {
+        // Ignore stale observer detach errors.
+      }
     }
+  } finally {
+    img.removeAttribute("data-deferred-card-activation-queued");
+    img.removeAttribute("data-deferred-card-activation-pending");
   }
 }
 
@@ -18447,7 +19394,7 @@ function syncDeferredCategoryCardImages(root = document) {
       deferredCategoryCardImageObserver = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
-          activateDeferredCategoryCardImage(entry.target);
+          scheduleDeferredCardImageActivation(entry.target, activateDeferredCategoryCardImage);
         });
       }, {
         root: null,
@@ -18459,7 +19406,7 @@ function syncDeferredCategoryCardImages(root = document) {
     return;
   }
 
-  pendingImages.forEach((img) => activateDeferredCategoryCardImage(img));
+  pendingImages.forEach((img) => scheduleDeferredCardImageActivation(img, activateDeferredCategoryCardImage));
 }
 
 function shouldDeferJournalImageSource(source = "") {
@@ -18474,15 +19421,19 @@ function deferredJournalImageRootMargin() {
   return deferredCardImageRootMargin();
 }
 
-function renderJournalImageTag(source, altText, { entryId = "", index = 0, className = "", style = "" } = {}) {
+function renderJournalImageTag(source, altText, { entryId = "", index = 0, className = "", style = "", previewVariant = "", forceDeferred = false } = {}) {
   const normalizedSource = String(source || "").trim();
   if (!normalizedSource) return "";
   const classAttribute = className ? ` class="${escapeAttribute(className)}"` : "";
   const styleAttribute = style ? ` style="${escapeAttribute(style)}"` : "";
-  if (!shouldDeferJournalImageSource(normalizedSource)) {
-    return `<img src="${escapeAttribute(normalizedSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${classAttribute}${styleAttribute}>`;
+  const previewVariantAttribute = previewVariant ? ` data-journal-preview-variant="${escapeAttribute(previewVariant)}"` : "";
+  const shouldDefer = forceDeferred
+    ? shouldUseMobileDeferredVarietyImages() && !isPlaceholderImage(normalizedSource)
+    : shouldDeferJournalImageSource(normalizedSource);
+  if (!shouldDefer) {
+    return `<img src="${escapeAttribute(normalizedSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${previewVariantAttribute}${classAttribute}${styleAttribute}>`;
   }
-  return `<img src="${escapeAttribute(placeholderImage())}" data-lazy-journal-image-entry="${escapeAttribute(entryId)}" data-lazy-journal-image-index="${escapeAttribute(String(index))}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${classAttribute}${styleAttribute}>`;
+  return `<img src="${escapeAttribute(placeholderImage())}" data-lazy-journal-image-entry="${escapeAttribute(entryId)}" data-lazy-journal-image-index="${escapeAttribute(String(index))}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${previewVariantAttribute}${classAttribute}${styleAttribute}>`;
 }
 
 function resolveDeferredJournalImageSource(entryId = "", imageIndex = 0) {
@@ -18503,7 +19454,10 @@ async function activateDeferredJournalImage(img) {
   const imageIndex = Math.max(0, Number(img.getAttribute("data-lazy-journal-image-index") || 0) || 0);
   const source = resolveDeferredJournalImageSource(entryId, imageIndex);
   if (!source) return;
-  const previewSource = await resolvePreviewImageSource(source, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  const previewVariant = String(img.getAttribute("data-journal-preview-variant") || "").trim();
+  const previewSource = previewVariant === "sidebar-media"
+    ? await resolveJournalSidebarPreviewImageSource(source, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION)
+    : await resolvePreviewImageSource(source, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION);
   if (!img.isConnected) return;
   img.src = previewSource || source;
   img.removeAttribute("data-lazy-journal-image-entry");
@@ -18610,6 +19564,264 @@ async function resolvePreviewImageSource(source = "", maxDimension = LIST_IMAGE_
         }
         context.drawImage(image, 0, 0, width, height);
         resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch (error) {
+        resolve(normalized);
+      }
+    };
+    image.onerror = () => resolve(normalized);
+    image.src = normalized;
+  }).then((resolved) => {
+    derivedPreviewImagePromiseCache.delete(cacheKey);
+    derivedPreviewImageCache.set(cacheKey, resolved);
+    if (derivedPreviewImageCache.size > 160) {
+      const oldestKey = derivedPreviewImageCache.keys().next().value;
+      if (oldestKey) derivedPreviewImageCache.delete(oldestKey);
+    }
+    return resolved;
+  });
+
+  derivedPreviewImagePromiseCache.set(cacheKey, promise);
+  return promise;
+}
+
+function hasVisibleContentInRow(data, width, y) {
+  const minVisiblePixels = Math.max(2, Math.round(width * 0.04));
+  let visiblePixels = 0;
+  const rowOffset = y * width * 4;
+  for (let x = 0; x < width; x += 1) {
+    if (!isLightBackgroundPixel(data, rowOffset + x * 4) && ++visiblePixels >= minVisiblePixels) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasVisibleContentInColumn(data, width, height, x) {
+  const minVisiblePixels = Math.max(2, Math.round(height * 0.04));
+  let visiblePixels = 0;
+  for (let y = 0; y < height; y += 1) {
+    if (!isLightBackgroundPixel(data, (y * width + x) * 4) && ++visiblePixels >= minVisiblePixels) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function detectLightTrimBounds(canvas) {
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  const width = canvas.width;
+  const height = canvas.height;
+  if (width < 8 || height < 8) return null;
+
+  const imageData = context.getImageData(0, 0, width, height);
+  const { data } = imageData;
+  let top = 0;
+  let bottom = height - 1;
+  let left = 0;
+  let right = width - 1;
+
+  while (top < bottom && !hasVisibleContentInRow(data, width, top)) top += 1;
+  while (bottom > top && !hasVisibleContentInRow(data, width, bottom)) bottom -= 1;
+  while (left < right && !hasVisibleContentInColumn(data, width, height, left)) left += 1;
+  while (right > left && !hasVisibleContentInColumn(data, width, height, right)) right -= 1;
+
+  const trimmedWidth = right - left + 1;
+  const trimmedHeight = bottom - top + 1;
+  if (trimmedWidth < 8 || trimmedHeight < 8) return null;
+
+  const widthReduction = width - trimmedWidth;
+  const heightReduction = height - trimmedHeight;
+  if (widthReduction < Math.round(width * 0.06) && heightReduction < Math.round(height * 0.06)) {
+    return null;
+  }
+
+  return {
+    x: left,
+    y: top,
+    width: trimmedWidth,
+    height: trimmedHeight
+  };
+}
+
+function fitCropRectToAspect(rect, targetAspectRatio, imageWidth, imageHeight) {
+  let x = Math.max(0, Number(rect?.x) || 0);
+  let y = Math.max(0, Number(rect?.y) || 0);
+  let width = Math.max(1, Number(rect?.width) || imageWidth || 1);
+  let height = Math.max(1, Number(rect?.height) || imageHeight || 1);
+  const currentAspectRatio = width / Math.max(1, height);
+
+  if (currentAspectRatio > targetAspectRatio) {
+    const targetWidth = Math.max(1, Math.round(height * targetAspectRatio));
+    x += Math.max(0, Math.round((width - targetWidth) / 2));
+    width = targetWidth;
+  } else if (currentAspectRatio < targetAspectRatio) {
+    const targetHeight = Math.max(1, Math.round(width / targetAspectRatio));
+    y += Math.max(0, Math.round((height - targetHeight) / 2));
+    height = targetHeight;
+  }
+
+  if (x + width > imageWidth) x = Math.max(0, imageWidth - width);
+  if (y + height > imageHeight) y = Math.max(0, imageHeight - height);
+
+  return { x, y, width, height };
+}
+
+function zoomCropRect(rect, keepRatio, imageWidth, imageHeight, focusX = 0.5, focusY = 0.5) {
+  const safeKeepRatio = Math.min(1, Math.max(0.18, Number(keepRatio) || 1));
+  const width = Math.max(1, Math.round((Number(rect?.width) || imageWidth || 1) * safeKeepRatio));
+  const height = Math.max(1, Math.round((Number(rect?.height) || imageHeight || 1) * safeKeepRatio));
+  const rectX = Math.max(0, Number(rect?.x) || 0);
+  const rectY = Math.max(0, Number(rect?.y) || 0);
+  const rectWidth = Math.max(1, Number(rect?.width) || imageWidth || 1);
+  const rectHeight = Math.max(1, Number(rect?.height) || imageHeight || 1);
+  const centerX = rectX + rectWidth * Math.min(1, Math.max(0, Number(focusX) || 0.5));
+  const centerY = rectY + rectHeight * Math.min(1, Math.max(0, Number(focusY) || 0.5));
+  let x = Math.round(centerX - width * Math.min(1, Math.max(0, Number(focusX) || 0.5)));
+  let y = Math.round(centerY - height * Math.min(1, Math.max(0, Number(focusY) || 0.5)));
+
+  if (x + width > imageWidth) x = Math.max(0, imageWidth - width);
+  if (y + height > imageHeight) y = Math.max(0, imageHeight - height);
+
+  return { x, y, width, height };
+}
+
+function scorePreviewCropRect(data, imageWidth, rect, leftBiasWeight = 0) {
+  const width = Math.max(1, Math.round(Number(rect?.width) || 1));
+  const height = Math.max(1, Math.round(Number(rect?.height) || 1));
+  const startX = Math.max(0, Math.round(Number(rect?.x) || 0));
+  const startY = Math.max(0, Math.round(Number(rect?.y) || 0));
+  const step = Math.max(2, Math.round(Math.min(width, height) / 18));
+  let totalSamples = 0;
+  let contentSamples = 0;
+
+  for (let y = startY; y < startY + height; y += step) {
+    for (let x = startX; x < startX + width; x += step) {
+      totalSamples += 1;
+      if (!isLightBackgroundPixel(data, (y * imageWidth + x) * 4)) {
+        contentSamples += 1;
+      }
+    }
+  }
+
+  const densityScore = totalSamples ? contentSamples / totalSamples : 0;
+  const leftBiasScore = 1 - (startX / Math.max(1, imageWidth - width));
+  return densityScore + leftBiasScore * leftBiasWeight;
+}
+
+function findContentAwarePreviewCrop(canvas, bounds, targetAspectRatio) {
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return fitCropRectToAspect(bounds, targetAspectRatio, canvas.width, canvas.height);
+  }
+
+  const imageWidth = canvas.width;
+  const imageHeight = canvas.height;
+  const baseRect = fitCropRectToAspect(bounds, targetAspectRatio, imageWidth, imageHeight);
+  const { data } = context.getImageData(0, 0, imageWidth, imageHeight);
+  const portraitLike = bounds.height > bounds.width * 1.08;
+  const keepRatios = portraitLike ? [0.5, 0.62, 0.74, 0.86] : [0.74, 0.86, 1];
+  const horizontalSteps = portraitLike ? 5 : 4;
+  const verticalSteps = portraitLike ? 6 : 4;
+  let bestRect = baseRect;
+  let bestScore = -Infinity;
+
+  keepRatios.forEach((keepRatio) => {
+    const candidateSize = zoomCropRect(baseRect, keepRatio, imageWidth, imageHeight, 0.5, portraitLike ? 0.34 : 0.5);
+    const maxX = Math.max(bounds.x, bounds.x + bounds.width - candidateSize.width);
+    const maxY = Math.max(bounds.y, bounds.y + bounds.height - candidateSize.height);
+
+    for (let xIndex = 0; xIndex <= horizontalSteps; xIndex += 1) {
+      const xRatio = horizontalSteps === 0 ? 0 : xIndex / horizontalSteps;
+      const x = Math.round(bounds.x + (maxX - bounds.x) * xRatio);
+      for (let yIndex = 0; yIndex <= verticalSteps; yIndex += 1) {
+        const yRatio = verticalSteps === 0 ? 0 : yIndex / verticalSteps;
+        const y = Math.round(bounds.y + (maxY - bounds.y) * yRatio);
+        const rect = {
+          x,
+          y,
+          width: candidateSize.width,
+          height: candidateSize.height
+        };
+        const score = scorePreviewCropRect(data, imageWidth, rect, portraitLike ? 0.12 : 0.04) + keepRatio * 0.08;
+        if (score > bestScore) {
+          bestScore = score;
+          bestRect = rect;
+        }
+      }
+    }
+  });
+
+  return bestRect;
+}
+
+async function resolveJournalSidebarPreviewImageSource(source = "", maxDimension = JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION, quality = 0.76) {
+  const normalized = String(source || "").trim();
+  if (!normalized || isPlaceholderImage(normalized)) return normalized;
+
+  const safeMaxDimension = Math.max(160, Number(maxDimension) || JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  const cacheKey = `journal-sidebar-v7|${safeMaxDimension}|${normalized}`;
+  if (derivedPreviewImageCache.has(cacheKey)) {
+    return derivedPreviewImageCache.get(cacheKey);
+  }
+  if (derivedPreviewImagePromiseCache.has(cacheKey)) {
+    return derivedPreviewImagePromiseCache.get(cacheKey);
+  }
+
+  const promise = new Promise((resolve) => {
+    const image = new Image();
+    image.decoding = "async";
+    if (/^https?:/i.test(normalized)) {
+      image.crossOrigin = "anonymous";
+    }
+    image.onload = () => {
+      try {
+        const sourceCanvas = document.createElement("canvas");
+        sourceCanvas.width = Math.max(1, image.width || 1);
+        sourceCanvas.height = Math.max(1, image.height || 1);
+        const sourceContext = sourceCanvas.getContext("2d");
+        if (!sourceContext) {
+          resolve(normalized);
+          return;
+        }
+
+        sourceContext.drawImage(image, 0, 0, sourceCanvas.width, sourceCanvas.height);
+        const trimmedBounds = detectLightTrimBounds(sourceCanvas) || {
+          x: 0,
+          y: 0,
+          width: sourceCanvas.width,
+          height: sourceCanvas.height
+        };
+        const cropRect = findContentAwarePreviewCrop(
+          sourceCanvas,
+          trimmedBounds,
+          JOURNAL_SIDEBAR_MEDIA_ASPECT_RATIO
+        );
+        const scale = Math.min(1, safeMaxDimension / Math.max(cropRect.width || 1, cropRect.height || 1));
+        const outputWidth = Math.max(1, Math.round((cropRect.width || 1) * scale));
+        const outputHeight = Math.max(1, Math.round((cropRect.height || 1) * scale));
+        const outputCanvas = document.createElement("canvas");
+        outputCanvas.width = outputWidth;
+        outputCanvas.height = outputHeight;
+        const outputContext = outputCanvas.getContext("2d");
+        if (!outputContext) {
+          resolve(normalized);
+          return;
+        }
+
+        outputContext.drawImage(
+          image,
+          cropRect.x,
+          cropRect.y,
+          cropRect.width,
+          cropRect.height,
+          0,
+          0,
+          outputWidth,
+          outputHeight
+        );
+        resolve(outputCanvas.toDataURL("image/jpeg", quality));
       } catch (error) {
         resolve(normalized);
       }
@@ -19716,7 +20928,7 @@ async function syncStateToSupabase() {
       body: String(entry?.text || "").trim(),
       entry_type: String(entry?.entryType || "note").trim() || "note",
       entry_at: safeSupabaseTimestamp(entry?.date),
-      mood: String(entry?.mood || "").trim(),
+      mood: serializeMoodValues(entry?.mood),
       place: "",
       tags: Array.isArray(entry?.tags) ? entry.tags : [],
       weather: entry?.weather && typeof entry.weather === "object" ? entry.weather : {},
@@ -19954,7 +21166,7 @@ async function importStateFromSupabase() {
       text: String(row?.body || fallbackData.text || "").trim(),
       date: String(row?.entry_at || fallbackData.date || "").trim(),
       entryType: String(row?.entry_type || fallbackData.entryType || "note").trim() || "note",
-      mood: String(row?.mood || fallbackData.mood || "").trim(),
+      mood: serializeMoodValues(row?.mood || fallbackData.mood || ""),
       place: "",
       tags: Array.isArray(row?.tags) ? row.tags : (Array.isArray(fallbackData.tags) ? fallbackData.tags : []),
       weather: row?.weather && typeof row.weather === "object" ? row.weather : (fallbackData.weather && typeof fallbackData.weather === "object" ? fallbackData.weather : null),
@@ -20597,11 +21809,37 @@ function weatherTrendInsight(days = []) {
 
 function renderWeatherOverviewLoadingMarkup() {
   return `
+    ${renderWeatherOverviewTopbarMarkup()}
     <div class="detail-layout detail-layout--compact">
       <div class="detail-copy detail-copy--wide weather-overview" data-weather-overview-modal>
-        <p class="eyebrow">Počasie</p>
         <h3>Načítavam týždenný prehľad</h3>
         <p class="home-weather-box__loading">Pripravujem pondelkové týždne, zrážky, vietor, priebeh dní aj upozornenia.</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderWeatherOverviewTopbarMarkup() {
+  return `
+    <div class="weather-overview__topbar-shell journal-overlay-shell__topline has-topbar">
+      <button class="back-button journal-overlay-shell__back weather-overview__topbar-back" type="button" data-weather-overview-back aria-label="Krok späť">Späť</button>
+      <div class="journal-overlay-shell__topline-main">
+        <div class="journal-overlay-list-topbar">
+          <h3 id="weather-overview-title">Počasie</h3>
+          <button class="button button--ghost journal-overlay-list-topbar__add weather-overview__topbar-spacer" type="button" aria-hidden="true" tabindex="-1">+</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWeatherOverviewErrorMarkup() {
+  return `
+    ${renderWeatherOverviewTopbarMarkup()}
+    <div class="detail-layout detail-layout--compact">
+      <div class="detail-copy detail-copy--wide weather-overview" data-weather-overview-modal>
+        <h3>Prehľad sa teraz nepodarilo načítať</h3>
+        <p class="home-weather-box__loading">Skús to o chvíľu znova. Základ appky tým ostal v poriadku.</p>
       </div>
     </div>
   `;
@@ -21152,6 +22390,7 @@ function renderWeatherOverviewContent(snapshot, overview) {
   const alerts = Array.isArray(overview?.alerts) ? overview.alerts : [];
   const selectedWeek = resolveWeatherOverviewSelectedWeek(overview);
   return `
+    ${renderWeatherOverviewTopbarMarkup()}
     <div class="detail-layout detail-layout--compact">
       <div class="detail-copy detail-copy--wide weather-overview" data-weather-overview-modal>
         <h3>${escapeHtml(overview?.placeLabel || snapshot?.placeLabel || "Zákopčie")}</h3>
@@ -21207,7 +22446,15 @@ function renderWeatherOverviewContent(snapshot, overview) {
 }
 
 function bindWeatherOverviewModalControls(root = detailContent) {
-  if (!root?.querySelectorAll || !homeWeatherOverview) return;
+  if (!root?.querySelectorAll) return;
+  root.querySelectorAll("[data-weather-overview-back]").forEach((button) => {
+    if (button.dataset.weatherOverviewBackBound === "true") return;
+    button.dataset.weatherOverviewBackBound = "true";
+    button.addEventListener("click", () => {
+      detailModalBackEl?.click();
+    });
+  });
+  if (!homeWeatherOverview) return;
   const candidates = weatherOverviewHeroCandidates(homeWeatherOverview);
   const weekCandidates = weatherOverviewWeekCandidates(homeWeatherOverview);
 
@@ -21670,30 +22917,16 @@ function openWeatherOverviewModal(options = {}) {
     loadHomeWeatherOverview(Boolean(options.forceReload))
   ]).then(([snapshot, overview]) => {
     if (!snapshot || !overview) {
-      detailContent.innerHTML = `
-        <div class="detail-layout detail-layout--compact">
-          <div class="detail-copy detail-copy--wide weather-overview" data-weather-overview-modal>
-            <p class="eyebrow">Počasie</p>
-            <h3>Prehľad sa teraz nepodarilo načítať</h3>
-            <p class="home-weather-box__loading">Skús to o chvíľu znova. Základ appky tým ostal v poriadku.</p>
-          </div>
-        </div>
-      `;
+      detailContent.innerHTML = renderWeatherOverviewErrorMarkup();
+      bindWeatherOverviewModalControls(detailContent);
       return;
     }
 
     detailContent.innerHTML = renderWeatherOverviewContent(snapshot, overview);
     bindWeatherOverviewModalControls(detailContent);
   }).catch(() => {
-    detailContent.innerHTML = `
-      <div class="detail-layout detail-layout--compact">
-        <div class="detail-copy detail-copy--wide weather-overview" data-weather-overview-modal>
-          <p class="eyebrow">Počasie</p>
-          <h3>Prehľad sa teraz nepodarilo načítať</h3>
-          <p class="home-weather-box__loading">Skús to o chvíľu znova. Základ appky tým ostal v poriadku.</p>
-        </div>
-      </div>
-    `;
+    detailContent.innerHTML = renderWeatherOverviewErrorMarkup();
+    bindWeatherOverviewModalControls(detailContent);
   });
 }
 

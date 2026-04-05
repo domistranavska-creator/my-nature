@@ -2630,13 +2630,18 @@ select {
 }
 
 .mood-picker__option.is-selected {
-  border-color: rgba(95, 134, 48, 0.38);
+  border-color: rgba(89, 144, 43, 0.54);
   background:
-    radial-gradient(circle at top, rgba(255, 244, 205, 0.86), transparent 52%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(237, 233, 214, 0.96));
+    radial-gradient(circle at top, rgba(240, 255, 214, 0.92), transparent 54%),
+    linear-gradient(180deg, rgba(245, 255, 233, 0.99), rgba(214, 235, 182, 0.97));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 14px 22px rgba(86, 114, 50, 0.12);
+    0 14px 22px rgba(86, 138, 44, 0.18),
+    0 0 0 1px rgba(126, 176, 72, 0.18);
+}
+
+.mood-picker__option.is-selected .mood-picker__emoji {
+  transform: scale(1.08);
 }
 
 .mood-picker__emoji {
@@ -3069,6 +3074,34 @@ select {
     inset 0 1px 0 rgba(255, 255, 255, 0.98),
     0 8px 16px rgba(55, 47, 31, 0.05);
   font-size: 0.98rem;
+}
+
+.journal-mood-badge-render {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.journal-mood-badge-render__emoji {
+  line-height: 1;
+}
+
+.journal-mood-badge-render__more {
+  line-height: 1;
+  font-size: 0.54rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-preview-card__mood.journal-mood-badge--multi,
+.journal-mood-badge.journal-mood-badge--multi,
+.journal-overlay-card__mood.journal-mood-badge--multi {
+  width: auto;
+  min-width: 30px;
+  padding-inline: 6px;
+  gap: 2px;
 }
 
 .sidebar-preview-card__meta {
@@ -3657,6 +3690,23 @@ select {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.94),
     0 4px 10px rgba(77, 63, 38, 0.05);
+}
+
+.journal-weather--single-line {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.journal-weather__pill--summary {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.journal-weather__summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .journal-weather__item {
@@ -4959,6 +5009,11 @@ select {
   font-size: 1.02rem;
 }
 
+.journal-overlay-card__mood.journal-mood-badge--multi {
+  min-width: 36px;
+  padding-inline: 8px;
+}
+
 .journal-overlay-card__actions {
   display: flex;
   gap: 8px;
@@ -5120,7 +5175,7 @@ select {
 .journal-walk-gps__head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
   align-items: start;
 }
 
@@ -5131,11 +5186,20 @@ select {
   line-height: 1.35;
 }
 
+.journal-walk-gps__hint--compact {
+  margin-top: 0;
+  max-width: 34ch;
+}
+
 .journal-walk-gps__actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.journal-walk-gps__actions--single {
+  width: 100%;
 }
 
 .journal-walk-gps__button.button {
@@ -5153,12 +5217,30 @@ select {
   min-width: 156px;
 }
 
+.journal-walk-gps__button--toggle.button {
+  width: 100%;
+  min-width: 0;
+}
+
 .journal-walk-gps__button--start.button span[aria-hidden="true"],
 .journal-walk-gps__button--pause.button span[aria-hidden="true"],
 .journal-walk-gps__button--resume.button span[aria-hidden="true"],
-.journal-walk-gps__button--stop.button span[aria-hidden="true"] {
+.journal-walk-gps__button--stop.button span[aria-hidden="true"],
+.journal-walk-gps__button--toggle.button span[aria-hidden="true"] {
   font-size: 1rem;
   line-height: 1;
+}
+
+.journal-walk-gps__button--toggle.button[data-state="live"] {
+  color: #ffffff;
+  border-color: rgba(146, 89, 64, 0.3);
+  background: linear-gradient(180deg, #ba7452, #9f5f40);
+}
+
+.journal-walk-gps__button--toggle.button[data-state="paused"] {
+  color: #ffffff;
+  border-color: rgba(82, 129, 158, 0.24);
+  background: linear-gradient(180deg, #6f9dbc, #4e7b99);
 }
 
 .journal-walk-gps__button--pause.button {
@@ -5183,6 +5265,10 @@ select {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.journal-walk-gps__auto--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .journal-walk-gps__auto-card {
@@ -7450,7 +7536,37 @@ select {
   display: flex;
   justify-content: flex-end;
   align-items: flex-start;
+  gap: 10px;
   flex: 0 0 auto;
+}
+
+.category-panel__journal-shortcut,
+.detail-modal--card-view .card-view-journal-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(185, 191, 166, 0.34);
+  background: rgba(255, 251, 243, 0.94);
+  color: #50623d;
+  box-shadow: 0 10px 22px rgba(66, 84, 72, 0.08);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.category-panel__journal-shortcut:hover,
+.category-panel__journal-shortcut:focus-visible,
+.detail-modal--card-view .card-view-journal-shortcut:hover,
+.detail-modal--card-view .card-view-journal-shortcut:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(126, 159, 75, 0.42);
+  background: rgba(252, 248, 238, 0.98);
+  color: #40542f;
 }
 
 .category-panel__hero-tag {
@@ -18050,7 +18166,7 @@ body.app-mobile-shell .journal-walk-gps {
 body.app-mobile-shell .journal-walk-gps__head {
   display: grid !important;
   grid-template-columns: 1fr !important;
-  gap: 12px !important;
+  gap: 8px !important;
 }
 
 body.app-mobile-shell .journal-walk-gps__head > div:first-child {
@@ -18060,12 +18176,14 @@ body.app-mobile-shell .journal-walk-gps__head > div:first-child {
 body.app-mobile-shell .journal-walk-gps__hint {
   max-width: none !important;
   white-space: normal !important;
+  font-size: 0.82rem !important;
+  line-height: 1.28 !important;
 }
 
 body.app-mobile-shell .journal-walk-gps__actions {
   display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 10px !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
   width: 100% !important;
   justify-content: stretch !important;
 }
@@ -18084,8 +18202,8 @@ body.app-mobile-shell .journal-walk-gps__button--start.button {
 }
 
 body.app-mobile-shell .journal-walk-gps__auto {
-  grid-template-columns: 1fr !important;
-  gap: 10px !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
 }
 
 body.app-mobile-shell .journal-walk-gps__auto-card {
@@ -18630,8 +18748,8 @@ body.app-mobile-shell .journal-walk-gps__button--start.button {
 }
 
 body.app-mobile-shell .journal-walk-gps__auto-card {
-  min-height: 84px !important;
-  padding: 12px 12px !important;
+  min-height: 74px !important;
+  padding: 10px 12px !important;
   border-color: rgba(136, 120, 90, 0.18) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.96),
@@ -18649,9 +18767,11 @@ body.app-mobile-shell .journal-walk-gps__auto-card strong {
 }
 
 body.app-mobile-shell .journal-walk-gps__status {
-  padding: 10px 12px !important;
+  padding: 8px 12px !important;
   border-radius: 16px !important;
   background: rgba(255, 252, 245, 0.78) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.28 !important;
 }
 
 body.app-mobile-shell .journal-walk-gps__summary,
@@ -20288,7 +20408,7 @@ body.app-mobile-shell .detail-modal--weather .weather-hero,
 body.app-mobile-shell .detail-modal--weather .weather-hero--compact {
   width: calc(100% + 24px) !important;
   margin-inline: -12px !important;
-  border-radius: 0 0 24px 24px !important;
+  border-radius: 24px !important;
   grid-template-columns: 84px minmax(0, 1fr) !important;
   padding: 8px 10px 10px !important;
 }
@@ -29734,8 +29854,8 @@ body.app-mobile-shell.app-focused-mode .category-panel--summary {
     0 10px 26px rgba(45, 37, 25, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.44),
     inset 0 0 0 1px rgba(130, 111, 84, 0.04) !important;
-  backdrop-filter: blur(14px) saturate(118%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  backdrop-filter: blur(8px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(118%) !important;
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
@@ -30277,16 +30397,28 @@ body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-top {
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__meta--journal {
-  padding-right: 38px !important;
+  padding-right: 44px !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__mood {
   position: absolute !important;
-  top: -2px !important;
+  top: 0 !important;
   right: 0 !important;
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 11px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 58px !important;
+  height: auto !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  font-size: 1rem !important;
+  gap: 2px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__mood .journal-mood-badge-render__more {
+  color: #8a9094 !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__title--journal,
@@ -31498,6 +31630,34 @@ body.app-mobile-shell .journal-overlay-card .journal-item__action {
   -webkit-backdrop-filter: blur(14px) saturate(134%) !important;
 }
 
+body.app-mobile-shell .journal-overlay-card__mood.journal-mood-badge--multi {
+  width: auto !important;
+  min-width: 36px !important;
+  max-width: 64px !important;
+  padding-inline: 7px !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__mood {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: auto !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__mood.journal-mood-badge--multi {
+  min-width: 0 !important;
+  max-width: none !important;
+  padding-inline: 0 !important;
+  gap: 2px !important;
+}
+
 body.app-mobile-shell .journal-overlay-card .journal-item__action {
   width: 42px !important;
   height: 42px !important;
@@ -31664,8 +31824,8 @@ body.app-mobile-shell .journal-tag-filter {
   border: 1px solid rgba(255, 255, 255, 0.28) !important;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(247, 242, 233, 0.18)) !important;
   box-shadow: none !important;
-  backdrop-filter: blur(10px) saturate(122%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(122%) !important;
+  backdrop-filter: blur(6px) saturate(122%) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(122%) !important;
 }
 
 body.app-mobile-shell .detail-modal--settings .settings-panel,
@@ -32371,16 +32531,16 @@ body.app-mobile-shell .journal-overlay-shell .journal-quick-actions__chips::-web
 
 body.app-mobile-shell .journal-overlay-root {
   background: linear-gradient(180deg, rgba(20, 25, 19, 0.16), rgba(20, 25, 19, 0.26)) !important;
-  backdrop-filter: blur(22px) saturate(145%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(145%) !important;
+  backdrop-filter: blur(14px) saturate(145%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(145%) !important;
 }
 
 body.app-mobile-shell .detail-modal__content,
 body.app-mobile-shell .journal-overlay-shell {
   background: linear-gradient(180deg, rgba(250, 247, 241, 0.97), rgba(244, 238, 229, 0.95)) !important;
   border-color: rgba(255, 255, 255, 0.44) !important;
-  backdrop-filter: blur(26px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(26px) saturate(150%) !important;
+  backdrop-filter: blur(16px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(150%) !important;
 }
 
 body.app-mobile-shell .detail-modal--worklog .detail-modal__content {
@@ -32732,6 +32892,32 @@ body.app-mobile-shell .relation-disclosure__content {
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .field-block--relation-simple,
+body.app-mobile-shell .journal-overlay-shell .field-block--relation-simple > .field-block {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .relation-simple-select {
+  min-height: 232px !important;
+  width: 100% !important;
+  padding: 0 !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(214, 223, 234, 0.98) !important;
+  box-shadow: none !important;
+  color: #334155 !important;
+  appearance: auto !important;
+  -webkit-appearance: listbox !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .relation-simple-select option {
+  padding: 8px 10px !important;
+  line-height: 1.34 !important;
 }
 
 body.app-mobile-shell .category-tree-picker--mobile .category-tree-picker__panel {
@@ -33661,6 +33847,10 @@ body.app-mobile-shell .toolbar-add-menu__panel {
   z-index: 430 !important;
 }
 
+body.app-mobile-shell .toolbar-add-menu:not([open]) > .toolbar-add-menu__panel {
+  display: none !important;
+}
+
 body.app-mobile-shell .toolbar-add-submenu__panel {
   display: grid !important;
   gap: 8px !important;
@@ -33726,9 +33916,20 @@ body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-submenu__panel {
 }
 
 /* Mobile add menu overlay mode:
-   open the quick-add panel as a true top overlay above category cards. */
+   open the quick-add panel as a true bottom sheet above category cards. */
 body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-menu[open] {
   z-index: 5200 !important;
+}
+
+@keyframes mobile-toolbar-add-sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 body.app-mobile-shell:has(#toolbar-add-menu[open])::after {
@@ -33744,16 +33945,23 @@ body.app-mobile-shell:has(#toolbar-add-menu[open])::after {
 
 body.app-mobile-shell:has(#toolbar-add-menu[open]) .toolbar-add-menu[open] .toolbar-add-menu__panel {
   position: fixed !important;
-  top: calc(env(safe-area-inset-top) + 96px) !important;
-  left: 12px !important;
-  right: 12px !important;
-  width: auto !important;
+  top: auto !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+  width: min(calc(100vw - 24px), 560px) !important;
   min-width: 0 !important;
-  max-width: none !important;
-  max-height: min(54dvh, calc(100dvh - 120px - env(safe-area-inset-bottom))) !important;
+  max-width: min(calc(100vw - 24px), 560px) !important;
+  max-height: min(52dvh, calc(100dvh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom))) !important;
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
   -webkit-overflow-scrolling: touch !important;
+  margin: 0 !important;
+  padding: 12px !important;
+  border-radius: 28px !important;
+  transform: translateX(-50%) translateY(0) !important;
+  transform-origin: bottom center !important;
+  animation: mobile-toolbar-add-sheet-rise 220ms cubic-bezier(0.22, 1, 0.36, 1) !important;
   background: linear-gradient(180deg, rgba(255, 252, 246, 1), rgba(247, 241, 232, 0.995)) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -33779,21 +33987,22 @@ body.app-mobile-shell.app-toolbar-add-overlay-open::after {
 
 body.app-mobile-shell.app-toolbar-add-overlay-open #toolbar-add-menu-overlay-host .toolbar-add-menu__panel {
   position: absolute !important;
-  top: var(--toolbar-add-overlay-top, calc(env(safe-area-inset-top) + 96px)) !important;
-  left: 12px !important;
-  right: 12px !important;
-  width: auto !important;
+  top: auto !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+  width: min(calc(100vw - 24px), 560px) !important;
   min-width: 0 !important;
-  max-width: none !important;
-  max-height: min(54dvh, calc(100dvh - 120px - env(safe-area-inset-bottom))) !important;
+  max-width: min(calc(100vw - 24px), 560px) !important;
+  max-height: min(52dvh, calc(100dvh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom))) !important;
   margin: 0 !important;
-  padding: 10px !important;
+  padding: 12px !important;
   display: grid !important;
   gap: 10px !important;
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
   -webkit-overflow-scrolling: touch !important;
-  border-radius: 24px !important;
+  border-radius: 28px !important;
   border: 1px solid rgba(182, 197, 214, 0.92) !important;
   background: rgba(255, 255, 255, 0.99) !important;
   box-shadow: 0 22px 42px rgba(21, 35, 56, 0.14) !important;
@@ -33802,6 +34011,9 @@ body.app-mobile-shell.app-toolbar-add-overlay-open #toolbar-add-menu-overlay-hos
   opacity: 1 !important;
   pointer-events: auto !important;
   isolation: isolate !important;
+  transform: translateX(-50%) translateY(0) !important;
+  transform-origin: bottom center !important;
+  animation: mobile-toolbar-add-sheet-rise 220ms cubic-bezier(0.22, 1, 0.36, 1) !important;
   z-index: 6210 !important;
 }
 
@@ -34118,6 +34330,35 @@ body.app-mobile-shell .photo-quick-sheet {
   gap: 14px !important;
 }
 
+body.app-mobile-shell .detail-modal--photo-quick .detail-modal__back {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .detail-layout--photo-quick-layout {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__intro {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 14px 16px !important;
+  border-radius: 22px !important;
+  border: 1px solid var(--mobile-modal-border) !important;
+  background: var(--mobile-modal-surface-soft) !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__intro .eyebrow {
+  margin: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__intro > p:last-child {
+  margin: 0 !important;
+  color: rgba(93, 99, 83, 0.92) !important;
+  text-align: center !important;
+}
+
 body.app-mobile-shell .photo-quick-sheet__headline-copy p {
   margin: 6px 0 0 !important;
   color: rgba(93, 99, 83, 0.92) !important;
@@ -34147,6 +34388,47 @@ body.app-mobile-shell .photo-quick-sheet__media img {
   min-height: 240px !important;
   object-fit: cover !important;
   object-position: center !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__media-shell {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__preview-list {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__preview-list[hidden] {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__preview-list .journal-form__image {
+  min-width: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__preview-list .journal-form__image img,
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__preview-list .journal-form__image video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__upload {
+  padding: 12px 14px !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__upload .upload-field__mobile-actions {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__upload .upload-field__mobile-button {
+  min-height: 40px !important;
 }
 
 body.app-mobile-shell .photo-quick-sheet__weather {
@@ -34195,6 +34477,25 @@ body.app-mobile-shell .photo-quick-sheet__weather-copy span {
 body.app-mobile-shell .photo-quick-sheet__core {
   display: grid !important;
   gap: 12px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__type {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__field {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .photo-quick-sheet__field > span {
+  margin: 0 !important;
+  color: #6b7d90 !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
 }
 
 body.app-mobile-shell .photo-quick-sheet__field textarea {
@@ -34816,8 +35117,7 @@ body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
 
 body.app-mobile-shell .detail-modal__back,
 body.app-mobile-shell .journal-overlay-shell__back,
-body.app-mobile-shell .image-lightbox__back,
-body.app-mobile-shell .back-button {
+body.app-mobile-shell .image-lightbox__back {
   position: fixed !important;
   top: calc(10px + env(safe-area-inset-top)) !important;
   left: 12px !important;
@@ -36122,10 +36422,7 @@ body.app-mobile-shell .detail-modal--worklog .detail-copy--wide,
 body.app-mobile-shell .detail-modal--batch .detail-copy--wide,
 body.app-mobile-shell .detail-modal--editor .detail-copy--wide,
 body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  padding: 16px !important;
+  padding: 14px !important;
 }
 
 body.app-mobile-shell .detail-modal--settings .settings-grid {
@@ -36553,6 +36850,10 @@ body.app-mobile-shell .detail-modal--editor .upload-field--editor-media input[ty
 
 body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media {
   gap: 10px !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined .upload-field__mobile-actions {
+  grid-template-columns: minmax(0, 1fr) !important;
 }
 
 body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media input[type="file"] {
@@ -38475,6 +38776,21 @@ body.app-mobile-shell.app-focused-mode .category-panel__title-row {
   gap: 6px !important;
 }
 
+body.app-mobile-shell .category-panel__hero-side,
+body.app-mobile-shell.app-focused-mode .category-panel__hero-side {
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .category-panel__journal-shortcut,
+body.app-mobile-shell.app-focused-mode .category-panel__journal-shortcut {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  font-size: 0.95rem !important;
+}
+
 body.app-mobile-shell .category-panel__notes,
 body.app-mobile-shell.app-focused-mode .category-panel__notes {
   font-size: 0.84rem !important;
@@ -39036,6 +39352,1032 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
   line-height: 1.18 !important;
 }
 
+/* Mobile back button recovery:
+   keep modal back controls inside their own sheets and stop generic Back buttons
+   from floating under the top chrome. */
+body.app-mobile-shell .detail-modal__back,
+body.app-mobile-shell .image-lightbox__back {
+  display: inline-flex !important;
+  position: absolute !important;
+  top: calc(14px + env(safe-area-inset-top)) !important;
+  left: 14px !important;
+  z-index: 9500 !important;
+}
+
+body.app-mobile-shell .category-shell__back,
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__back,
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-switch__back {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  z-index: auto !important;
+}
+
+/* Mobile modal tint alignment:
+   keep the existing working layout/back behavior and only align shell color + rounding closer to the journal. */
+body.app-mobile-shell .detail-modal--editor .detail-modal__content,
+body.app-mobile-shell .detail-modal--settings .detail-modal__content,
+body.app-mobile-shell .detail-modal--overview .detail-modal__content,
+body.app-mobile-shell .detail-modal--weather .detail-modal__content,
+body.app-mobile-shell .detail-modal--batch .detail-modal__content,
+body.app-mobile-shell .detail-modal--worklog .detail-modal__content,
+body.app-mobile-shell .detail-modal--card-view .detail-modal__content,
+body.app-mobile-shell .detail-modal--photo-quick .detail-modal__content {
+  border-radius: 30px !important;
+  border: 1px solid rgba(226, 235, 245, 0.98) !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.16) !important;
+  color: #243246 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-hero,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--settings .settings-panel__storage-meta,
+body.app-mobile-shell .detail-modal--settings .settings-panel__status,
+body.app-mobile-shell .detail-modal--settings .settings-panel__account-grid > *,
+body.app-mobile-shell .detail-modal--worklog .worklog-section,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager__selection-card,
+body.app-mobile-shell .detail-modal--overview .overview-group,
+body.app-mobile-shell .detail-modal--weather .weather-overview__hero,
+body.app-mobile-shell .detail-modal--weather .weather-overview__external,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group,
+body.app-mobile-shell .detail-modal--weather .weather-alert,
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__intro {
+  border-radius: 22px !important;
+  border: 1px solid rgba(218, 229, 241, 0.98) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal__content h2,
+body.app-mobile-shell .detail-modal__content h3 {
+  color: #243246 !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Mobile add-card modal parity:
+   keep the add-card editor on the same shell size as the diary and use a two-row mobile header like photo quick. */
+body.app-mobile-shell .detail-modal--editor-topline .detail-modal__content {
+  width: min(100%, 560px) !important;
+  max-width: min(100%, 560px) !important;
+  max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  margin: 0 auto !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  padding: 16px 16px calc(156px + env(safe-area-inset-bottom)) !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-modal__content > .detail-layout--editor {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  margin: 0 0 6px !important;
+  padding: calc(4px + env(safe-area-inset-top)) 0 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar__row {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: 42px !important;
+  margin: 0 0 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar .journal-overlay-shell__back {
+  position: absolute !important;
+  left: 0 !important;
+  top: calc(4px + env(safe-area-inset-top)) !important;
+  z-index: 3 !important;
+  pointer-events: auto !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar__actions {
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  z-index: 3 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar__submit {
+  position: static !important;
+  right: auto !important;
+  top: auto !important;
+  transform: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: 0 0 auto !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(29, 45, 78, 0.34) !important;
+  background: linear-gradient(180deg, #243858, #1a2944) !important;
+  color: #fbfdff !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar__submit::before {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar .detail-editor-mobile-switch {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar .detail-editor-mobile-switch::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar .detail-editor-mobile-switch .entry-mode-switch--topbar {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar .detail-editor-mobile-switch .entry-mode-switch__button {
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-editor-mobile-topbar .detail-editor-mobile-switch .entry-mode-switch__button-icon {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 0.94rem !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-form__lead-action {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-copy__headline {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-form--editor {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-layout,
+body.app-mobile-shell .detail-modal--editor-topline .detail-layout--editor,
+body.app-mobile-shell .detail-modal--editor-topline .detail-copy--editor,
+body.app-mobile-shell .detail-modal--editor-topline .detail-copy__headline,
+body.app-mobile-shell .detail-modal--editor-topline .detail-grid,
+body.app-mobile-shell .detail-modal--editor-topline .detail-top-row,
+body.app-mobile-shell .detail-modal--editor-topline .status-date-row,
+body.app-mobile-shell .detail-modal--editor-topline .field-block__inline-pair,
+body.app-mobile-shell .detail-modal--editor-topline .editor-gallery,
+body.app-mobile-shell .detail-modal--editor-topline .danger-zone {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .field-block,
+body.app-mobile-shell .detail-modal--editor-topline .status-date-row__field,
+body.app-mobile-shell .detail-modal--editor-topline .field-block__subfield,
+body.app-mobile-shell .detail-modal--editor-topline .upload-field--compact,
+body.app-mobile-shell .detail-modal--editor-topline .relation-disclosure,
+body.app-mobile-shell .detail-modal--editor-topline .entry-advanced {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .field-block--relation-simple,
+body.app-mobile-shell .detail-modal--editor-topline .field-block--relation-simple > .field-block {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .relation-simple-select {
+  min-height: 232px !important;
+  width: 100% !important;
+  padding: 0 !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(214, 223, 234, 0.98) !important;
+  box-shadow: none !important;
+  color: #334155 !important;
+  appearance: auto !important;
+  -webkit-appearance: listbox !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .relation-simple-select option {
+  padding: 8px 10px !important;
+  line-height: 1.34 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .choice-group.choice-group--flags {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .choice-group.choice-group--flags .choice-chip {
+  width: 100% !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .choice-group.choice-group--flags .choice-chip span {
+  width: 100% !important;
+  min-width: 0 !important;
+  justify-content: center !important;
+  text-align: center !important;
+  white-space: normal !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .choice-group.choice-group--flags .choice-chip:last-child:nth-child(odd) {
+  grid-column: 1 / -1 !important;
+  width: calc(50% - 5px) !important;
+  justify-self: center !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-tools > span {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-tools__actions {
+  margin-top: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-tools__actions .button {
+  min-height: 36px !important;
+  padding-inline: 12px !important;
+  font-size: 0.78rem !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-tools__status {
+  margin: 8px 0 0 !important;
+  padding: 8px 10px !important;
+  border-radius: 14px !important;
+  font-size: 0.8rem !important;
+  line-height: 1.28 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker {
+  gap: 8px !important;
+  margin-top: 8px !important;
+  padding: 10px !important;
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__search {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__search > span {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__search input {
+  min-height: 40px !important;
+  padding: 0 12px !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__list {
+  gap: 6px !important;
+  max-height: 168px !important;
+  padding-right: 2px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__empty {
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  font-size: 0.82rem !important;
+  line-height: 1.3 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__item {
+  gap: 10px !important;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__item-main strong {
+  font-size: 0.9rem !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__item-main span {
+  font-size: 0.78rem !important;
+  line-height: 1.24 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .bird-ebird-picker__badge {
+  min-height: 28px !important;
+  padding: 0 9px !important;
+  font-size: 0.68rem !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-top-row {
+  grid-template-columns: minmax(0, 1fr) 56px !important;
+  gap: 10px !important;
+  align-items: end !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-top-row__name {
+  grid-column: 1 / 2 !important;
+  margin-bottom: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-top-row__f1 {
+  grid-column: 2 / 3 !important;
+  justify-self: end !important;
+  align-self: center !important;
+  margin-top: 24px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor-topline .detail-top-row__category {
+  grid-column: 1 / -1 !important;
+  min-width: 0 !important;
+  align-self: end !important;
+}
+
+/* Mobile settings modal parity:
+   use the same compact shell and centered topbar pattern as the diary/weather reference. */
+body.app-mobile-shell .detail-modal--category .detail-modal__content,
+body.app-mobile-shell .detail-modal--batch .detail-modal__content {
+  width: min(100%, 560px) !important;
+  max-width: min(100%, 560px) !important;
+  max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  margin: 0 auto !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  padding: 16px 16px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--category .detail-layout--compact,
+body.app-mobile-shell .detail-modal--batch .detail-layout--compact {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--category .detail-copy--editor,
+body.app-mobile-shell .detail-modal--batch .detail-copy--editor {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 0 2px calc(124px + env(safe-area-inset-bottom)) !important;
+  gap: 10px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--category .detail-modal__back,
+body.app-mobile-shell .detail-modal--batch .detail-modal__back {
+  display: none !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  min-height: 42px !important;
+  margin: 0 0 6px !important;
+  padding: calc(4px + env(safe-area-inset-top)) 0 0 !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar .journal-overlay-shell__back {
+  position: absolute !important;
+  left: 0 !important;
+  top: calc(4px + env(safe-area-inset-top)) !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar__main {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar__titleline {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 44px !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar__titleline > h3 {
+  margin: 0 !important;
+  width: 100% !important;
+  text-align: center !important;
+  font-size: clamp(1.4rem, 6.6vw, 1.72rem) !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+  color: #243246 !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar__actions {
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar__submit {
+  position: static !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(29, 45, 78, 0.34) !important;
+  background: linear-gradient(180deg, #243858, #1a2944) !important;
+  color: #fbfdff !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar__submit::before {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--category .mobile-compact-modal-topbar__titleline > h3,
+body.app-mobile-shell .detail-modal--batch .mobile-compact-modal-topbar__titleline > h3 {
+  font-size: clamp(1.18rem, 5.2vw, 1.42rem) !important;
+  line-height: 1.08 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog-manager .detail-modal__content {
+  width: min(100%, 560px) !important;
+  max-width: min(100%, 560px) !important;
+  max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  margin: 0 auto !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  padding: 16px 16px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog-manager .detail-modal__back {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog-manager .detail-layout--worklog {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog-manager .worklog-manager.detail-copy--wide {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 0 2px calc(124px + env(safe-area-inset-bottom)) !important;
+  gap: 10px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog-manager .mobile-compact-modal-topbar__titleline > h3 {
+  font-size: clamp(1.18rem, 5.2vw, 1.42rem) !important;
+  line-height: 1.08 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog-manager .mobile-compact-modal-topbar__actions {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog-manager #open-add-task-from-worklog {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(92, 130, 37, 0.36) !important;
+  background: linear-gradient(180deg, #8fc74b, #6ea431) !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  font-size: 1.26rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  text-indent: 0 !important;
+  letter-spacing: 0 !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell .detail-modal--category .detail-form--editor,
+body.app-mobile-shell .detail-modal--category .detail-grid,
+body.app-mobile-shell .detail-modal--category .category-manager__grid,
+body.app-mobile-shell .detail-modal--category .category-manager__field,
+body.app-mobile-shell .detail-modal--category .category-manager__preview-field,
+body.app-mobile-shell .detail-modal--category .category-manager__preview-shell,
+body.app-mobile-shell .detail-modal--category .danger-zone,
+body.app-mobile-shell .detail-modal--batch .detail-form--editor,
+body.app-mobile-shell .detail-modal--batch .detail-grid,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager__filters,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager__filter,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager__selection-card,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager__selection-head {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--batch #batch-move-summary + .batch-sowing__toolbar.batch-sowing__toolbar--double {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--batch #batch-move-summary + .batch-sowing__toolbar.batch-sowing__toolbar--double .button {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+body.app-mobile-shell .detail-modal--batch #batch-sowing-summary + .batch-sowing__toolbar.batch-sowing__toolbar--triple {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--batch #batch-sowing-summary + .batch-sowing__toolbar.batch-sowing__toolbar--triple .button {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+body.app-mobile-shell .detail-modal--batch #batch-sowing-summary + .batch-sowing__toolbar.batch-sowing__toolbar--triple .button:last-child:nth-child(odd) {
+  grid-column: 1 / -1 !important;
+  width: calc(50% - 5px) !important;
+  justify-self: center !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .detail-modal__content {
+  width: min(100%, 560px) !important;
+  max-width: min(100%, 560px) !important;
+  max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  margin: 0 auto !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  padding: 16px 16px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-sheet {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 2px calc(124px + env(safe-area-inset-bottom)) !important;
+  gap: 10px !important;
+  background: transparent !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-grid {
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .detail-modal__back {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-topbar-shell {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  min-height: 42px !important;
+  margin: 0 0 6px !important;
+  padding: calc(4px + env(safe-area-inset-top)) 0 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .detail-modal__content > .settings-topbar-shell {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-topbar-shell .journal-overlay-shell__back {
+  position: absolute !important;
+  left: 0 !important;
+  top: calc(4px + env(safe-area-inset-top)) !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-topbar-shell .journal-overlay-shell__topline-main {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-topbar-shell .journal-overlay-list-topbar {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 44px !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-topbar-shell .journal-overlay-list-topbar > h3,
+body.app-mobile-shell .detail-modal--settings #settings-modal-title {
+  margin: 0 !important;
+  width: 100% !important;
+  text-align: center !important;
+  font-size: clamp(1.4rem, 6.6vw, 1.72rem) !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+  color: #243246 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-topbar__spacer {
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  font-size: 1.38rem !important;
+  line-height: 1 !important;
+  z-index: 2 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Mobile photo quick modal parity:
+   keep the camera quick sheet on the same back/title pattern as the diary. */
+body.app-mobile-shell .detail-modal--photo-quick .detail-modal__content {
+  width: min(100%, 560px) !important;
+  max-width: min(100%, 560px) !important;
+  max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  margin: 0 auto !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  padding: 16px 16px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .detail-modal__content > .detail-layout--photo-quick-layout {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 0 2px calc(124px + env(safe-area-inset-bottom)) !important;
+  gap: 10px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__form {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__intro {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .detail-editor-mobile-switch,
+body.app-mobile-shell .detail-modal--photo-quick .journal-quick-actions--topbar {
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .detail-editor-mobile-switch::after,
+body.app-mobile-shell .detail-modal--photo-quick .journal-quick-actions--topbar.detail-editor-mobile-switch::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .detail-editor-mobile-switch .entry-mode-switch--topbar,
+body.app-mobile-shell .detail-modal--photo-quick .journal-quick-actions--topbar .journal-quick-actions__chips {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__topbar {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  min-height: 42px !important;
+  margin: 0 0 6px !important;
+  padding: calc(4px + env(safe-area-inset-top)) 0 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__topbar .journal-overlay-shell__topline-main {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__topbar .journal-overlay-list-topbar {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 44px !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__topbar .journal-overlay-list-topbar > h3,
+body.app-mobile-shell .detail-modal--photo-quick #quick-photo-entry-title {
+  margin: 0 !important;
+  width: 100% !important;
+  text-align: center !important;
+  font-size: clamp(1.18rem, 5.2vw, 1.42rem) !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+  color: #243246 !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__topbar .photo-quick-sheet__back {
+  position: absolute !important;
+  left: 0 !important;
+  top: calc(4px + env(safe-area-inset-top)) !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__topbar .photo-quick-sheet__topbar-actions {
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__topbar .photo-quick-sheet__save {
+  position: static !important;
+  right: auto !important;
+  top: auto !important;
+  transform: none !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+  z-index: 2 !important;
+}
+
+/* Mobile weather modal parity:
+   keep weather on the same shell size as the diary and pin Back safely on this one view. */
+body.app-mobile-shell .detail-modal--weather .detail-modal__content {
+  width: min(100%, 560px) !important;
+  max-width: min(100%, 560px) !important;
+  max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  margin: 0 auto !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  padding: 16px 16px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview.detail-copy--wide {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 2px calc(124px + env(safe-area-inset-bottom)) !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .detail-modal__back {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__topbar-shell {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  min-height: 42px !important;
+  margin: 0 0 6px !important;
+  padding: calc(4px + env(safe-area-inset-top)) 0 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .detail-modal__content > .weather-overview__topbar-shell {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__topbar-shell .journal-overlay-shell__back {
+  position: absolute !important;
+  left: 0 !important;
+  top: calc(4px + env(safe-area-inset-top)) !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__topbar-shell .journal-overlay-shell__topline-main {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__topbar-shell .journal-overlay-list-topbar {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 44px !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__topbar-shell .journal-overlay-list-topbar > h3,
+body.app-mobile-shell .detail-modal--weather #weather-overview-title {
+  margin: 0 !important;
+  width: 100% !important;
+  text-align: center !important;
+  font-size: clamp(1.4rem, 6.6vw, 1.72rem) !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+  color: #243246 !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__topbar-spacer {
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  font-size: 1.38rem !important;
+  line-height: 1 !important;
+  z-index: 2 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview > h3 {
+  padding: 0 14px !important;
+}
+
 /* Final mobile root category hard lock:
    hlavne kategorie musia byt natvrdo identicke s podradenymi. */
 body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card {
@@ -39450,6 +40792,39 @@ body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group {
   padding: 10px !important;
 }
 
+/* V mobile weather modale nechame hero aj tyzdenny blok priamo na modrom podklade bez bielych obalov. */
+body.app-mobile-shell .detail-modal--weather .weather-overview__hero,
+body.app-mobile-shell .detail-modal--weather .weather-overview > .overview-group:last-of-type,
+body.app-mobile-shell .detail-modal--weather .weather-week-card,
+body.app-mobile-shell .detail-modal--weather .weather-day-card {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Aj weather alert sekcia ostane bez bielej obalky a bez oramovania samotnej karty. */
+body.app-mobile-shell .detail-modal--weather .weather-overview__alerts,
+body.app-mobile-shell .detail-modal--weather .weather-alert {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__alerts,
+body.app-mobile-shell .detail-modal--weather .weather-alert {
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--weather .weather-overview__alerts .overview-group__count {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 body.app-mobile-shell .weather-overview__hero-days {
   gap: 6px !important;
 }
@@ -39552,34 +40927,43 @@ body.app-mobile-shell .weather-week-row__flags {
    preview denníka nech je bližšie appkovému listu s médiom, nie len suché textové boxy. */
 body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile {
   gap: 0 !important;
-  padding: 12px !important;
-  border-radius: 20px !important;
-  background:
-    radial-gradient(circle at top right, rgba(244, 249, 235, 0.32), transparent 34%),
-    linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(243, 238, 228, 0.9)) !important;
+  padding: 10px 12px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(220, 224, 228, 0.98) !important;
+  background: rgba(247, 248, 249, 0.98) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile[data-open-journal-sidebar-entry] {
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile[data-open-journal-sidebar-entry]:focus-visible {
+  outline: 2px solid rgba(123, 160, 76, 0.34) !important;
+  outline-offset: 2px !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-mobile-shell {
   display: grid !important;
-  gap: 12px !important;
-  align-items: start !important;
+  gap: 8px !important;
+  align-items: center !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile-media .sidebar-preview-card__journal-mobile-shell {
-  grid-template-columns: 92px minmax(0, 1fr) !important;
+  grid-template-columns: 84px minmax(0, 1fr) !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-media {
-  width: 92px !important;
-  min-width: 92px !important;
-  aspect-ratio: 0.86 !important;
-  border-radius: 18px !important;
+  width: 84px !important;
+  min-width: 84px !important;
+  height: 60px !important;
+  aspect-ratio: auto !important;
+  border-radius: 10px !important;
   overflow: hidden !important;
-  background: rgba(241, 244, 235, 0.94) !important;
-  border: 1px solid rgba(214, 206, 191, 0.86) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 8px 18px rgba(45, 37, 25, 0.06) !important;
+  background: #eef1f3 !important;
+  border: 1px solid rgba(221, 225, 228, 0.96) !important;
+  box-shadow: none !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-media img {
@@ -39587,13 +40971,14 @@ body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-media img {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
+  object-position: center !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-mobile-main {
   display: grid !important;
-  gap: 6px !important;
+  gap: 4px !important;
   min-width: 0 !important;
-  align-content: start !important;
+  align-content: center !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__journal-top {
@@ -39607,24 +40992,31 @@ body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sid
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__meta--journal {
   padding-right: 0 !important;
-  font-size: 0.72rem !important;
+  font-size: 0.74rem !important;
   line-height: 1.18 !important;
-  letter-spacing: 0.08em !important;
-  color: #708062 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: #8a9094 !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__mood {
   position: static !important;
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 10px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
   margin-left: auto !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__title--journal {
   margin: 0 !important;
-  font-size: 1.06rem !important;
+  font-size: 0.98rem !important;
   line-height: 1.14 !important;
+  color: #2f3437 !important;
   -webkit-line-clamp: 2 !important;
 }
 
@@ -39637,27 +41029,21 @@ body.app-mobile-shell .workspace-side .sidebar-preview-card__excerpt--journal-mo
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-mobile-bottom {
-  display: grid !important;
-  gap: 7px !important;
-  margin-top: 2px !important;
+  display: block !important;
+  margin-top: 0 !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__type-pill {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: fit-content !important;
-  min-height: 28px !important;
-  padding: 0 10px !important;
-  border-radius: 999px !important;
-  background: linear-gradient(180deg, #86b44c, #648f33) !important;
-  border: 1px solid rgba(82, 123, 41, 0.4) !important;
-  color: #fffdf7 !important;
+  display: inline-block !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  color: #8a9094 !important;
   font-size: 0.74rem !important;
-  font-weight: 800 !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 6px 12px rgba(72, 108, 34, 0.16) !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__tag-row {
@@ -39681,6 +41067,17 @@ body.app-mobile-shell .workspace-side .sidebar-preview-card__tag-chip {
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile-plain .sidebar-preview-card__journal-mobile-shell {
   grid-template-columns: 1fr !important;
+}
+
+body.app-mobile-shell .workspace-side #open-all-journal {
+  min-height: 42px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(208, 219, 229, 0.96) !important;
+  background: rgba(236, 244, 250, 0.96) !important;
+  box-shadow: none !important;
+  color: #4f5f66 !important;
+  font-size: 0.92rem !important;
+  font-weight: 800 !important;
 }
 
 /* Mobile task compact pass:
@@ -39862,8 +41259,9 @@ body.app-mobile-shell .workspace-side .progress-card__task-stack {
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile {
-  display: grid !important;
-  gap: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
   padding: 7px 10px !important;
   border-radius: 16px !important;
   background: rgba(255, 252, 247, 0.74) !important;
@@ -39875,7 +41273,8 @@ body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile {
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__task-mobile-main {
   display: flex !important;
-  align-items: flex-start !important;
+  align-items: center !important;
+  flex: 1 1 auto !important;
   gap: 8px !important;
   min-width: 0 !important;
 }
@@ -39891,21 +41290,25 @@ body.app-mobile-shell .workspace-side .sidebar-preview-card--task-mobile .sideba
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__title--task-mobile {
-  margin-top: 1px !important;
+  margin-top: 0 !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
   font-size: 0.82rem !important;
   line-height: 1.18 !important;
-  display: -webkit-box !important;
-  -webkit-line-clamp: 2 !important;
-  -webkit-box-orient: vertical !important;
+  display: block !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
   overflow: hidden !important;
 }
 
 body.app-mobile-shell .workspace-side .sidebar-preview-card__task-mobile-meta {
   display: flex !important;
   align-items: center !important;
-  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  flex: 0 0 auto !important;
+  flex-wrap: nowrap !important;
   gap: 6px !important;
-  padding-left: 26px !important;
+  padding-left: 0 !important;
   min-width: 0 !important;
 }
 
@@ -40020,7 +41423,7 @@ body.app-mobile-shell .detail-modal--worklog .worklog-manager .task-item.task-it
   padding: 8px 10px !important;
   border-radius: 18px !important;
   border: 1px solid rgba(133, 117, 89, 0.12) !important;
-  background: rgba(255, 251, 246, 0.74) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.88),
     0 4px 12px rgba(41, 32, 18, 0.04) !important;
@@ -40325,6 +41728,7 @@ body.app-mobile-shell.app-focused-mode .toolbar-search__field:focus-within {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 8px;
 }
 
 .card-view-hero {
@@ -41408,27 +42812,100 @@ body.app-mobile-shell .detail-modal--card-view .card-view-head__summary {
   line-height: 1.35 !important;
 }
 
+body.app-mobile-shell .detail-modal--card-view .detail-modal__content {
+  width: min(100%, 560px) !important;
+  max-width: min(100%, 560px) !important;
+  max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  margin: 0 auto !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  padding: 16px 16px 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .detail-modal__back {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .detail-layout--card-view {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .detail-copy--card-view {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 0 2px calc(124px + env(safe-area-inset-bottom)) !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .mobile-compact-modal-topbar__titleline {
+  padding: 0 108px 0 44px !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .mobile-compact-modal-topbar__titleline > h3 {
+  font-size: clamp(1.18rem, 5.2vw, 1.42rem) !important;
+  line-height: 1.08 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view #card-view-mobile-title {
+  visibility: hidden !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .mobile-compact-modal-topbar__actions {
+  gap: 6px !important;
+}
+
 body.app-mobile-shell .detail-modal--card-view #card-view-edit {
-  position: absolute !important;
-  top: calc(14px + env(safe-area-inset-top)) !important;
-  right: 14px !important;
-  z-index: 31 !important;
-  min-height: 32px !important;
-  padding-inline: 12px !important;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 9px !important;
   border-radius: 999px !important;
-  background: #1f3553 !important;
-  border: 1px solid rgba(17, 33, 54, 0.78) !important;
+  background: linear-gradient(180deg, #243858, #1a2944) !important;
+  border: 1px solid rgba(29, 45, 78, 0.34) !important;
   color: #ffffff !important;
-  box-shadow: 0 8px 18px rgba(23, 42, 66, 0.18) !important;
-  font-size: 0.74rem !important;
-  font-weight: 800 !important;
+  box-shadow: none !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view #card-view-edit:hover,
 body.app-mobile-shell .detail-modal--card-view #card-view-edit:focus-visible {
-  background: #17304d !important;
-  border-color: rgba(12, 25, 42, 0.88) !important;
+  background: linear-gradient(180deg, #243858, #1a2944) !important;
+  border-color: rgba(29, 45, 78, 0.34) !important;
   color: #ffffff !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-hero-bar {
+  display: none !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view #card-view-edit,
+body.app-mobile-shell .detail-modal--card-view .card-view-journal-shortcut {
+  position: static !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-journal-shortcut {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(214, 223, 234, 0.98) !important;
+  box-shadow: none !important;
+  font-size: 0.92rem !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-chip-list {
@@ -41637,10 +43114,10 @@ body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catal
 /* Mobile memories viewer:
    zmensi viewer a posunie ho nizsie, aby bolo nad nim viac vidno oblohu a slnko. */
 body.app-mobile-shell.app-main-menu-mode .workspace-side .memory-strip__frame {
-  width: 78% !important;
-  max-width: 78% !important;
+  width: 100% !important;
+  max-width: none !important;
   min-width: 0 !important;
-  margin: 164px auto 0 !important;
+  margin: 164px 0 0 !important;
 }
 
 body.app-mobile-shell.app-main-menu-mode .workspace-side .memory-strip__hero {
@@ -41686,8 +43163,8 @@ body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-wea
   box-shadow:
     0 10px 20px rgba(22, 30, 20, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
-  backdrop-filter: blur(14px) saturate(118%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  backdrop-filter: blur(8px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(118%) !important;
 }
 
 body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini__card--hero-pill::before {
@@ -42074,8 +43551,8 @@ body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weath
   box-shadow:
     0 10px 20px rgba(22, 30, 20, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
-  backdrop-filter: blur(14px) saturate(118%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  backdrop-filter: blur(8px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(118%) !important;
 }
 
 body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini__card--hero-pill::before {
@@ -42519,8 +43996,8 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
   background: rgba(255, 255, 255, 0.18) !important;
   border: 1px solid rgba(255, 255, 255, 0.22) !important;
   box-shadow: 0 8px 18px rgba(8, 16, 30, 0.12) !important;
-  backdrop-filter: blur(10px) saturate(125%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(125%) !important;
+  backdrop-filter: blur(6px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(125%) !important;
 }
 
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon {
@@ -42635,6 +44112,7 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
   max-width: 70% !important;
   min-width: 0 !important;
   margin: 0 !important;
+  margin-right: 8px !important;
 }
 
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field,
@@ -42646,8 +44124,8 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
   background: rgba(255, 255, 255, 0.18) !important;
   border: 1px solid rgba(255, 255, 255, 0.22) !important;
   box-shadow: 0 8px 18px rgba(8, 16, 30, 0.12) !important;
-  backdrop-filter: blur(10px) saturate(125%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(125%) !important;
+  backdrop-filter: blur(6px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(125%) !important;
 }
 
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon {
@@ -42687,6 +44165,9 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #open-settings-panel,
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home #toggle-weather-sound {
   flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   width: auto !important;
   min-width: 24px !important;
   max-width: none !important;
@@ -42771,6 +44252,480 @@ body.app-mobile-shell .workspace-layout--menu .memory-strip__note {
   scroll-margin-top: 96px;
 }
 
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-shell__close {
+  display: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-frame__head {
+  display: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-shell__topline {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  min-height: 42px !important;
+  margin: 0 0 6px !important;
+  padding: calc(4px + env(safe-area-inset-top)) 0 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-shell__back {
+  position: absolute !important;
+  left: 0 !important;
+  top: calc(4px + env(safe-area-inset-top)) !important;
+  z-index: 2 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-shell__topline-main {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-list-topbar {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 44px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-list-topbar > h3,
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] #journal-overlay-title {
+  margin: 0 !important;
+  width: 100% !important;
+  text-align: center !important;
+  font-size: clamp(1.4rem, 6.6vw, 1.72rem) !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-list-topbar__add {
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  font-size: 1.38rem !important;
+  line-height: 1 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-list-topbar__actions {
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-list-topbar__action {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  font-size: 1.18rem !important;
+  line-height: 1 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-list-topbar__action--danger {
+  color: rgba(173, 47, 47, 0.94) !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list[data-open-journal-overlay-entry] {
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list[data-open-journal-overlay-entry]:focus-visible {
+  outline: 2px solid rgba(123, 160, 76, 0.34) !important;
+  outline-offset: 2px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list {
+  width: 100% !important;
+  padding: 8px 10px !important;
+  gap: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__compact-shell {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list.journal-overlay-card--with-image .journal-overlay-card__compact-shell {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__compact-main {
+  display: grid !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__compact-topline {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__compact-topline .journal-weather {
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__compact-topline .journal-weather__pill {
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__title-row,
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__meta {
+  gap: 4px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__title {
+  font-size: 0.98rem !important;
+  line-height: 1.12 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-shell__body {
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-list,
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-group,
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list {
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: auto !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-group {
+  padding: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card {
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__topline {
+  gap: 4px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__gallery,
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__gallery--compact-list,
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__gallery--compact-inline {
+  gap: 4px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__compact-media {
+  display: grid !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__gallery--compact-inline {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  align-content: start !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-item__image {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 8px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-item__more {
+  min-width: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 8px !important;
+  font-size: 0.62rem !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-item__video--compact-list {
+  width: 100% !important;
+  max-width: none !important;
+  border-radius: 12px !important;
+  pointer-events: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-item__video--compact-list video {
+  width: 100% !important;
+  display: block !important;
+  aspect-ratio: 16 / 9 !important;
+  object-fit: cover !important;
+  pointer-events: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__chips {
+  gap: 4px !important;
+  justify-content: flex-start !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__chips--compact-inline {
+  padding-top: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__chips .tag {
+  min-height: 24px !important;
+  padding-inline: 8px !important;
+  font-size: 0.68rem !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__disclosure {
+  display: grid !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  min-height: 44px !important;
+  padding: 10px 12px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(210, 219, 229, 0.96) !important;
+  background: rgba(248, 250, 252, 0.98) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 18px rgba(42, 34, 24, 0.05) !important;
+  list-style: none !important;
+  cursor: pointer !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary::-webkit-details-marker {
+  display: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary::after {
+  content: "v";
+  flex: 0 0 auto !important;
+  color: #5a6b7c !important;
+  font-size: 0.92rem !important;
+  line-height: 1 !important;
+  transition: transform 160ms ease !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__disclosure[open] .journal-tag-filter__summary::after {
+  transform: rotate(180deg) !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary-copy {
+  display: grid !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary-clear {
+  position: relative !important;
+  z-index: 1 !important;
+  flex: 0 0 auto !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(220, 95, 95, 0.3) !important;
+  background: rgba(255, 235, 235, 0.98) !important;
+  color: #c83f3f !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary-label {
+  color: #6e7b8a !important;
+  font-size: 0.62rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary-value {
+  color: #334155 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter.is-filter-active .journal-tag-filter__summary-value {
+  color: #496b30 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__content {
+  display: grid !important;
+  gap: 8px !important;
+  padding: 0 2px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__meta {
+  display: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__head {
+  justify-content: flex-start !important;
+  gap: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__lead {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  width: 100% !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__active {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 26px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #6f9950, #517538) !important;
+  color: #ffffff !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  line-height: 1.12 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 8px 16px rgba(69, 102, 43, 0.16) !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__clear {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 24px !important;
+  padding: 0 2px !important;
+  color: #3f5530 !important;
+  font-size: 0.74rem !important;
+  font-weight: 800 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__sections {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__section {
+  display: grid !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__section-label {
+  width: auto !important;
+  text-align: left !important;
+  font-size: 0.58rem !important;
+  letter-spacing: 0.08em !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__section .journal-tag-filter__chips {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  padding-bottom: 0 !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__chip {
+  flex: 0 0 auto !important;
+  min-height: 26px !important;
+  padding-inline: 9px !important;
+  font-size: 0.72rem !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__chip.is-active {
+  transform: translateY(-1px) !important;
+  box-shadow:
+    0 0 0 2px rgba(66, 96, 49, 0.18),
+    0 10px 18px rgba(42, 34, 24, 0.12) !important;
+  filter: saturate(1.06) contrast(1.04) !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__chip.is-active .journal-tag-filter__chip-count {
+  background: rgba(255, 255, 255, 0.78) !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-mobile-main {
+  gap: 3px !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card--journal-mobile .sidebar-preview-card__title--journal {
+  margin: 0 !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__excerpt--journal-mobile {
+  margin: 0 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  color: #6d7681 !important;
+  font-size: 0.78rem !important;
+  line-height: 1.24 !important;
+}
+
+body.app-mobile-shell .workspace-side .sidebar-preview-card__journal-mobile-bottom,
+body.app-mobile-shell .workspace-side .sidebar-preview-card__type-pill {
+  display: none !important;
+}
+
 /* Mobile floating top chrome host:
    search, zvuk, nastavenia a weather pill sedia hore v stranke,
    ale pri scrollovani maju odist s obsahom prec. */
@@ -42821,8 +44776,8 @@ body.app-mobile-shell .catalog-card--main-menu-card:focus-within {
     0 10px 26px rgba(45, 37, 25, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.44),
     inset 0 0 0 1px rgba(130, 111, 84, 0.04) !important;
-  backdrop-filter: blur(14px) saturate(118%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  backdrop-filter: blur(8px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(118%) !important;
   border-radius: 16px !important;
   min-height: 0 !important;
   max-width: none !important;

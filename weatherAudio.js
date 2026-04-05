@@ -292,8 +292,7 @@
       night_deep_air: layerDef({
         group: "time",
         fileList: [
-          "assets/weather-audio/night-bed.mp3",
-          "assets/weather-audio/summer-night-soft.mp3"
+          "assets/weather-audio/night-bed.mp3"
         ],
         baseVolume: 0.08,
         crossfadeDuration: 5.4
@@ -347,8 +346,7 @@
       drizzle_soft: layerDef({
         group: "weather",
         fileList: [
-          "assets/weather-audio/rain-light.mp3",
-          "assets/weather-audio/light-rain-atmosphere.mp3"
+          "assets/weather-audio/rain-light.mp3"
         ],
         baseVolume: 0.36
       }),
@@ -1720,19 +1718,10 @@
       const temperatureBand = this.temperatureBandFromValue(temperatureC);
       const normalizedPhenomenonVariant = (() => {
         const rawPhenomenon = String(input.phenomenonVariant || "").trim().toLowerCase();
-        if (!Number.isFinite(temperatureC)) return rawPhenomenon;
-        if (rawPhenomenon === "snow") {
-          if (temperatureC >= 14) return precipitationAmount > 0.02 ? "rain" : "none";
-          if (temperatureC >= 6) return "sleet";
-        }
-        if (rawPhenomenon === "sleet" || rawPhenomenon === "freezing-rain") {
-          if (temperatureC >= 12) return precipitationAmount > 0.02 ? "rain" : "none";
-          if (temperatureC <= -2) return "snow";
-        }
-        if (rawPhenomenon === "rain" && temperatureC <= -1.5) {
-          return precipitationAmount > 0.02 ? "sleet" : "none";
-        }
-        if (rawPhenomenon === "frost" && temperatureC > 2) return "none";
+        if (rawPhenomenon === "light-rain" || rawPhenomenon === "heavy-rain" || rawPhenomenon === "drizzle") return "rain";
+        if (rawPhenomenon === "light-snow" || rawPhenomenon === "dense-snow" || rawPhenomenon === "blizzard") return "snow";
+        if (rawPhenomenon === "freezing-rain") return "sleet";
+        if (rawPhenomenon === "frost" && Number.isFinite(temperatureC) && temperatureC > 2) return "none";
         return rawPhenomenon;
       })();
       const rainIntensity = clamp(precipitationAmount / 6.8, 0, 1);
@@ -2197,6 +2186,7 @@
         case "night_crickets_bed":
           if (nextState.timeOfDay !== "night" || nextState.temperatureBand === "cold" || nextState.season === "winter") return 0;
           if (["fog", "drizzle", "rain", "heavy_rain", "storm_far", "storm_near", "hail", "snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "frost", "post_snow"].includes(nextState.weather)) return 0;
+          if (Number.isFinite(nextState.temperatureC) && nextState.temperatureC < 10) return 0;
           if (nextState.windIntensity >= 0.40) return 0;
           return base * clamp((season === "summer" ? 0.26 : 0.10) + (calm * 0.22) + (nextState.temperatureBand === "hot" ? 0.12 : nextState.temperatureBand === "warm" ? 0.08 : 0) - (nextState.windIntensity * 0.22), 0, 0.70);
         case "evening_warm_insects":
