@@ -106,6 +106,8 @@
     activeSeason: "spring",
     activeDebugLabel: "",
     rafId: 0,
+    paused: false,
+    pausedAt: 0,
     startTs: 0,
     lastFrameTs: 0,
     lastSkyDrawTs: 0,
@@ -3509,11 +3511,18 @@
     state.rafId = 0;
   }
 
-  function ensureAnimation() {
+  function ensureAnimation(options = {}) {
+    const preserveTimeline = Boolean(options?.preserveTimeline);
+    if (state.paused) {
+      stopAnimationLoop();
+      return;
+    }
     if (shouldUseStaticMobileWeatherScene()) {
       stopAnimationLoop();
       const now = performance.now();
-      state.startTs = now;
+      if (!preserveTimeline || !state.startTs) {
+        state.startTs = now;
+      }
       state.lastFrameTs = 0;
       state.lastSkyDrawTs = 0;
       state.lastTreeDrawTs = 0;
@@ -3522,7 +3531,9 @@
       return;
     }
     if (state.rafId) return;
-    state.startTs = performance.now();
+    if (!preserveTimeline || !state.startTs) {
+      state.startTs = performance.now();
+    }
     state.lastFrameTs = 0;
     state.lastSkyDrawTs = 0;
     state.lastTreeDrawTs = 0;
@@ -3536,6 +3547,34 @@
       renderFrame(ts);
     };
     state.rafId = window.requestAnimationFrame(step);
+  }
+
+  function pauseAnimation() {
+    if (state.paused) return;
+    state.paused = true;
+    state.pausedAt = performance.now();
+    stopAnimationLoop();
+  }
+
+  function resumeAnimation() {
+    if (!state.paused) return;
+    const now = performance.now();
+    const pauseDelta = state.pausedAt ? Math.max(0, now - state.pausedAt) : 0;
+    state.paused = false;
+    state.pausedAt = 0;
+    if (state.startTs) {
+      state.startTs += pauseDelta;
+    } else {
+      state.startTs = now;
+    }
+    state.lastFrameTs = 0;
+    state.lastSkyDrawTs = 0;
+    state.lastTreeDrawTs = 0;
+    state.frameScale = 1;
+    state.forceSkyRedraw = true;
+    state.forceTreeRedraw = true;
+    if (!state.root) return;
+    ensureAnimation({ preserveTimeline: true });
   }
 
   function renderFrame(ts) {
@@ -5517,6 +5556,9 @@
     state.lightningValue = 0;
     state.lightningBolt = null;
     state.activeElectricityLevel = 0;
+    state.paused = false;
+    state.pausedAt = 0;
+    state.startTs = 0;
     state.lastFrameTs = 0;
     state.lastSkyDrawTs = 0;
     state.lastTreeDrawTs = 0;
@@ -5547,6 +5589,8 @@
   window.weatherBackgroundEngine = {
     apply,
     clear,
-    getDebugState
+    getDebugState,
+    pauseAnimation,
+    resumeAnimation
   };
 })();

@@ -8709,6 +8709,37 @@ input::placeholder {
   width: 100%;
 }
 
+.date-input-wrap--with-empty-label .date-input-wrap__empty-label {
+  position: absolute;
+  top: 50%;
+  left: 18px;
+  transform: translateY(-50%);
+  color: rgba(110, 124, 141, 0.9);
+  font-size: 0.98rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.date-input-wrap--with-empty-label.is-filled .date-input-wrap__empty-label {
+  display: none;
+}
+
+.date-input-wrap--with-empty-label:not(.is-filled) .date-input {
+  color: transparent;
+}
+
+.date-input-wrap--with-empty-label:not(.is-filled) .date-input::-webkit-datetime-edit,
+.date-input-wrap--with-empty-label:not(.is-filled) .date-input::-webkit-datetime-edit-fields-wrapper,
+.date-input-wrap--with-empty-label:not(.is-filled) .date-input::-webkit-date-and-time-value,
+.date-input-wrap--with-empty-label:not(.is-filled) .date-input::-webkit-datetime-edit-text,
+.date-input-wrap--with-empty-label:not(.is-filled) .date-input::-webkit-datetime-edit-day-field,
+.date-input-wrap--with-empty-label:not(.is-filled) .date-input::-webkit-datetime-edit-month-field,
+.date-input-wrap--with-empty-label:not(.is-filled) .date-input::-webkit-datetime-edit-year-field {
+  color: transparent;
+}
+
 .date-input {
   position: relative;
   width: 100%;
@@ -33833,13 +33864,16 @@ body.app-mobile-shell .toolbar-add-menu__panel {
   width: min(284px, calc(100vw - 24px)) !important;
   min-width: 220px !important;
   margin-top: 0 !important;
-  padding: 10px !important;
-  display: grid !important;
-  gap: 10px !important;
-  border-radius: 24px !important;
-  border: 1px solid rgba(182, 197, 214, 0.92) !important;
-  background: rgba(255, 255, 255, 0.99) !important;
-  box-shadow: 0 22px 42px rgba(21, 35, 56, 0.14) !important;
+  padding: 12px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  gap: 12px !important;
+  border-radius: 26px !important;
+  border: 1px solid rgba(177, 195, 214, 0.94) !important;
+  background: linear-gradient(180deg, rgba(239, 247, 255, 0.99), rgba(225, 236, 248, 0.985)) !important;
+  box-shadow: 0 22px 42px rgba(36, 58, 86, 0.16) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   overflow: hidden !important;
@@ -33865,16 +33899,27 @@ body.app-mobile-shell .toolbar-add-submenu__panel {
 
 body.app-mobile-shell .toolbar-add-menu__action,
 body.app-mobile-shell .toolbar-add-submenu > summary {
+  box-sizing: border-box !important;
   position: relative !important;
   z-index: 1 !important;
-  width: 100% !important;
-  min-height: 52px !important;
+  display: flex !important;
+  flex: 1 1 calc(50% - 6px) !important;
+  width: calc(50% - 6px) !important;
+  min-width: min(148px, 100%) !important;
+  max-width: calc(50% - 6px) !important;
+  min-height: 58px !important;
+  padding: 11px 10px !important;
   justify-content: center !important;
+  align-items: center !important;
   text-align: center !important;
-  border-radius: 18px !important;
-  border: 1px solid rgba(223, 231, 240, 0.98) !important;
-  background: #ffffff !important;
-  box-shadow: none !important;
+  white-space: normal !important;
+  line-height: 1.18 !important;
+  font-size: 0.91rem !important;
+  font-weight: 700 !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(198, 212, 228, 0.98) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(246, 250, 255, 0.985)) !important;
+  box-shadow: 0 10px 22px rgba(47, 72, 102, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
   color: #223446 !important;
   pointer-events: auto !important;
 }
@@ -33996,16 +34041,19 @@ body.app-mobile-shell.app-toolbar-add-overlay-open #toolbar-add-menu-overlay-hos
   max-width: min(calc(100vw - 24px), 560px) !important;
   max-height: min(52dvh, calc(100dvh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom))) !important;
   margin: 0 !important;
-  padding: 12px !important;
-  display: grid !important;
-  gap: 10px !important;
+  padding: 14px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  gap: 12px !important;
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
   -webkit-overflow-scrolling: touch !important;
   border-radius: 28px !important;
-  border: 1px solid rgba(182, 197, 214, 0.92) !important;
-  background: rgba(255, 255, 255, 0.99) !important;
-  box-shadow: 0 22px 42px rgba(21, 35, 56, 0.14) !important;
+  border: 1px solid rgba(177, 195, 214, 0.94) !important;
+  background: linear-gradient(180deg, rgba(239, 247, 255, 0.995), rgba(225, 236, 248, 0.99)) !important;
+  box-shadow: 0 24px 46px rgba(36, 58, 86, 0.18) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   opacity: 1 !important;
@@ -36358,6 +36406,15 @@ body.app-mobile-shell .image-lightbox::backdrop {
   -webkit-backdrop-filter: none !important;
 }
 
+body.app-mobile-shell .image-lightbox {
+  border: 0 !important;
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+}
+
+body.app-mobile-shell .image-lightbox::backdrop {
+  background: linear-gradient(180deg, rgba(238, 244, 251, 0.96) 0%, rgba(233, 240, 247, 0.96) 100%) !important;
+}
+
 body.app-mobile-shell .journal-overlay-root {
   align-items: flex-end !important;
   justify-content: center !important;
@@ -36603,12 +36660,21 @@ body.app-mobile-shell .image-lightbox__nav {
   color: #4c5c70 !important;
 }
 
+body.app-mobile-shell .image-lightbox__nav {
+  display: none !important;
+}
+
 body.app-mobile-shell .image-lightbox__figure {
   border-radius: 28px !important;
   border: 1px solid var(--mobile-modal-border) !important;
   background: #ffffff !important;
   box-shadow: var(--mobile-modal-shadow) !important;
   overflow: hidden !important;
+  touch-action: pan-y pinch-zoom !important;
+}
+
+body.app-mobile-shell .image-lightbox__image {
+  touch-action: pan-y pinch-zoom !important;
 }
 
 /* Mobile journal final cleanup:
@@ -37408,6 +37474,35 @@ body.app-mobile-shell .mobile-bottom-nav__button--camera .mobile-bottom-nav__ico
   color: #f8fbff !important;
   font-size: 1.5rem !important;
   font-weight: 300 !important;
+}
+
+body.app-mobile-shell .mobile-bottom-nav__button--camera {
+  border: 1px solid rgba(193, 205, 218, 0.92) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(244, 248, 252, 0.985)) !important;
+  box-shadow: 0 10px 18px rgba(31, 47, 67, 0.12) !important;
+}
+
+body.app-mobile-shell .mobile-bottom-nav__button--camera .mobile-bottom-nav__icon.mobile-bottom-nav__icon--camera {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  display: block !important;
+  position: static !important;
+  margin: 0 auto !important;
+  overflow: hidden !important;
+  background: #556a7d !important;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8.2 6.5h1.3l.8-1.4c.2-.4.6-.6 1-.6h1.4c.4 0 .8.2 1 .6l.8 1.4h1.3c1.8 0 3.2 1.4 3.2 3.2v5.6c0 1.8-1.4 3.2-3.2 3.2H8.2C6.4 18.5 5 17.1 5 15.3V9.7c0-1.8 1.4-3.2 3.2-3.2Zm3.8 2.2a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 1.7a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z'/%3E%3C/svg%3E") !important;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8.2 6.5h1.3l.8-1.4c.2-.4.6-.6 1-.6h1.4c.4 0 .8.2 1 .6l.8 1.4h1.3c1.8 0 3.2 1.4 3.2 3.2v5.6c0 1.8-1.4 3.2-3.2 3.2H8.2C6.4 18.5 5 17.1 5 15.3V9.7c0-1.8 1.4-3.2 3.2-3.2Zm3.8 2.2a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 1.7a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z'/%3E%3C/svg%3E") !important;
+  -webkit-mask-repeat: no-repeat !important;
+  mask-repeat: no-repeat !important;
+  -webkit-mask-position: center !important;
+  mask-position: center !important;
+  -webkit-mask-size: contain !important;
+  mask-size: contain !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
 }
 
 /* Mobile main-menu top bar refresh:
@@ -39324,6 +39419,7 @@ body.app-mobile-shell .eyebrow {
 
 body.app-mobile-shell .catalog-grid--main-menu {
   gap: 8px !important;
+  margin-top: 56px !important;
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card {
@@ -39351,6 +39447,238 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
   font-size: 0.66rem !important;
   line-height: 1.18 !important;
 }
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__head--category > .catalog-card__title.catalog-card__title--body {
+  font-size: 0.82rem !important;
+  line-height: 1.02 !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Final mobile focused subcategory title lock:
+   musi byt mensie ako doteraz a uz nesmie byt prepisane neskorsim blokom. */
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__head--category > .catalog-card__title.catalog-card__title--body {
+  font-size: 0.82rem !important;
+  line-height: 1.02 !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel__subcategories-inline {
+  width: 100% !important;
+  margin-top: 8px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel__subcategories-inline .catalog-grid--subcategories {
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+/* Focused category header minimal pass:
+   back should sit naturally on the left and the compact category header
+   should read like a clean title + subtle manage control, not a big card. */
+body.app-mobile-shell.app-focused-mode .category-shell__nav--mobile-back {
+  justify-content: flex-start !important;
+  margin: 6px 0 4px !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-shell__back {
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 13px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid rgba(217, 228, 239, 0.96) !important;
+  color: #56687b !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary::before,
+body.app-mobile-shell.app-focused-mode .category-panel--summary::after {
+  content: none !important;
+  display: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary.category-panel--summary-compact {
+  padding: 2px 0 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: auto !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero.category-panel__hero--compact {
+  padding: 0 !important;
+  gap: 4px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero--compact .category-panel__intro,
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero--compact .category-panel__intro-copy {
+  justify-items: center !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero--compact .category-panel__title-row {
+  display: inline-flex !important;
+  width: auto !important;
+  max-width: 100% !important;
+  flex-wrap: nowrap !important;
+  position: relative !important;
+  min-height: 30px !important;
+  padding: 0 30px 0 36px !important;
+  gap: 6px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  justify-self: center !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero--compact .category-panel__intro-copy h3,
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero--compact .category-panel__header h3 {
+  display: block !important;
+  margin: 0 !important;
+  max-width: min(100%, calc(100vw - 168px)) !important;
+  font-size: 1.24rem !important;
+  line-height: 1.06 !important;
+  letter-spacing: -0.03em !important;
+  overflow-wrap: anywhere !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero--compact .category-panel__title-count {
+  font-size: 0.72rem !important;
+  line-height: 1 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-shell__back--inline {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #314355 !important;
+  border-radius: 999px !important;
+  font-size: 1.8rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__hero--compact {
+  position: relative !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__manage--floating-inline {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding-top: 0 !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__manage--floating-inline .category-action-disclosure__summary {
+  position: absolute !important;
+  top: 0 !important;
+  right: 48px !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #314355 !important;
+  box-shadow: none !important;
+  font-size: 1.55rem !important;
+  font-weight: 900 !important;
+  line-height: 30px !important;
+  text-align: center !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__manage--floating-inline .category-action-disclosure__summary::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Mobile focused header night contrast:
+   v noci mimo uplneho overcastu musi ist header do bieleho kontrastu ako pocasie. */
+body.app-mobile-shell.app-focused-mode[data-mobile-weather-period="night"]:not([data-mobile-weather-variant="overcast"]) .category-panel--summary .category-panel__hero--compact .category-panel__intro-copy h3,
+body.app-mobile-shell.app-focused-mode[data-mobile-weather-period="night"]:not([data-mobile-weather-variant="overcast"]) .category-panel--summary .category-panel__hero--compact .category-panel__header h3,
+body.app-mobile-shell.app-focused-mode[data-mobile-weather-period="night"]:not([data-mobile-weather-variant="overcast"]) .category-shell__back--inline,
+body.app-mobile-shell.app-focused-mode[data-mobile-weather-period="night"]:not([data-mobile-weather-variant="overcast"]) .category-panel--summary .category-panel__manage--floating-inline .category-action-disclosure__summary {
+  color: var(--mobile-weather-floating-title) !important;
+  text-shadow: var(--mobile-weather-floating-shadow) !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__manage--floating-inline[open] {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__manage--floating-inline .category-action-panel--inline {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  width: min(284px, calc(100vw - 28px)) !important;
+  max-width: min(284px, calc(100vw - 28px)) !important;
+  margin: 10px auto 0 !important;
+  padding: 10px !important;
+  border: 1px solid rgba(214, 224, 235, 0.92) !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 18px 34px rgba(31, 47, 67, 0.16) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  z-index: 61 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__manage--floating-inline .category-action-panel__row--filters {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .category-panel--summary .category-panel__manage--floating-inline .category-action-panel__row--filters .tag {
+  min-height: 26px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(185, 204, 146, 0.44) !important;
+  background: rgba(242, 249, 224, 0.96) !important;
+  color: #55653a !important;
+  box-shadow: none !important;
+}
+
 
 /* Mobile back button recovery:
    keep modal back controls inside their own sheets and stop generic Back buttons
@@ -40046,6 +40374,56 @@ body.app-mobile-shell .detail-modal--settings .settings-panel {
   -webkit-backdrop-filter: none !important;
 }
 
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible {
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible .settings-panel__head {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 14px 16px !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(209, 220, 233, 0.9) !important;
+  box-shadow: 0 10px 22px rgba(47, 69, 98, 0.08) !important;
+  cursor: pointer !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible .settings-panel__head::after {
+  content: "\25BE";
+  flex: 0 0 auto !important;
+  margin-left: auto !important;
+  color: #60738a !important;
+  font-size: 0.98rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  transform: rotate(0deg);
+  transition: transform 180ms ease;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible:not(.is-collapsed) .settings-panel__head::after {
+  transform: rotate(180deg);
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible .settings-panel__head:focus-visible {
+  outline: none !important;
+  box-shadow:
+    0 0 0 1px rgba(121, 150, 184, 0.34),
+    0 10px 22px rgba(47, 69, 98, 0.1) !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible .settings-form {
+  padding: 10px 4px 2px !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible.is-collapsed .settings-form {
+  display: none !important;
+}
+
 body.app-mobile-shell .detail-modal--settings .detail-modal__back {
   display: none !important;
 }
@@ -40408,19 +40786,19 @@ body.app-mobile-shell .catalog-card--main-menu-card:focus-within::before {
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
-  margin: 8px 8px 0 !important;
-  padding: 4px !important;
-  min-height: 78px !important;
-  aspect-ratio: 1 / 0.76 !important;
-  border-radius: 12px !important;
+  margin: 10px 10px 0 !important;
+  padding: 6px !important;
+  min-height: 92px !important;
+  aspect-ratio: 1 / 0.84 !important;
+  border-radius: 14px !important;
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
   display: grid !important;
   justify-items: center !important;
   align-content: start !important;
-  gap: 3px !important;
-  padding: 8px 8px 10px !important;
+  gap: 4px !important;
+  padding: 10px 10px 12px !important;
   text-align: center !important;
 }
 
@@ -40432,14 +40810,21 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--categor
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
   width: 100% !important;
   margin: 0 !important;
-  font-size: 0.9rem !important;
+  font-size: 0.82rem !important;
   line-height: 1.02 !important;
   text-align: center !important;
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
-  font-size: 0.66rem !important;
-  line-height: 1.18 !important;
+  font-size: 0.58rem !important;
+  line-height: 1.04 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__head--category > .catalog-card__title.catalog-card__title--body {
+  font-size: 0.82rem !important;
+  line-height: 1.02 !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em !important;
 }
 
 /* Mobile root category hard lock:
@@ -40501,13 +40886,64 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
   line-height: 1.18 !important;
 }
 
-body.app-mobile-shell .catalog-grid--subcategories {
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories {
   gap: 8px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > * {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child {
+  min-height: auto !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__image {
+  margin: 10px 10px 0 !important;
+  padding: 6px !important;
+  min-height: 92px !important;
+  aspect-ratio: 1 / 0.84 !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__body {
+  padding: 10px 10px 12px !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__title,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__title--body {
+  width: 100% !important;
+  margin: 0 !important;
+  font-size: 0.82rem !important;
+  line-height: 1.02 !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em !important;
+  text-align: center !important;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__meta {
+  margin: 2px 0 0 !important;
+  line-height: 1.06 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__count {
+  margin-top: 2px !important;
+  min-height: 0 !important;
+  align-self: center !important;
+  padding: 3px 8px !important;
+  font-size: 0.58rem !important;
+  line-height: 1.04 !important;
 }
 
 body.app-mobile-shell .catalog-card--child,
 body.app-mobile-shell.app-focused-mode .catalog-card--child {
   border-radius: 16px !important;
+  min-height: auto !important;
 }
 
 body.app-mobile-shell .catalog-card--child .catalog-card__image,
@@ -40521,13 +40957,17 @@ body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image
 
 body.app-mobile-shell .catalog-card--child .catalog-card__body,
 body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__body {
-  padding: 8px 8px 10px !important;
-  gap: 3px !important;
+  padding: 5px 6px 7px !important;
+  gap: 2px !important;
 }
 
+body.app-mobile-shell .catalog-card--child .catalog-card__title,
 body.app-mobile-shell .catalog-card--child .catalog-card__title--body,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__title,
 body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__title--body {
-  font-size: 0.9rem !important;
+  font-size: 0.82rem !important;
+  line-height: 1.02 !important;
+  font-weight: 650 !important;
 }
 
 body.app-mobile-shell .catalog-card--child .catalog-card__count,
@@ -40536,7 +40976,7 @@ body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__count
 }
 
 body.app-mobile-shell .catalog-grid--varieties {
-  gap: 8px !important;
+  gap: 6px !important;
 }
 
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety,
@@ -41497,11 +41937,11 @@ body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item_
 
 body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__actions--mobile .button,
 body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__actions--mobile .journal-item__action {
-  width: 28px !important;
-  height: 28px !important;
-  min-width: 28px !important;
-  min-height: 28px !important;
-  border-radius: 10px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border-radius: 14px !important;
   padding: 0 !important;
 }
 
@@ -41538,8 +41978,9 @@ body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item_
 }
 
 body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .journal-item__action--danger {
-  background: rgba(235, 243, 252, 0.96) !important;
-  color: #5d7290 !important;
+  background: #fef3f2 !important;
+  border-color: rgba(240, 86, 86, 0.16) !important;
+  color: #b42318 !important;
   box-shadow: none !important;
 }
 
@@ -41891,6 +42332,29 @@ body.app-mobile-shell.app-focused-mode .toolbar-search__field:focus-within {
   gap: 8px;
 }
 
+.card-view-title-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(109, 87, 163, 0.12);
+  color: #6d57a3;
+  font-size: 0.74rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.card-view-head__flags {
+  margin: 0;
+  color: #697764;
+  font-size: 0.88rem;
+  line-height: 1.48;
+  font-weight: 720;
+}
+
 .card-view-chip {
   display: inline-flex;
   align-items: center;
@@ -42031,6 +42495,8 @@ body.app-mobile-shell .detail-modal--card-view .detail-modal__content {
 
 body.app-mobile-shell .detail-modal--card-view .detail-image--card-view {
   gap: 6px;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-hero-bar {
@@ -42592,7 +43058,7 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:focus-with
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
   grid-template-rows: auto auto auto !important;
   gap: 2px !important;
-  padding: 7px 7px 8px !important;
+  padding: 6px 6px 7px !important;
   align-content: start !important;
 }
 
@@ -42609,14 +43075,14 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-c
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview {
   display: grid !important;
   place-items: center !important;
-  min-height: 78px !important;
+  min-height: 72px !important;
   height: auto !important;
   max-height: none !important;
-  width: 86% !important;
-  padding: 4px 6px !important;
-  margin-top: -2px !important;
+  width: 84% !important;
+  padding: 3px 5px !important;
+  margin-top: -1px !important;
   justify-self: center !important;
-  border-radius: 12px !important;
+  border-radius: 11px !important;
   overflow: visible !important;
   background: linear-gradient(180deg, rgba(248, 245, 237, 0.96), rgba(239, 244, 236, 0.9)) !important;
 }
@@ -42626,7 +43092,7 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-c
   width: auto !important;
   height: auto !important;
   max-width: 100% !important;
-  max-height: 94px !important;
+  max-height: 84px !important;
   object-fit: contain !important;
   object-position: center center !important;
   justify-self: center !important;
@@ -42665,20 +43131,20 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-c
 
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__title--body {
   color: #1e2c22 !important;
-  font-size: 0.74rem !important;
-  line-height: 1.12 !important;
+  font-size: 0.7rem !important;
+  line-height: 1.08 !important;
   font-weight: 800 !important;
   display: block !important;
   text-align: center !important;
   width: 100% !important;
   max-width: none !important;
-  min-height: calc(2 * 1.12em) !important;
+  min-height: calc(2 * 1.08em) !important;
   padding: 0 2px !important;
   margin: 0 auto !important;
   white-space: normal !important;
   overflow-wrap: anywhere !important;
   word-break: break-word !important;
-  max-height: calc(2 * 1.12em) !important;
+  max-height: calc(2 * 1.08em) !important;
   overflow: hidden !important;
 }
 
@@ -42689,9 +43155,9 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-c
 
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview {
   color: #5d6b60 !important;
-  font-size: 0.61rem !important;
+  font-size: 0.58rem !important;
   font-weight: 760 !important;
-  line-height: 1.1 !important;
+  line-height: 1.05 !important;
   letter-spacing: 0.04em !important;
   text-transform: uppercase !important;
   margin: 0 !important;
@@ -42713,7 +43179,7 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-c
 }
 
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__rating-inline .star-rating__star {
-  font-size: 0.56rem !important;
+  font-size: 0.52rem !important;
 }
 
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__quick--preview {
@@ -42727,9 +43193,9 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-c
 }
 
 body.app-mobile-shell .preview-card-badge {
-  min-height: 13px !important;
-  padding: 1px 5px !important;
-  font-size: 0.5rem !important;
+  min-height: 12px !important;
+  padding: 1px 4px !important;
+  font-size: 0.47rem !important;
   line-height: 1.1 !important;
   font-weight: 720 !important;
   background: rgba(255, 250, 243, 0.72) !important;
@@ -42748,8 +43214,8 @@ body.app-mobile-shell .detail-modal--card-view .detail-copy--card-view {
 body.app-mobile-shell .detail-modal--card-view .card-view-hero {
   padding: 6px !important;
   border-radius: 20px !important;
-  background: linear-gradient(180deg, rgba(244, 239, 228, 0.9), rgba(232, 241, 247, 0.72)) !important;
-  box-shadow: 0 6px 16px rgba(52, 77, 94, 0.08) !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-hero img {
@@ -42770,16 +43236,17 @@ body.app-mobile-shell .detail-modal--card-view .card-view-gallery__thumb {
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-head {
-  gap: 6px !important;
+  gap: 8px !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-head__eyebrow span {
   padding: 0 !important;
   background: none !important;
   border: 0 !important;
-  color: #72806f !important;
-  font-size: 0.68rem !important;
-  letter-spacing: 0.08em !important;
+  color: #677766 !important;
+  font-size: 0.76rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-head__topline {
@@ -42790,26 +43257,45 @@ body.app-mobile-shell .detail-modal--card-view .card-view-head__topline {
 
 body.app-mobile-shell .detail-modal--card-view .card-view-head__title-line {
   gap: 6px !important;
+  align-items: center !important;
 }
 
-body.app-mobile-shell .detail-modal--card-view .card-view-head__title-line .card-view-chip {
-  min-height: 16px !important;
-  padding: 2px 6px !important;
-  font-size: 0.58rem !important;
-  line-height: 1.1 !important;
+body.app-mobile-shell .detail-modal--card-view .card-view-title-badge {
+  min-height: 24px !important;
+  padding: 4px 10px !important;
+  font-size: 0.8rem !important;
+  line-height: 1 !important;
   align-self: center !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-head__topline h3 {
   color: #243246 !important;
-  font-size: clamp(1.18rem, 5.2vw, 1.54rem) !important;
-  line-height: 1.05 !important;
+  font-size: clamp(1.26rem, 5.4vw, 1.62rem) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.02em !important;
+  font-weight: 850 !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-head__summary {
   margin: 0 !important;
-  font-size: 0.82rem !important;
-  line-height: 1.35 !important;
+  color: #405242 !important;
+  font-size: 0.92rem !important;
+  line-height: 1.42 !important;
+  font-weight: 720 !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__rating-stars {
+  color: #d2a13e !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.04em !important;
+}
+
+body.app-mobile-shell .detail-modal--card-view .card-view-head__flags {
+  margin: 0 !important;
+  color: #677567 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.5 !important;
+  font-weight: 720 !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .detail-modal__content {
@@ -42933,12 +43419,14 @@ body.app-mobile-shell .detail-modal--card-view .card-view-panel--note {
 body.app-mobile-shell .detail-modal--card-view .card-view-panel + .card-view-panel,
 body.app-mobile-shell .detail-modal--card-view .card-view-panel--note {
   padding-top: 14px !important;
-  border-top: 1px solid rgba(176, 189, 198, 0.18) !important;
+  border-top: 0 !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-panel h4 {
-  margin: 0 0 6px !important;
-  font-size: 0.68rem !important;
+  margin: 0 0 8px !important;
+  color: #607154 !important;
+  font-size: 0.76rem !important;
+  letter-spacing: 0.06em !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-panel__body {
@@ -42953,24 +43441,24 @@ body.app-mobile-shell .detail-modal--card-view .card-view-row {
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-row span {
-  color: #7a8677 !important;
-  font-size: 0.74rem !important;
+  color: #697764 !important;
+  font-size: 0.78rem !important;
   font-weight: 800 !important;
-  letter-spacing: 0 !important;
+  letter-spacing: 0.01em !important;
   text-transform: none !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-row strong {
-  color: #304129 !important;
-  font-size: 0.9rem !important;
-  line-height: 1.35 !important;
-  font-weight: 700 !important;
+  color: #2a3a2c !important;
+  font-size: 0.98rem !important;
+  line-height: 1.42 !important;
+  font-weight: 760 !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-note {
-  font-size: 0.94rem !important;
-  line-height: 1.62 !important;
-  color: #31423a !important;
+  font-size: 1rem !important;
+  line-height: 1.68 !important;
+  color: #2e3f38 !important;
 }
 
 body.app-mobile-shell .detail-modal--card-view .card-view-link {
@@ -43056,6 +43544,7 @@ body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview [data-
 
 body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu {
   gap: 8px !important;
+  margin-top: 56px !important;
 }
 
 body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card {
@@ -43067,11 +43556,11 @@ body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catal
 }
 
 body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__image {
-  margin: 8px 8px 0 !important;
-  padding: 4px !important;
-  min-height: 78px !important;
-  aspect-ratio: 1 / 0.76 !important;
-  border-radius: 12px !important;
+  margin: 10px 10px 0 !important;
+  padding: 6px !important;
+  min-height: 92px !important;
+  aspect-ratio: 1 / 0.84 !important;
+  border-radius: 14px !important;
 }
 
 body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__image img {
@@ -43088,8 +43577,8 @@ body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catal
   display: grid !important;
   justify-items: center !important;
   align-content: start !important;
-  gap: 3px !important;
-  padding: 8px 8px 10px !important;
+  gap: 4px !important;
+  padding: 10px 10px 12px !important;
   text-align: center !important;
 }
 
@@ -43101,14 +43590,14 @@ body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catal
 body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__title--body {
   width: 100% !important;
   margin: 0 !important;
-  font-size: 0.9rem !important;
+  font-size: 0.82rem !important;
   line-height: 1.02 !important;
   text-align: center !important;
 }
 
 body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__count {
-  font-size: 0.66rem !important;
-  line-height: 1.18 !important;
+  font-size: 0.58rem !important;
+  line-height: 1.04 !important;
 }
 
 /* Mobile memories viewer:
@@ -44759,6 +45248,7 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-floatin
    hlavne kategorie musia mat natvrdo rovnaky look, vysku, rozmer a image frame ako podradene. */
 body.app-mobile-shell .catalog-grid--main-menu {
   gap: 8px !important;
+  margin-top: 56px !important;
 }
 
 body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card {
@@ -44790,19 +45280,19 @@ body.app-mobile-shell .catalog-card--main-menu-card:focus-within::before {
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
-  margin: 8px 8px 0 !important;
-  padding: 4px !important;
-  min-height: 78px !important;
-  aspect-ratio: 1 / 0.76 !important;
-  border-radius: 12px !important;
+  margin: 10px 10px 0 !important;
+  padding: 6px !important;
+  min-height: 92px !important;
+  aspect-ratio: 1 / 0.84 !important;
+  border-radius: 14px !important;
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
   display: grid !important;
   justify-items: center !important;
   align-content: start !important;
-  gap: 3px !important;
-  padding: 8px 8px 10px !important;
+  gap: 4px !important;
+  padding: 10px 10px 12px !important;
   text-align: center !important;
 }
 
@@ -44814,12 +45304,12 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--categor
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
   width: 100% !important;
   margin: 0 !important;
-  font-size: 0.9rem !important;
+  font-size: 0.82rem !important;
   line-height: 1.02 !important;
   text-align: center !important;
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
-  font-size: 0.66rem !important;
-  line-height: 1.18 !important;
+  font-size: 0.58rem !important;
+  line-height: 1.04 !important;
 }

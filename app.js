@@ -995,6 +995,7 @@ const detailContent = document.getElementById("detail-content");
 const imageLightboxEl = document.getElementById("image-lightbox");
 let activeOverlayHistoryKind = "";
 let overlayHistoryNavigating = false;
+let appNavigationHistoryBackPending = false;
 let detailModalPreviousOverflow = null;
 let bodyScrollLockX = 0;
 let bodyScrollLockY = 0;
@@ -1013,9 +1014,11 @@ let mobilePreviewEnabled = (() => {
 })();
 let mobileWeatherSoundEnabled = (() => {
   try {
-    return localStorage.getItem(MOBILE_WEATHER_SOUND_KEY) !== "0";
+    const storedValue = localStorage.getItem(MOBILE_WEATHER_SOUND_KEY);
+    if (storedValue === null) return false;
+    return storedValue !== "0";
   } catch (error) {
-    return true;
+    return false;
   }
 })();
 let mobileWeatherSoundVolume = 1;
@@ -1425,7 +1428,8 @@ function readStoredMobileWeatherSoundState() {
   let enabled = mobileWeatherSoundEnabled;
   let volume = mobileWeatherSoundVolume;
   try {
-    enabled = localStorage.getItem(MOBILE_WEATHER_SOUND_KEY) !== "0";
+    const storedValue = localStorage.getItem(MOBILE_WEATHER_SOUND_KEY);
+    enabled = storedValue === null ? false : storedValue !== "0";
   } catch (error) {
     enabled = mobileWeatherSoundEnabled;
   }
@@ -2410,6 +2414,26 @@ function syncMainMenuTouchScrollState() {
   body.classList.toggle("app-focused-scroll-safe", isFocusedMode && !hasBlockingOverlay);
 }
 
+function shouldPauseWeatherBackgroundLoop() {
+  return Boolean(
+    detailModal?.open
+    || journalOverlayRoot()
+    || imageLightboxEl?.open
+    || authGateRoot()
+    || isMobileCameraPickerOpen()
+  );
+}
+
+function syncWeatherBackgroundLoopVisibility() {
+  const engine = window.weatherBackgroundEngine;
+  if (!engine) return;
+  if (shouldPauseWeatherBackgroundLoop()) {
+    engine.pauseAnimation?.();
+    return;
+  }
+  engine.resumeAnimation?.();
+}
+
 function scheduleWalkMapResize(map) {
   if (!map) return;
   requestAnimationFrame(() => map.invalidateSize());
@@ -2738,6 +2762,8 @@ function buildAppNavigationHistoryState(baseState = {}) {
   nextState.__mzView = isFocusedView ? "category" : "menu";
   nextState.__mzCategoryId = isFocusedView ? String(activeCategoryId || "").trim() : "";
   nextState.__mzMenuCategories = !isFocusedView && mainMenuCategoriesPreviewVisible ? 1 : 0;
+  const navIndex = Number(nextState.__mzNavIndex);
+  nextState.__mzNavIndex = Number.isFinite(navIndex) && navIndex >= 0 ? Math.round(navIndex) : 0;
   return nextState;
 }
 
@@ -2760,18 +2786,61 @@ function syncAppNavigationHistoryState({ mode = "replace" } = {}) {
     ? window.history.state
     : {};
   const nextState = buildAppNavigationHistoryState(currentState);
+  const currentNavIndex = Number.isFinite(Number(currentState.__mzNavIndex)) && Number(currentState.__mzNavIndex) >= 0
+    ? Math.round(Number(currentState.__mzNavIndex))
+    : 0;
   if (mode === "push" && window.history?.pushState) {
     if (sameAppNavigationHistoryState(currentState)) {
       window.history.replaceState(nextState, "");
       return;
     }
+    nextState.__mzNavIndex = currentNavIndex + 1;
     window.history.pushState(nextState, "");
     return;
   }
+  nextState.__mzNavIndex = currentNavIndex;
   window.history.replaceState(nextState, "");
 }
 
-function applyAppNavigationHistoryState(historyState = null, { scrollToTop = true } = {}) {
+function goBackOneAppNavigationStep({ fallbackCategoryId = "", fallbackToMenu = false } = {}) {
+  if (typeof window !== "undefined" && window.history?.back) {
+    const currentState = window.history.state && typeof window.history.state === "object"
+      ? window.history.state
+      : {};
+    const currentNavIndex = Number.isFinite(Number(currentState.__mzNavIndex)) && Number(currentState.__mzNavIndex) > 0
+      ? Math.round(Number(currentState.__mzNavIndex))
+      : 0;
+    if (currentNavIndex > 0) {
+      appNavigationHistoryBackPending = true;
+      window.history.back();
+      return true;
+    }
+  }
+
+  appNavigationHistoryBackPending = false;
+  const normalizedFallbackId = String(fallbackCategoryId || "").trim();
+  if (normalizedFallbackId) {
+    applyAppNavigationHistoryState({
+      ...(window.history?.state && typeof window.history.state === "object" ? window.history.state : {}),
+      __mzView: "category",
+      __mzCategoryId: normalizedFallbackId,
+      __mzMenuCategories: 0
+    }, { scrollToTop: true });
+    return false;
+  }
+
+  if (fallbackToMenu) {
+    applyAppNavigationHistoryState({
+      ...(window.history?.state && typeof window.history.state === "object" ? window.history.state : {}),
+      __mzView: "menu",
+      __mzCategoryId: "",
+      __mzMenuCategories: 0
+    }, { scrollToTop: true });
+  }
+  return false;
+}
+
+function applyAppNavigationHistoryState(historyState = null, { scrollToTop = true, compactScrollReset = false, fromHistoryNavigation = false } = {}) {
   const nextState = historyState && typeof historyState === "object" ? historyState : {};
   const nextView = String(nextState.__mzView || "menu").trim() === "category" ? "category" : "menu";
   const nextCategoryId = String(nextState.__mzCategoryId || "").trim();
@@ -2792,6 +2861,23 @@ function applyAppNavigationHistoryState(historyState = null, { scrollToTop = tru
   syncAppNavigationHistoryState({ mode: "replace" });
 
   if (!scrollToTop) return;
+  const useDeferredHistoryScrollReset = fromHistoryNavigation || compactScrollReset;
+  if (useDeferredHistoryScrollReset) {
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => {
+        scrollNavigationViewportTop();
+        if (!isFocusedView && mainMenuCategoriesPreviewVisible) {
+          window.requestAnimationFrame(scrollMainMenuCategoriesPreviewIntoView);
+        }
+      });
+      return;
+    }
+    scrollNavigationViewportTop();
+    if (!isFocusedView && mainMenuCategoriesPreviewVisible) {
+      scrollMainMenuCategoriesPreviewIntoView();
+    }
+    return;
+  }
   scrollNavigationViewportTop();
   if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
     window.requestAnimationFrame(scrollNavigationViewportTop);
@@ -2819,6 +2905,7 @@ function openDetailModalDialog() {
     lockDetailBodyScroll();
     detailModal.showModal();
   }
+  syncWeatherBackgroundLoopVisibility();
   syncMobileOverlayBottomNavPlacement();
   detailModal.scrollTop = 0;
   if (detailContent) detailContent.scrollTop = 0;
@@ -2842,6 +2929,7 @@ const addCategoryQuickEl = document.getElementById("open-add-category");
 const worklogPanelToggleEl = document.getElementById("toggle-worklog-panel");
 const journalPanelToggleEl = document.getElementById("toggle-journal-panel");
 const addCardQuickEl = document.getElementById("open-add-card");
+const addGalleryQuickEl = document.getElementById("open-add-gallery");
 const batchSowingQuickEl = document.getElementById("open-batch-sowing");
 const batchMoveQuickEl = document.getElementById("open-batch-move");
 const menuPanelEl = document.getElementById("menu-panel");
@@ -2916,6 +3004,11 @@ const worklogQuickOriginalParentEl = worklogPanelToggleEl?.parentElement || null
 const journalQuickOriginalParentEl = journalPanelToggleEl?.parentElement || null;
 let lastDeleted = loadUndoState();
 const imageLightboxState = { images: [], index: 0, label: "Fotka" };
+const imageLightboxTouchState = {
+  startX: 0,
+  startY: 0,
+  active: false
+};
 let deferredCategoryCardImageObserver = null;
 let deferredJournalImageObserver = null;
 let deferredVarietyCardImageObserver = null;
@@ -3234,6 +3327,7 @@ function closeJournalOverlay(options = {}) {
   } else if (activeOverlayHistoryKind === "journal") {
     activeOverlayHistoryKind = "";
   }
+  syncWeatherBackgroundLoopVisibility();
   syncMobileOverlayBottomNavPlacement();
 }
 
@@ -3257,6 +3351,7 @@ function ensureJournalOverlayRoot(options = {}) {
   document.removeEventListener("keydown", handleJournalOverlayEscape);
   document.addEventListener("keydown", handleJournalOverlayEscape);
   if (!skipHistoryPush) pushOverlayHistory("journal");
+  syncWeatherBackgroundLoopVisibility();
   return root;
 }
 
@@ -3732,6 +3827,7 @@ function openJournalOverlayEntry(entryId = "", returnTagKey = "", options = {}) 
   });
   bindJournalOverlayCardActions(root);
   hydrateWalkMaps(root);
+  syncWeatherBackgroundLoopVisibility();
   syncMobileOverlayBottomNavPlacement();
 }
 
@@ -5314,9 +5410,10 @@ function bindCatalogDelegatedActions() {
       event.preventDefault();
       const activeCategory = currentCategory();
       const parentCategoryId = String(activeCategory?.parentCategoryId || "").trim();
-      if (parentCategoryId) {
-        openFocusedCategoryNavigation(parentCategoryId);
-      }
+      goBackOneAppNavigationStep({
+        fallbackCategoryId: parentCategoryId,
+        fallbackToMenu: !parentCategoryId
+      });
       return;
     }
 
@@ -5708,6 +5805,13 @@ function wireStaticEvents() {
     });
   }
 
+  if (addGalleryQuickEl) {
+    addGalleryQuickEl.addEventListener("click", () => {
+      closeToolbarAddMenu();
+      openVarietyEditor(null, resolveQuickAddVarietyCategoryId(), "gallery");
+    });
+  }
+
   if (batchSowingQuickEl) {
     batchSowingQuickEl.addEventListener("click", () => {
       closeToolbarAddMenu();
@@ -5765,6 +5869,7 @@ function wireStaticEvents() {
 
   detailModal.addEventListener("close", () => {
     unlockDetailBodyScroll();
+    syncWeatherBackgroundLoopVisibility();
     syncMobileOverlayBottomNavPlacement();
     detailModalBackOverride = null;
     if (!overlayHistoryNavigating) {
@@ -5863,7 +5968,9 @@ function wireStaticEvents() {
       }, 0);
       return;
     }
-    applyAppNavigationHistoryState(event.state, { scrollToTop: true });
+    const compactScrollReset = appNavigationHistoryBackPending;
+    appNavigationHistoryBackPending = false;
+    applyAppNavigationHistoryState(event.state, { scrollToTop: true, compactScrollReset, fromHistoryNavigation: true });
   });
 
   document.addEventListener("click", (event) => {
@@ -5879,6 +5986,16 @@ function wireStaticEvents() {
     if (!(input instanceof HTMLInputElement)) return;
     event.preventDefault();
     openDateInputPicker(input);
+  });
+
+  document.addEventListener("input", (event) => {
+    if (!(event.target instanceof HTMLInputElement) || !event.target.classList.contains("date-input")) return;
+    syncDateInputEmptyState(event.target);
+  });
+
+  document.addEventListener("change", (event) => {
+    if (!(event.target instanceof HTMLInputElement) || !event.target.classList.contains("date-input")) return;
+    syncDateInputEmptyState(event.target);
   });
 
   if (imageLightboxCloseEl) {
@@ -5901,11 +6018,15 @@ function wireStaticEvents() {
     imageLightboxEl.addEventListener("click", (event) => {
       if (event.target === imageLightboxEl) closeImageLightbox();
     });
+    imageLightboxEl.addEventListener("touchstart", beginImageLightboxTouch, { passive: true });
+    imageLightboxEl.addEventListener("touchend", endImageLightboxTouch, { passive: true });
+    imageLightboxEl.addEventListener("touchcancel", resetImageLightboxTouchState, { passive: true });
     imageLightboxEl.addEventListener("cancel", (event) => {
       event.preventDefault();
       closeImageLightbox();
     });
     imageLightboxEl.addEventListener("close", () => {
+      resetImageLightboxTouchState();
       const fallbackKind = inferVisibleOverlayHistoryKind();
       if (!overlayHistoryNavigating) {
         if (activeOverlayHistoryKind === "lightbox" && typeof window !== "undefined" && window.history?.back) {
@@ -5926,6 +6047,7 @@ function wireStaticEvents() {
       }
 
       unlockBodyScroll("lightbox");
+      syncWeatherBackgroundLoopVisibility();
       syncMobileOverlayBottomNavPlacement();
     });
   }
@@ -5970,6 +6092,7 @@ function openImageLightbox(images, startIndex = 0, label = "Fotka") {
   if (!imageLightboxEl) return;
   const validImages = (images || []).filter(Boolean);
   if (!validImages.length) return;
+  resetImageLightboxTouchState();
   imageLightboxState.images = validImages;
   imageLightboxState.index = startIndex;
   imageLightboxState.label = label;
@@ -5979,6 +6102,7 @@ function openImageLightbox(images, startIndex = 0, label = "Fotka") {
     lockBodyScroll("lightbox");
     imageLightboxEl.showModal();
   }
+  syncWeatherBackgroundLoopVisibility();
   syncMobileOverlayBottomNavPlacement();
 }
 
@@ -5994,6 +6118,35 @@ function stepImageLightbox(direction) {
   if (!images.length || images.length < 2) return;
   imageLightboxState.index = (imageLightboxState.index + direction + images.length) % images.length;
   syncImageLightbox();
+}
+
+function resetImageLightboxTouchState() {
+  imageLightboxTouchState.startX = 0;
+  imageLightboxTouchState.startY = 0;
+  imageLightboxTouchState.active = false;
+}
+
+function beginImageLightboxTouch(event) {
+  if (!imageLightboxEl?.open || imageLightboxState.images.length < 2) {
+    resetImageLightboxTouchState();
+    return;
+  }
+  const touch = event.changedTouches?.[0];
+  if (!touch) return;
+  imageLightboxTouchState.startX = touch.clientX;
+  imageLightboxTouchState.startY = touch.clientY;
+  imageLightboxTouchState.active = true;
+}
+
+function endImageLightboxTouch(event) {
+  if (!imageLightboxTouchState.active) return;
+  imageLightboxTouchState.active = false;
+  const touch = event.changedTouches?.[0];
+  if (!touch) return;
+  const deltaX = touch.clientX - imageLightboxTouchState.startX;
+  const deltaY = touch.clientY - imageLightboxTouchState.startY;
+  if (Math.abs(deltaX) < 28 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+  stepImageLightbox(deltaX < 0 ? 1 : -1);
 }
 
 function render() {
@@ -6029,6 +6182,9 @@ function render() {
   reconcileBodyScrollState();
   syncMainMenuTouchScrollState();
   scheduleEmbeddedMobilePreviewMetricsPush();
+  if (typeof window !== "undefined" && window.history && "scrollRestoration" in window.history) {
+    window.history.scrollRestoration = "manual";
+  }
   syncAppNavigationHistoryState({ mode: "replace" });
   markAppBootReady();
 }
@@ -6710,17 +6866,17 @@ function mobileBottomNavMarkup() {
       <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--diary" aria-hidden="true">📒</span>
       <span class="mobile-bottom-nav__label">Denník</span>
     </button>
-    <button class="mobile-bottom-nav__button mobile-bottom-nav__button--camera" type="button" data-mobile-bottom-nav="add" aria-label="Pridať">
-      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--camera" aria-hidden="true">+</span>
-      <span class="mobile-bottom-nav__label mobile-bottom-nav__label--hidden">Pridať</span>
+    <button class="mobile-bottom-nav__button mobile-bottom-nav__button--camera" type="button" data-mobile-bottom-nav="camera" aria-label="Foto">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--camera" aria-hidden="true">📷</span>
+      <span class="mobile-bottom-nav__label mobile-bottom-nav__label--hidden">Foto</span>
     </button>
     <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="categories">
       <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--categories" aria-hidden="true">🌿</span>
       <span class="mobile-bottom-nav__label">Kategórie</span>
     </button>
-    <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="camera">
-      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--photo" aria-hidden="true">📷</span>
-      <span class="mobile-bottom-nav__label">Foto</span>
+    <button class="mobile-bottom-nav__button" type="button" data-mobile-bottom-nav="add" aria-label="Pridať">
+      <span class="mobile-bottom-nav__icon mobile-bottom-nav__icon--add" aria-hidden="true">+</span>
+      <span class="mobile-bottom-nav__label">Pridať</span>
     </button>
   `;
 }
@@ -7117,6 +7273,18 @@ function enableMobileMediaPickerForInput(input, options = {}) {
       delete input.dataset.mobileMediaPickerBypass;
       return;
     }
+    if (options?.preferNativePicker) {
+      event.preventDefault();
+      event.stopPropagation();
+      input.dataset.mobileMediaPickerBypass = "true";
+      window.setTimeout(() => {
+        if (input.dataset.mobileMediaPickerBypass === "true") {
+          delete input.dataset.mobileMediaPickerBypass;
+        }
+      }, 0);
+      openNativeFilePicker(input);
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     openMobileMediaPickerForInput(input, options);
@@ -7135,14 +7303,17 @@ function closeMobileCameraPicker({ fromHistory = false, skipHistory = true } = {
     if (activeOverlayHistoryKind === "mobile-camera") {
       activeOverlayHistoryKind = inferVisibleOverlayHistoryKind();
     }
+    syncWeatherBackgroundLoopVisibility();
     return;
   }
   if (skipHistory) {
     if (activeOverlayHistoryKind === "mobile-camera") {
       activeOverlayHistoryKind = inferVisibleOverlayHistoryKind();
     }
+    syncWeatherBackgroundLoopVisibility();
     return;
   }
+  syncWeatherBackgroundLoopVisibility();
   clearOverlayHistory("mobile-camera");
 }
 
@@ -7309,6 +7480,7 @@ function openMobileMediaPickerForInput(input, options = {}) {
   host.setAttribute("aria-hidden", "false");
   host.classList.add("is-open");
   pushOverlayHistory("mobile-camera");
+  syncWeatherBackgroundLoopVisibility();
 }
 
 function openMobileCameraPicker() {
@@ -7330,6 +7502,7 @@ function openMobileCameraPicker() {
   host.setAttribute("aria-hidden", "false");
   host.classList.add("is-open");
   pushOverlayHistory("mobile-camera");
+  syncWeatherBackgroundLoopVisibility();
 }
 
 async function openQuickPhotoEntryFlow(photoFiles) {
@@ -7882,9 +8055,47 @@ function renderCatalog() {
   const varietyEmpty = category.nodeType === "parent"
     ? "Karty patria skôr pod konkrétne kategórie. Najprv otvor alebo vytvor podradenú kategóriu."
     : "V tejto kategórii ešte nie sú karty. Klikni na Pridať kartu.";
+  const categoryManageSummaryLabel = isMobileShell ? "Správa" : "Správa kategórie";
+  const categoryBackAriaLabel = escapeAttribute(previousCategoryId ? `Späť do ${previousCategory?.name || "nadradenej kategórie"}` : "Späť o jednu úroveň");
+  const useInlineCategoryBack = isMobileShell && isFocusedView;
+  const useInlineCategoryManage = isMobileShell && isFocusedView;
+  const renderInlineChildCategories = isMobileShell && isFocusedView && childCategories.length;
+  const showCategoryTitleCount = scopedCategoryVarieties.length && !(isMobileShell && isFocusedView);
+  const inlineCategoryBackMarkup = useInlineCategoryBack
+    ? `<button class="category-shell__back category-shell__back--inline" type="button" data-category-back aria-label="${categoryBackAriaLabel}" title="Späť">&#8249;</button>`
+    : "";
+  const childCategoriesGridMarkup = childCategories.length
+    ? `
+            <div class="catalog-grid catalog-grid--subcategories">
+              ${childCategories.map(renderChildCategoryCard).join("")}
+            </div>
+      `
+    : "";
+  const inlineChildCategoriesMarkup = renderInlineChildCategories
+    ? `
+              <div class="category-panel__subcategories-inline">
+                ${childCategoriesGridMarkup}
+              </div>
+        `
+    : "";
+  const childCategoriesSectionMarkup = childCategories.length && !renderInlineChildCategories
+    ? `
+          <section class="subcatalog subcatalog--overview">
+            ${childCategoriesGridMarkup}
+          </section>
+      `
+    : "";
+  const categoryFilterChipsMarkup = `
+        ${sownCount ? `<button class="tag tag--button tag--button-sown" type="button" id="open-category-sown">${sownCount} vysiate</button>` : ""}
+        ${topCount ? `<button class="tag tag--button tag--button-top" type="button" id="open-category-top">${topCount} top</button>` : ""}
+        ${avoidCount ? `<button class="tag tag--button tag--button-avoid" type="button" id="open-category-avoid">${avoidCount} neodporúčam</button>` : ""}
+        ${neverGrownCount ? `<button class="tag tag--button tag--button-never-grown" type="button" id="open-category-never-grown">${neverGrownCount} ešte som nepestovala</button>` : ""}
+        ${showBreedingChips && hybridCount ? `<button class="tag tag--button tag--button-hybrid" type="button" id="open-category-hybrid">${hybridCount} F1</button>` : ""}
+        ${showBreedingChips && openPollinatedCount ? `<button class="tag tag--button tag--button-open" type="button" id="open-category-open-pollinated">${openPollinatedCount} nehybridná</button>` : ""}
+      `;
   const categoryManageMarkup = `
-      <details class="category-action-disclosure category-action-disclosure--inline category-panel__manage">
-        <summary class="button button--soft category-action-disclosure__summary">Správa kategórie</summary>
+      <details class="category-action-disclosure category-action-disclosure--inline category-panel__manage${useInlineCategoryManage ? " category-panel__manage--floating-inline" : ""}">
+        <summary class="button button--soft category-action-disclosure__summary" aria-label="Správa kategórie">${useInlineCategoryManage ? "⋯" : categoryManageSummaryLabel}</summary>
         <section class="category-action-panel category-action-panel--inline">
           <div class="category-action-panel__row category-action-panel__row--category">
             <button class="button button--soft category-action-panel__button category-action-panel__button--manage" type="button" id="edit-category">Upraviť kategóriu</button>
@@ -7896,22 +8107,26 @@ function renderCatalog() {
             <button class="button button--soft category-action-panel__button category-action-panel__button--sowing" type="button" id="sow-category-entries">Hromadný výsev</button>
             <button class="button button--soft category-action-panel__button category-action-panel__button--move" type="button" id="move-category-entries">Hromadný presun kariet</button>
           </div>
+          ${useInlineCategoryManage && categoryFilterChipsMarkup.trim()
+            ? `<div class="category-action-panel__row category-action-panel__row--filters">${categoryFilterChipsMarkup}</div>`
+            : ""}
         </section>
       </details>
     `;
+  const inlineCategoryManageMarkup = useInlineCategoryManage ? categoryManageMarkup : "";
   const categoryNavMarkup = isMobileShell
-    ? `
+    ? (useInlineCategoryBack ? "" : `
         <div class="category-shell__nav category-shell__nav--compact category-shell__nav--mobile-back">
           <button
             class="back-button category-shell__back"
             type="button"
             data-category-back
-            aria-label="${escapeAttribute(previousCategoryId ? `Späť do ${previousCategory?.name || "nadradenej kategórie"}` : "Späť o jednu úroveň")}"
+            aria-label="${categoryBackAriaLabel}"
           >
             Späť
           </button>
         </div>
-      `
+      `)
     : `
         <div class="category-shell__nav category-shell__nav--compact">
           <div class="breadcrumb breadcrumb--compact">
@@ -7936,31 +8151,23 @@ function renderCatalog() {
           <div class="category-panel__intro">
             <div class="category-panel__intro-copy">
               <div class="category-panel__title-row">
-                <h3>${escapeHtml(category.name)}${scopedCategoryVarieties.length ? ` <span class="category-panel__title-count">(${scopedCategoryVarieties.length})</span>` : ""}</h3>
+                ${inlineCategoryBackMarkup}
+                <h3>${escapeHtml(category.name)}${showCategoryTitleCount ? ` <span class="category-panel__title-count">(${scopedCategoryVarieties.length})</span>` : ""}</h3>
                 ${inheritedSowingWindow || categoryJournalButtonMarkup ? `<div class="category-panel__hero-side">${categoryJournalButtonMarkup}${inheritedSowingWindow ? `<span class="tag category-panel__hero-tag">Odporúčaný výsev: ${escapeHtml(inheritedSowingWindow)}</span>` : ""}</div>` : ""}
               </div>
+              ${inlineCategoryManageMarkup}
+              ${inlineChildCategoriesMarkup}
               ${inheritedNotes ? `<p class="category-panel__notes">${escapeHtml(inheritedNotes)}</p>` : ""}
             </div>
           </div>
-          ${categoryManageMarkup}
+          ${useInlineCategoryManage ? "" : categoryManageMarkup}
       </div>
-        <div class="category-panel__chips category-panel__chips--actions">
-        ${sownCount ? `<button class="tag tag--button tag--button-sown" type="button" id="open-category-sown">${sownCount} vysiate</button>` : ""}
-        ${topCount ? `<button class="tag tag--button tag--button-top" type="button" id="open-category-top">${topCount} top</button>` : ""}
-        ${avoidCount ? `<button class="tag tag--button tag--button-avoid" type="button" id="open-category-avoid">${avoidCount} neodporúčam</button>` : ""}
-        ${neverGrownCount ? `<button class="tag tag--button tag--button-never-grown" type="button" id="open-category-never-grown">${neverGrownCount} ešte som nepestovala</button>` : ""}
-        ${showBreedingChips && hybridCount ? `<button class="tag tag--button tag--button-hybrid" type="button" id="open-category-hybrid">${hybridCount} F1</button>` : ""}
-        ${showBreedingChips && openPollinatedCount ? `<button class="tag tag--button tag--button-open" type="button" id="open-category-open-pollinated">${openPollinatedCount} nehybridná</button>` : ""}
-      </div>
+        ${useInlineCategoryManage
+          ? ""
+          : `<div class="category-panel__chips category-panel__chips--actions">${categoryFilterChipsMarkup}</div>`}
     </section>
         ` : ""}
-        ${childCategories.length ? `
-          <section class="subcatalog subcatalog--overview">
-            <div class="catalog-grid catalog-grid--subcategories">
-              ${childCategories.map(renderChildCategoryCard).join("")}
-            </div>
-          </section>
-        ` : ""}
+        ${childCategoriesSectionMarkup}
     </div>
       ${varieties.length ? `
         <section class="subcatalog">
@@ -7993,18 +8200,6 @@ function renderCatalog() {
           )
         );
       compactBreadcrumb.scrollTo({ left: targetLeft });
-    });
-  }
-
-  const categoryBackButton = catalogEl.querySelector(".category-shell__back");
-  if (categoryBackButton) {
-    categoryBackButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (previousCategoryId) {
-        openFocusedCategoryNavigation(previousCategoryId);
-        return;
-      }
-      openMainMenuView();
     });
   }
 
@@ -11393,6 +11588,12 @@ function relatedTasksForTheme(record) {
 }
 
 function renderChildCategoryCard(category) {
+  const isFocusedMobileChildCard = typeof document !== "undefined"
+    && document.body.classList.contains("app-mobile-shell")
+    && document.body.classList.contains("app-focused-mode");
+  const mobileChildTitleStyle = isFocusedMobileChildCard
+    ? ' style="font-size:0.72rem;line-height:0.98;font-weight:650;letter-spacing:-0.02em;-webkit-text-size-adjust:none;text-size-adjust:none;"'
+    : "";
   return `
     <article class="catalog-card catalog-card--child catalog-card--clickable catalog-card--${category.nodeType || "kind"}" style="--category-accent:${escapeAttribute(category.color || "#7e9f4b")}">
       <button class="catalog-card__main-hit" type="button" data-open-category="${category.id}" aria-label="Otvoriť kategóriu ${escapeHtml(category.name)}">
@@ -11401,7 +11602,7 @@ function renderChildCategoryCard(category) {
         </div>
         <div class="catalog-card__body catalog-card__body--category">
           <div class="catalog-card__head catalog-card__head--category">
-            <h3 class="catalog-card__title catalog-card__title--body">${escapeHtml(category.name)}</h3>
+            <h3 class="catalog-card__title catalog-card__title--body"${mobileChildTitleStyle}>${escapeHtml(category.name)}</h3>
           </div>
           <p class="catalog-card__count">${escapeHtml(categoryVarietyCountLabel(category.id))}</p>
         </div>
@@ -13661,7 +13862,7 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
   const preview = document.getElementById("category-preview");
   const clearImageButton = document.getElementById("clear-category-image");
 
-  enableMobileMediaPickerForInput(imageInput);
+  enableMobileMediaPickerForInput(imageInput, { preferNativePicker: true });
 
   const renderCategoryPreview = (image = "", altText = "") => {
     if (image) {
@@ -13815,6 +14016,9 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
   }
 
   openDetailModalDialog();
+  if (!existing && currentEntryKind === "detail") {
+    scheduleCardEditorTypeWarmup(String(categoryId || "").trim(), "variety");
+  }
 }
 
 function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntryKind = "detail") {
@@ -13936,7 +14140,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
               <label class="field-block"><span>Kategória</span><select name="categoryId" required>${categoryOptions(categoryId)}</select></label>
               <div class="field-block field-block--full">
                 <span>${currentEntryKind === "quick" ? "Dátum záznamu" : "Dátum albumu"}</span>
-                ${renderDateInput({ id: "variety-sowed-at", name: "sowedAt", value: existing?.sowedAt || "" })}
+                ${renderDateInput({ id: "variety-sowed-at", name: "sowedAt", value: existing?.sowedAt || "", emptyHint: currentEntryKind === "gallery" ? "dd.mm.rrrr" : "" })}
               </div>
             `}
           </div>
@@ -15129,6 +15333,64 @@ function mobileAddCardTypeBarMarkup(selectedType, { formId = "", submitLabel = "
   `;
 }
 
+const cardEditorWarmPlaceholderCache = new Set();
+
+function preloadCardEditorPlaceholder(cardTypeValue = "variety") {
+  const source = String(cardPlaceholderImage(cardTypeValue) || "").trim();
+  if (!source || typeof Image !== "function" || cardEditorWarmPlaceholderCache.has(source)) return;
+  cardEditorWarmPlaceholderCache.add(source);
+  const image = new Image();
+  image.decoding = "async";
+  image.src = source;
+}
+
+function warmCardEditorTypeSwitch(cardTypeValue = "variety", preferredCategoryId = "") {
+  const resolvedType = String(cardTypeValue || "").trim() || "variety";
+  const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  preloadCardEditorPlaceholder(resolvedType);
+
+  if (resolvedType === "variety") {
+    const resolvedCategoryId = String(preferredCategoryId || resolveDefaultVarietyCategoryId() || FALLBACK_CATEGORY_ID).trim() || FALLBACK_CATEGORY_ID;
+    categoryOptions(resolvedCategoryId, { compactLabels: isMobileShell });
+    choiceChipOptions("statusValues", [
+      { value: "planned", label: "Plánujem" },
+      { value: "sown", label: "Vysiate" },
+      { value: "transplanted", label: "Vysadené" },
+      { value: "harvested", label: "Zber" }
+    ], []);
+    ratingOptions(0);
+    return;
+  }
+
+  const resolvedCategoryId = String(resolvePreferredCategoryIdForCardType(resolvedType, preferredCategoryId) || FALLBACK_CATEGORY_ID).trim() || FALLBACK_CATEGORY_ID;
+  categoryOptions(resolvedCategoryId, { cardTypeValue: resolvedType });
+  renderUniversalCardSpecificFields(resolvedType, {});
+}
+
+function scheduleCardEditorTypeWarmup(preferredCategoryId = "", skipType = "") {
+  if (typeof window === "undefined") return;
+  const safePreferredCategoryId = String(preferredCategoryId || "").trim();
+  const safeSkipType = String(skipType || "").trim();
+  const runWarmup = () => {
+    CARD_TYPE_OPTIONS
+      .map((option) => String(option?.value || "").trim())
+      .filter(Boolean)
+      .filter((type) => type !== safeSkipType)
+      .forEach((type) => {
+        warmCardEditorTypeSwitch(type, safePreferredCategoryId);
+      });
+  };
+
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => {
+      window.setTimeout(runWarmup, 0);
+    });
+    return;
+  }
+
+  window.setTimeout(runWarmup, 0);
+}
+
 function renderMediaUploadField({
   label = "",
   inputName = "imageFile",
@@ -15230,15 +15492,23 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   detailModal.classList.add("detail-modal--settings");
   const isMobileSettingsShell = document.body.classList.contains("app-mobile-shell");
   const weatherPreferences = loadWeatherPreferences();
-  const authProfile = loadLocalAuthProfile();
-  const authSession = loadLocalAuthSession();
+  clearLocalAuthSession();
+  clearLocalAuthProfile();
+  const authProfile = null;
+  const authSession = null;
+  const supabaseBootstrapPreferences = loadSupabaseBootstrapPreferences();
   const supabasePreferences = loadSupabasePreferences();
   const supabaseAuthMirror = loadSupabaseAuthMirror();
   const supabaseSyncMeta = loadSupabaseSyncMeta();
   const currentWeatherPlace = String(weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).trim() || GARDEN_WEATHER_PLACE;
-  const hasLocalAccount = Boolean(authProfile?.enabled);
-  const isSignedIn = isLocalAuthSessionValid(authProfile, authSession);
-  const accountName = hasLocalAccount ? localAuthDisplayName(authProfile) : "";
+  const hasLocalAccount = false;
+  const isSignedIn = false;
+  const accountName = "";
+  const supabaseManagedInCode = Boolean(
+    supabaseBootstrapPreferences.enabled
+    && supabaseBootstrapPreferences.url
+    && supabaseBootstrapPreferences.anonKey
+  );
   const supabaseEnabled = Boolean(supabasePreferences.enabled && supabasePreferences.url && supabasePreferences.anonKey);
   const supabaseCloudSignedIn = Boolean(supabaseAuthMirror.email);
   const supabaseCloudReady = supabaseEnabled && supabaseCloudSignedIn;
@@ -15257,9 +15527,11 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     : "Tu si vieš bezpečne uložiť export JSON a neskôr ho načítať späť do appky.";
   const supabaseStatusMessage = statusScope === "supabase"
     ? statusMessage
-    : (supabaseEnabled
+    : (supabaseManagedInCode
+      ? "Supabase je načítaný priamo z kódu cez supabase-config.js."
+      : (supabaseEnabled
       ? "Supabase je uložený ako pripravený backend pre ďalší krok."
-      : "Sem si vieš uložiť URL a anon key svojho Supabase projektu. Zatiaľ tým len pripravíme čistú cestu na cloud.");
+      : "Sem si vieš uložiť URL a anon key svojho Supabase projektu. Zatiaľ tým len pripravíme čistú cestu na cloud."));
   const cloudAccountStatusMessage = statusScope === "cloud-account"
     ? statusMessage
     : (supabaseEnabled
@@ -15301,7 +15573,6 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
         </div>
         <div class="settings-hero__meta">
           <div class="settings-hero__pill">${escapeHtml(currentWeatherPlace)}</div>
-          <div class="settings-hero__pill">${escapeHtml(hasLocalAccount ? (isSignedIn ? `Účet: ${accountName || "prihlásená"}` : `Účet: ${accountName || "zamknutý"}`) : "Účet: zatiaľ vypnutý")}</div>
           <div class="settings-hero__pill">${escapeHtml(supabaseEnabled ? "Supabase pripravený" : "Supabase zatiaľ nie")}</div>
           <div class="settings-hero__pill">${escapeHtml(supabaseCloudSignedIn ? `Cloud: ${supabaseAuthMirror.email}` : "Cloud: zatiaľ nie")}</div>
         </div>
@@ -15313,7 +15584,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     <div class="settings-sheet">
       ${settingsHeroMarkup}
       <div class="settings-grid">
-        <section class="settings-panel">
+        <section class="settings-panel" data-settings-section="weather" ${(!statusScope || statusScope === "weather") ? "data-settings-default-open" : ""}>
           <div class="settings-panel__head">
             <div>
               <p class="eyebrow">Počasie</p>
@@ -15333,7 +15604,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
             <p class="settings-panel__status ${weatherTone ? `is-${weatherTone}` : ""}" data-settings-weather-status>${escapeHtml(weatherStatusMessage)}</p>
           </form>
         </section>
-        <section class="settings-panel">
+        <section class="settings-panel" data-settings-section="backup" ${statusScope === "backup" ? "data-settings-default-open" : ""}>
           <div class="settings-panel__head">
             <div>
               <p class="eyebrow">Záloha a prenos</p>
@@ -15350,32 +15621,42 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
             <p class="settings-panel__status ${backupTone ? `is-${backupTone}` : ""}" data-settings-backup-status>${escapeHtml(backupStatusMessage)}</p>
           </div>
         </section>
-        <section class="settings-panel settings-panel--wide">
+        <section class="settings-panel settings-panel--wide" data-settings-section="supabase" ${(statusScope === "supabase" || !supabaseEnabled) ? "data-settings-default-open" : ""}>
           <div class="settings-panel__head">
             <div>
               <p class="eyebrow">Backend</p>
               <h3>Supabase</h3>
             </div>
           </div>
-          <form id="settings-supabase-form" class="settings-form">
-            <label class="field-block field-block--full">
-              <span>Supabase URL</span>
-              <input name="supabaseUrl" type="url" value="${escapeAttribute(supabasePreferences.url || "")}" placeholder="https://xxxxx.supabase.co" autocomplete="off" spellcheck="false">
-            </label>
-            <label class="field-block field-block--full">
-              <span>Supabase anon key</span>
-              <input name="supabaseAnonKey" type="text" value="${escapeAttribute(supabasePreferences.anonKey || "")}" placeholder="Sem vlož anon public key" autocomplete="off" spellcheck="false">
-            </label>
-            <p class="settings-panel__help">Týmto ešte nič nemigruješ. Len si uložíš projekt, aby sme potom vedeli napojiť prihlásenie, dáta a obrázky bez ďalšej prestavby appky.</p>
-            <div class="settings-panel__actions">
-              <button class="button" type="submit">Uložiť Supabase</button>
-              <button class="button button--ghost" type="button" data-test-supabase ${supabaseEnabled ? "" : "hidden"}>Otestovať spojenie</button>
-              <button class="button button--ghost" type="button" data-clear-supabase ${supabaseEnabled ? "" : "hidden"}>Vymazať Supabase</button>
+          ${supabaseManagedInCode ? `
+            <div class="settings-form">
+              <p class="settings-panel__help">Supabase už ide priamo z lokálneho <code>supabase-config.js</code>. Preto tu už netreba ručne vypĺňať URL ani anon key.</p>
+              <div class="settings-panel__actions">
+                <button class="button button--ghost" type="button" data-test-supabase ${supabaseEnabled ? "" : "hidden"}>Otestovať spojenie</button>
+              </div>
+              <p class="settings-panel__status ${supabaseTone ? `is-${supabaseTone}` : ""}" data-settings-supabase-status>${escapeHtml(supabaseStatusMessage)}</p>
             </div>
-            <p class="settings-panel__status ${supabaseTone ? `is-${supabaseTone}` : ""}" data-settings-supabase-status>${escapeHtml(supabaseStatusMessage)}</p>
-          </form>
+          ` : `
+            <form id="settings-supabase-form" class="settings-form">
+              <label class="field-block field-block--full">
+                <span>Supabase URL</span>
+                <input name="supabaseUrl" type="url" value="${escapeAttribute(supabasePreferences.url || "")}" placeholder="https://xxxxx.supabase.co" autocomplete="off" spellcheck="false">
+              </label>
+              <label class="field-block field-block--full">
+                <span>Supabase anon key</span>
+                <input name="supabaseAnonKey" type="text" value="${escapeAttribute(supabasePreferences.anonKey || "")}" placeholder="Sem vlož anon public key" autocomplete="off" spellcheck="false">
+              </label>
+              <p class="settings-panel__help">Týmto ešte nič nemigruješ. Len si uložíš projekt, aby sme potom vedeli napojiť prihlásenie, dáta a obrázky bez ďalšej prestavby appky.</p>
+              <div class="settings-panel__actions">
+                <button class="button" type="submit">Uložiť Supabase</button>
+                <button class="button button--ghost" type="button" data-test-supabase ${supabaseEnabled ? "" : "hidden"}>Otestovať spojenie</button>
+                <button class="button button--ghost" type="button" data-clear-supabase ${supabaseEnabled ? "" : "hidden"}>Vymazať Supabase</button>
+              </div>
+              <p class="settings-panel__status ${supabaseTone ? `is-${supabaseTone}` : ""}" data-settings-supabase-status>${escapeHtml(supabaseStatusMessage)}</p>
+            </form>
+          `}
         </section>
-        <section class="settings-panel">
+        <section class="settings-panel" data-settings-section="cloud-account" ${(statusScope === "cloud-account" || (supabaseEnabled && !supabaseCloudSignedIn)) ? "data-settings-default-open" : ""}>
           <div class="settings-panel__head">
             <div>
               <p class="eyebrow">Cloud účet</p>
@@ -15394,7 +15675,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
             <div class="settings-panel__account-grid">
               <label class="field-block field-block--full">
                 <span>E-mail do cloudu</span>
-                <input name="cloudEmail" type="email" value="${escapeAttribute(supabaseAuthMirror.email || authProfile?.email || "")}" placeholder="napr. ja@mojazahrada.sk" autocomplete="username" ${supabaseEnabled ? "" : "disabled"}>
+                <input name="cloudEmail" type="email" value="${escapeAttribute(supabaseAuthMirror.email || "")}" placeholder="napr. ja@mojazahrada.sk" autocomplete="username" ${supabaseEnabled ? "" : "disabled"}>
               </label>
               <label class="field-block field-block--full">
                 <span>Heslo do cloudu</span>
@@ -15410,7 +15691,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
             <p class="settings-panel__status ${cloudAccountTone ? `is-${cloudAccountTone}` : ""}" data-settings-cloud-account-status>${escapeHtml(cloudAccountStatusMessage)}</p>
           </form>
         </section>
-        <section class="settings-panel settings-panel--wide">
+        <section class="settings-panel settings-panel--wide" data-settings-section="cloud-sync" ${(statusScope === "cloud-sync" || supabaseCloudReady) ? "data-settings-default-open" : ""}>
           <div class="settings-panel__head">
             <div>
               <p class="eyebrow">Cloud dáta</p>
@@ -15437,73 +15718,45 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
             <p class="settings-panel__status ${cloudSyncTone ? `is-${cloudSyncTone}` : ""}" data-settings-cloud-sync-status>${escapeHtml(cloudSyncStatusMessage)}</p>
           </div>
         </section>
-        <section class="settings-panel settings-panel--soft settings-panel--wide settings-panel--secondary">
-          <div class="settings-panel__head">
-            <div>
-              <p class="eyebrow">Lokálne</p>
-              <h3>Lokálny účet</h3>
-            </div>
-          </div>
-          <form id="settings-account-form" class="settings-form">
-            ${hasLocalAccount ? `
-              <div class="settings-panel__storage-meta settings-panel__account-meta">
-                <span>Profil</span>
-                <strong>${escapeHtml(accountName || "Moja appka")}</strong>
-                <span>E-mail</span>
-                <strong>${escapeHtml(authProfile.email)}</strong>
-                <span>Stav</span>
-                <strong>${escapeHtml(isSignedIn ? "prihlásená" : "zamknutá")}</strong>
-              </div>
-            ` : ""}
-            <div class="settings-panel__account-grid">
-              <label class="field-block field-block--full">
-                <span>Meno alebo názov profilu</span>
-                <input name="displayName" type="text" value="${escapeAttribute(authProfile?.displayName || "")}" placeholder="Napr. Domi alebo Moja záhrada" autocomplete="name">
-              </label>
-              <label class="field-block field-block--full">
-                <span>E-mail pre účet</span>
-                <input name="email" type="email" value="${escapeAttribute(authProfile?.email || "")}" placeholder="napr. ja@mojazahrada.sk" autocomplete="username">
-              </label>
-            </div>
-            ${hasLocalAccount ? `
-              <label class="field-block field-block--full">
-                <span>Aktuálne heslo</span>
-                <input name="currentPassword" type="password" placeholder="Zadaj heslo na potvrdenie zmien" autocomplete="current-password">
-              </label>
-              <div class="settings-panel__account-grid">
-                <label class="field-block field-block--full">
-                  <span>Nové heslo</span>
-                  <input name="nextPassword" type="password" placeholder="Nechaj prázdne, ak heslo nemeníš" autocomplete="new-password">
-                </label>
-                <label class="field-block field-block--full">
-                  <span>Potvrď nové heslo</span>
-                  <input name="nextPasswordConfirm" type="password" placeholder="Zopakuj nové heslo" autocomplete="new-password">
-                </label>
-              </div>
-            ` : `
-              <div class="settings-panel__account-grid">
-                <label class="field-block field-block--full">
-                  <span>Heslo</span>
-                  <input name="nextPassword" type="password" placeholder="Aspoň 6 znakov" autocomplete="new-password">
-                </label>
-                <label class="field-block field-block--full">
-                  <span>Potvrď heslo</span>
-                  <input name="nextPasswordConfirm" type="password" placeholder="Zopakuj heslo" autocomplete="new-password">
-                </label>
-              </div>
-            `}
-            <div class="settings-panel__actions">
-              <button class="button" type="submit">${hasLocalAccount ? "Uložiť účet" : "Zapnúť prihlasovanie"}</button>
-              ${hasLocalAccount ? `<button class="button button--ghost" type="button" data-lock-local-account>Zamknúť appku</button>` : ""}
-              ${hasLocalAccount && isSignedIn ? `<button class="button button--ghost" type="button" data-logout-local-account>Odhlásiť sa</button>` : ""}
-            </div>
-            <p class="settings-panel__help">Toto prihlasovanie je zatiaľ lokálne len v tomto prehliadači, ale ostáva ako bezpečná záloha.</p>
-            <p class="settings-panel__status ${accountTone ? `is-${accountTone}` : ""}" data-settings-account-status>${escapeHtml(accountStatusMessage)}</p>
-          </form>
-        </section>
       </div>
     </div>
   `;
+
+  if (isMobileSettingsShell) {
+    const settingsPanels = Array.from(detailContent.querySelectorAll(".settings-panel[data-settings-section]"));
+    const syncSettingsPanelState = (panel, collapsed) => {
+      if (!(panel instanceof HTMLElement)) return;
+      panel.classList.add("settings-panel--collapsible");
+      panel.classList.toggle("is-collapsed", collapsed);
+      const head = panel.querySelector(".settings-panel__head");
+      if (head instanceof HTMLElement) {
+        head.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      }
+    };
+    settingsPanels.forEach((panel) => {
+      syncSettingsPanelState(panel, !panel.hasAttribute("data-settings-default-open"));
+    });
+    settingsPanels.forEach((panel) => {
+      const head = panel.querySelector(".settings-panel__head");
+      if (!(head instanceof HTMLElement)) return;
+      head.tabIndex = 0;
+      head.setAttribute("role", "button");
+      const togglePanel = () => {
+        const shouldOpen = panel.classList.contains("is-collapsed");
+        settingsPanels.forEach((otherPanel) => {
+          syncSettingsPanelState(otherPanel, shouldOpen ? otherPanel !== panel : true);
+        });
+      };
+      head.addEventListener("click", () => {
+        togglePanel();
+      });
+      head.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        togglePanel();
+      });
+    });
+  }
 
   const settingsWeatherFormEl = document.getElementById("settings-weather-form");
   const settingsSupabaseFormEl = document.getElementById("settings-supabase-form");
@@ -16819,6 +17072,9 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
 
   renderEditor();
   openDetailModalDialog();
+  if (!existing) {
+    scheduleCardEditorTypeWarmup(selectedCategoryId, selectedType);
+  }
 }
 
 function resolveBatchSowingCategoryId() {
@@ -17565,7 +17821,7 @@ function cardViewRelatedCardName(varietyId = "") {
 
 function cardViewRatingText(item) {
   const ratingValue = Math.max(0, Math.min(5, Number(item?.rating) || 0));
-  return ratingValue > 0 ? `${ratingValue}/5` : "";
+  return ratingValue > 0 ? `${"★".repeat(ratingValue)}${"☆".repeat(5 - ratingValue)}` : "";
 }
 
 function cardViewSummaryChipsMarkup(item) {
@@ -17605,6 +17861,24 @@ function cardViewSummaryChipsMarkup(item) {
   }
 
   return chips.filter(Boolean).slice(0, 2).join("");
+}
+
+function cardViewSummaryTextMarkup(item) {
+  if (cardType(item) !== "variety" || entryKind(item) !== "detail") return "";
+
+  const parts = [];
+  if (item.top) parts.push("Top odroda");
+  if (item.avoidNextYear) parts.push("Neodporúčam");
+  if (!item.avoidNextYear && item.neverGrown) parts.push("Ešte som nepestovala");
+  if (!item.avoidNextYear && !item.neverGrown && item.notGrowingThisYear) parts.push("Tento rok nepestujem");
+  if (!item.sowedAt) {
+    const primaryStatus = varietyStatusValues(item).map((statusValue) => statusLabel(statusValue)).find(Boolean);
+    if (primaryStatus) parts.push(primaryStatus.charAt(0).toUpperCase() + primaryStatus.slice(1));
+  }
+
+  return parts.length
+    ? `<p class="card-view-head__flags">${parts.map((part) => escapeHtml(part)).join(" • ")}</p>`
+    : "";
 }
 
 function cardViewSectionsMarkup(item) {
@@ -17704,19 +17978,19 @@ function cardViewHeaderMetaMarkup(item) {
     const sowedAt = String(item.sowedAt || "").trim();
     const transplantedAt = String(item.transplantedAt || "").trim();
     const harvestedAt = String(item.harvestedAt || "").trim();
-    if (sowedAt) parts.push(`Vysiate ${formatDate(sowedAt)}`);
-    else if (transplantedAt) parts.push(`Vysadené ${formatDate(transplantedAt)}`);
-    else if (harvestedAt) parts.push(`Zber ${formatDate(harvestedAt)}`);
+    if (sowedAt) parts.push(escapeHtml(`Vysiate ${formatDate(sowedAt)}`));
+    else if (transplantedAt) parts.push(escapeHtml(`Vysadené ${formatDate(transplantedAt)}`));
+    else if (harvestedAt) parts.push(escapeHtml(`Zber ${formatDate(harvestedAt)}`));
     else {
       const primaryStatus = varietyStatusValues(item).map((statusValue) => statusLabel(statusValue)).find(Boolean);
-      if (primaryStatus) parts.push(primaryStatus.charAt(0).toUpperCase() + primaryStatus.slice(1));
+      if (primaryStatus) parts.push(escapeHtml(primaryStatus.charAt(0).toUpperCase() + primaryStatus.slice(1)));
     }
   } else {
     const recordedAt = String(item.recordedAt || "").trim();
-    if (recordedAt) parts.push(`${cardDateLabel(resolvedType)} ${formatDate(recordedAt)}`);
+    if (recordedAt) parts.push(escapeHtml(`${cardDateLabel(resolvedType)} ${formatDate(recordedAt)}`));
   }
-  if (ratingText) parts.push(`Hodnotenie ${ratingText}`);
-  return parts.length ? `<p class="card-view-head__summary">${parts.map((part) => escapeHtml(part)).join(" • ")}</p>` : "";
+  if (ratingText) parts.push(`Hodnotenie <span class="card-view-head__rating-stars">${escapeHtml(ratingText)}</span>`);
+  return parts.length ? `<p class="card-view-head__summary">${parts.join(" • ")}</p>` : "";
 }
 
 function openStoredCardView(varietyId) {
@@ -17731,9 +18005,14 @@ function openStoredCardView(varietyId) {
     ? categoryName(existing.categoryId)
     : cardTypeLabel(resolvedType);
   const headerMetaMarkup = cardViewHeaderMetaMarkup(existing);
-  const summaryChipsMarkup = cardViewSummaryChipsMarkup(existing);
+  const summaryMetaMarkup = resolvedType === "variety" && entryKind(existing) === "detail"
+    ? cardViewSummaryTextMarkup(existing)
+    : (() => {
+      const summaryChipsMarkup = cardViewSummaryChipsMarkup(existing);
+      return summaryChipsMarkup ? `<div class="card-view-chip-list card-view-chip-list--summary">${summaryChipsMarkup}</div>` : "";
+    })();
   const titleBadgeMarkup = resolvedType === "variety" && inferBreedingType(existing) === "hybrid"
-    ? cardViewChipMarkup("F1", "violet")
+    ? '<span class="card-view-title-badge">F1</span>'
     : "";
   const cardJournalThemeKey = `variety:${existing.id}`;
   const cardJournalCount = journalEntriesForTag(normalizedJournalList(), cardJournalThemeKey).length;
@@ -17791,7 +18070,7 @@ function openStoredCardView(varietyId) {
             </div>
           </div>
           ${headerMetaMarkup}
-          ${summaryChipsMarkup ? `<div class="card-view-chip-list card-view-chip-list--summary">${summaryChipsMarkup}</div>` : ""}
+          ${summaryMetaMarkup}
         </div>
         <div class="card-view-sections">
           ${cardViewSectionsMarkup(existing)}
@@ -18173,6 +18452,9 @@ function renderSimpleRelationFields({
 }) {
   const normalizedCategoryValues = normalizeIdList(categoryValues);
   const primaryCategoryId = normalizedCategoryValues[0] || "";
+  const initialLinkedVarietyOptions = primaryCategoryId || normalizeIdList(cardCategoryIds).length
+    ? linkedVarietyOptions(cardValue, primaryCategoryId ? [primaryCategoryId] : cardCategoryIds)
+    : "";
   return `
     <div class="field-block field-block--full field-block--relation field-block--relation-simple">
       <label class="field-block field-block--full">
@@ -18185,7 +18467,7 @@ function renderSimpleRelationFields({
         <span>${escapeHtml(cardLabel)}</span>
         <select name="${escapeAttribute(cardInputName)}">
           <option value="">Bez karty</option>
-          ${linkedVarietyOptions(cardValue, primaryCategoryId ? [primaryCategoryId] : cardCategoryIds)}
+          ${initialLinkedVarietyOptions}
         </select>
       </label>
     </div>
@@ -19348,6 +19630,10 @@ function renderCategoryCardImageTag(category, altText) {
   if (!shouldDeferCategoryCardImageSource(source)) {
     return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
+  const cachedPreviewSource = getCachedPreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  if (cachedPreviewSource) {
+    return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+  }
   return `<img src="${escapeAttribute(categoryPlaceholderImage(category))}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
 }
 
@@ -19356,6 +19642,14 @@ function resolveDeferredCategoryCardImageSource(categoryId = "") {
   if (!normalizedId) return "";
   const category = state.categories.find((item) => item.id === normalizedId);
   return category ? categoryCardImage(category) : "";
+}
+
+function getCachedPreviewImageSource(source = "", maxDimension = LIST_IMAGE_PREVIEW_MAX_DIMENSION) {
+  const normalized = String(source || "").trim();
+  if (!shouldDerivePreviewImageSource(normalized)) return normalized;
+  const safeMaxDimension = Math.max(160, Number(maxDimension) || LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  const cacheKey = `${safeMaxDimension}|${normalized}`;
+  return derivedPreviewImageCache.get(cacheKey) || "";
 }
 
 async function activateDeferredCategoryCardImage(img) {
@@ -19389,6 +19683,14 @@ function syncDeferredCategoryCardImages(root = document) {
   const pendingImages = [...root.querySelectorAll("img[data-lazy-category-image]")];
   if (!pendingImages.length) return;
 
+  const immediateCount = Math.max(0, Math.min(pendingImages.length, isRealMobileRuntimeMode() ? 4 : 0));
+  if (immediateCount > 0) {
+    pendingImages.slice(0, immediateCount).forEach((img) => activateDeferredCategoryCardImage(img));
+  }
+
+  const remainingImages = pendingImages.filter((img) => img.hasAttribute("data-lazy-category-image"));
+  if (!remainingImages.length) return;
+
   if ("IntersectionObserver" in window) {
     if (!deferredCategoryCardImageObserver) {
       deferredCategoryCardImageObserver = new IntersectionObserver((entries) => {
@@ -19402,11 +19704,11 @@ function syncDeferredCategoryCardImages(root = document) {
         threshold: 0.01
       });
     }
-    pendingImages.forEach((img) => deferredCategoryCardImageObserver.observe(img));
+    remainingImages.forEach((img) => deferredCategoryCardImageObserver.observe(img));
     return;
   }
 
-  pendingImages.forEach((img) => scheduleDeferredCardImageActivation(img, activateDeferredCategoryCardImage));
+  remainingImages.forEach((img) => scheduleDeferredCardImageActivation(img, activateDeferredCategoryCardImage));
 }
 
 function shouldDeferJournalImageSource(source = "") {
@@ -20307,6 +20609,14 @@ function loadSupabasePreferences() {
     return normalizeSupabasePreferences(JSON.parse(raw));
   } catch (error) {
     return loadSupabaseBootstrapPreferences();
+  }
+}
+
+function clearLocalAuthProfile() {
+  try {
+    localStorage.removeItem(LOCAL_AUTH_PROFILE_KEY);
+  } catch (error) {
+    return;
   }
 }
 
@@ -21392,6 +21702,7 @@ function removeAuthGate() {
   document.body.classList.remove("app-auth-locked");
   unlockBodyScroll("auth");
   authGatePreviousOverflow = null;
+  syncWeatherBackgroundLoopVisibility();
 }
 
 function ensureAuthGateRoot() {
@@ -21400,6 +21711,7 @@ function ensureAuthGateRoot() {
   root = document.createElement("div");
   root.id = "auth-gate-root";
   document.body.appendChild(root);
+  syncWeatherBackgroundLoopVisibility();
   return root;
 }
 
@@ -21419,82 +21731,9 @@ function lockAppToAuth() {
 }
 
 function syncAuthGate(statusMessage = "", tone = "") {
-  const profile = loadLocalAuthProfile();
-  if (!profile?.enabled) {
-    removeAuthGate();
-    return;
-  }
-  if (isLocalAuthSessionValid(profile)) {
-    removeAuthGate();
-    return;
-  }
-
-  const root = ensureAuthGateRoot();
-  const defaultStatus = tone
-    ? statusMessage
-    : `Prihlás sa do účtu ${localAuthDisplayName(profile)} a pokračuj tam, kde si skončila.`;
-  if (authGatePreviousOverflow === null) {
-    authGatePreviousOverflow = document.body.style.overflow;
-  }
-  lockBodyScroll("auth");
-  document.body.classList.add("app-auth-locked");
-  root.innerHTML = `
-    <div class="auth-gate">
-      <div class="auth-gate__backdrop"></div>
-      <section class="auth-gate__sheet">
-        <p class="eyebrow">Lokálny účet</p>
-        <h2>Prihlásenie do appky</h2>
-        <p class="auth-gate__lead">Účet je zatiaľ len lokálny v tomto prehliadači, ale pripravuje nám čistú cestu k budúcemu cloudu a synchronizácii.</p>
-        <div class="auth-gate__identity">
-          <span>${escapeHtml(localAuthDisplayName(profile))}</span>
-          <strong>${escapeHtml(profile.email)}</strong>
-        </div>
-        <form id="auth-gate-form" class="auth-gate__form">
-          <label class="field-block field-block--full">
-            <span>Heslo</span>
-            <input name="password" type="password" placeholder="Sem zadaj svoje heslo" autocomplete="current-password" required>
-          </label>
-          <div class="auth-gate__actions">
-            <button class="button" type="submit">Prihlásiť sa</button>
-          </div>
-          <p class="settings-panel__status ${tone ? `is-${tone}` : ""}" data-auth-gate-status>${escapeHtml(defaultStatus)}</p>
-        </form>
-      </section>
-    </div>
-  `;
-
-  root.querySelector("#auth-gate-form")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const password = String(new FormData(form).get("password") || "");
-    if (!password.trim()) {
-      syncAuthGate("Najprv zadaj heslo k svojmu účtu.", "error");
-      return;
-    }
-    try {
-      const isValid = await verifyLocalAuthPassword(password, profile);
-      if (!isValid) {
-        syncAuthGate("Heslo nesedí. Skús ho zadať ešte raz.", "error");
-        return;
-      }
-      const nextProfile = {
-        ...profile,
-        lastLoginAt: new Date().toISOString(),
-        updatedAt: profile.updatedAt || new Date().toISOString()
-      };
-      saveLocalAuthProfile(nextProfile);
-      saveLocalAuthSession({
-        userId: nextProfile.userId,
-        email: nextProfile.email,
-        displayName: localAuthDisplayName(nextProfile),
-        signedInAt: new Date().toISOString()
-      });
-      removeAuthGate();
-      render();
-    } catch (error) {
-      syncAuthGate(error instanceof Error ? error.message : "Prihlásenie sa teraz nepodarilo overiť.", "error");
-    }
-  });
+  clearLocalAuthSession();
+  clearLocalAuthProfile();
+  removeAuthGate();
 }
 
 function loadWeatherPreferences() {
@@ -23015,9 +23254,10 @@ async function refreshHomeWeatherCard() {
   }, WEATHER_AUTO_REFRESH_MS);
 }
 
-function renderDateInput({ id, name, value = "", required = false }) {
+function renderDateInput({ id, name, value = "", required = false, emptyHint = "" }) {
+  const safeEmptyHint = String(emptyHint || "").trim();
   return `
-    <div class="date-input-wrap">
+    <div class="date-input-wrap ${safeEmptyHint ? "date-input-wrap--with-empty-label" : ""} ${value ? "is-filled" : ""}"${safeEmptyHint ? ` data-date-empty-label="${escapeAttribute(safeEmptyHint)}"` : ""}>
       <input
         class="date-input"
         id="${escapeAttribute(id)}"
@@ -23026,8 +23266,16 @@ function renderDateInput({ id, name, value = "", required = false }) {
         ${value ? `value="${escapeAttribute(value)}"` : ""}
         ${required ? "required" : ""}
       >
+      ${safeEmptyHint ? `<span class="date-input-wrap__empty-label" aria-hidden="true">${escapeHtml(safeEmptyHint)}</span>` : ""}
     </div>
   `;
+}
+
+function syncDateInputEmptyState(input) {
+  if (!(input instanceof HTMLInputElement)) return;
+  const wrap = input.closest(".date-input-wrap");
+  if (!(wrap instanceof HTMLElement) || !wrap.classList.contains("date-input-wrap--with-empty-label")) return;
+  wrap.classList.toggle("is-filled", Boolean(String(input.value || "").trim()));
 }
 
 function updateCatalogHeader() {
