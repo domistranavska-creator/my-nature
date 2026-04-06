@@ -47,6 +47,9 @@ const LEAFLET_CSS_INTEGRITY = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BM
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const LEAFLET_JS_INTEGRITY = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
 const SUPABASE_SIGNED_IMAGE_CACHE_MS = 1000 * 60 * 30;
+const AUTO_CLOUD_PUSH_DEBOUNCE_MS = 1800;
+const AUTO_CLOUD_PULL_DEBOUNCE_MS = 1200;
+const AUTO_CLOUD_PULL_THROTTLE_MS = 15000;
 const UNDO_KEY = "moja-zahrada-undo-v1";
 const RESET_BACKUP_KEY = "moja-zahrada-reset-backup-v1";
 const IMAGE_BACKGROUND_MIGRATION_KEY = "moja-zahrada-white-bg-v1";
@@ -266,6 +269,331 @@ const CARD_TYPE_OPTIONS = [
   { value: "pest-problem", label: "Škodcovia a problémy" },
   { value: "processing-recipe", label: "Spracovanie a recepty" }
 ];
+const SYNC_MEDIA_STATUS_VALUES = new Set(["idle", "pending", "uploading", "done", "error"]);
+
+function normalizeSyncTimestamp(value = "") {
+  return String(value || "").trim();
+}
+
+function normalizeSyncMediaStatus(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  return SYNC_MEDIA_STATUS_VALUES.has(normalized) ? normalized : "idle";
+}
+
+function isSyncEntityDeleted(item) {
+  return Boolean(item?.deleted);
+}
+
+function activeSyncItems(items = []) {
+  return (Array.isArray(items) ? items : []).filter((item) => !isSyncEntityDeleted(item));
+}
+
+function activeSyncCount(items = []) {
+  return activeSyncItems(items).length;
+}
+
+function activeCategoryRecords() {
+  return activeSyncItems(Array.isArray(state?.categories) ? state.categories : []);
+}
+
+function activeVarietyRecords() {
+  return activeSyncItems(Array.isArray(state?.varieties) ? state.varieties : []);
+}
+
+function findActiveCategoryById(categoryId = "") {
+  const normalizedId = String(categoryId || "").trim();
+  if (!normalizedId) return null;
+  return activeCategoryRecords().find((item) => item.id === normalizedId) || null;
+}
+
+function findActiveVarietyById(varietyId = "") {
+  const normalizedId = String(varietyId || "").trim();
+  if (!normalizedId) return null;
+  return activeVarietyRecords().find((item) => item.id === normalizedId) || null;
+}
+
+function snapshotUndoStateValue() {
+  return lastDeleted ? clone(lastDeleted) : null;
+}
+
+function restoreUndoStateSnapshot(snapshot = null) {
+  if (snapshot && typeof snapshot === "object") {
+    setUndoState(clone(snapshot));
+    return;
+  }
+  clearUndoState();
+}
+
+function rollbackSoftDeleteResult(result = null) {
+  if (!result?.changed || !result.collectionKey) return false;
+  state[result.collectionKey] = Array.isArray(result.previousItems) ? result.previousItems : [];
+  restoreUndoStateSnapshot(result.previousUndoState ?? null);
+  return true;
+}
+
+function firstActiveCategoryId(categories = state?.categories || []) {
+  return activeSyncItems(categories)[0]?.id || null;
+}
+
+function currentSeasonYear() {
+  return new Date().getFullYear();
+}
+
+function normalizeSeasonYearValue(value, fallback = currentSeasonYear()) {
+  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
+  if (Number.isFinite(parsed) && parsed >= 1900 && parsed <= 2100) return parsed;
+  return fallback;
+}
+
+function extractSeasonYearFromDateValue(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const normalized = raw.includes("T") ? raw : `${raw}T12:00:00`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.getFullYear();
+}
+
+function inferRecordSeasonYear(record = {}, candidateValues = []) {
+  const explicitYear = normalizeSeasonYearValue(record?.seasonYear, Number.NaN);
+  if (Number.isFinite(explicitYear)) return explicitYear;
+  for (const candidate of candidateValues) {
+    const inferredYear = extractSeasonYearFromDateValue(candidate);
+    if (inferredYear !== null) return inferredYear;
+  }
+  return currentSeasonYear();
+}
+
+function normalizeCategoryRecord(category = {}) {
+  return normalizeEntitySyncMeta({
+    group: "Moje kategórie",
+    parentCategoryId: "",
+    nodeType: "kind",
+    color: "#7e9f4b",
+    image: "",
+    recommendedSowingWindow: "",
+    sowedAt: "",
+    ...category
+  }, "category");
+}
+
+function entityMediaSources(item = {}, entityType = "") {
+  if (entityType === "category") {
+    return [String(item?.image || "").trim()].filter(Boolean);
+  }
+  if (entityType === "card") {
+    return normalizeVarietyImages(item);
+  }
+  if (entityType === "journal") {
+    return [
+      ...journalImages(item),
+      String(item?.videoPath || "").trim(),
+      String(item?.video || "").trim()
+    ].filter(Boolean);
+  }
+  return [];
+}
+
+function hasPendingEntityMedia(item = {}, entityType = "") {
+  return entityMediaSources(item, entityType).some((source) => isProcessableImageDataUrl(source));
+}
+
+function normalizeEntitySyncMeta(item = {}, entityType = "") {
+  const dirty = Boolean(item?.dirty);
+  const deleted = Boolean(item?.deleted);
+  const syncUpdatedAtLocal = normalizeSyncTimestamp(item?.syncUpdatedAtLocal || item?.updatedAt || "");
+  const lastSyncedAt = normalizeSyncTimestamp(item?.lastSyncedAt || "");
+  let mediaSyncStatus = normalizeSyncMediaStatus(item?.mediaSyncStatus || "");
+  if (hasPendingEntityMedia(item, entityType)) {
+    if (mediaSyncStatus === "idle" || mediaSyncStatus === "done") {
+      mediaSyncStatus = "pending";
+    }
+  } else if (mediaSyncStatus === "uploading") {
+    mediaSyncStatus = "pending";
+  } else if (!mediaSyncStatus) {
+    mediaSyncStatus = "idle";
+  }
+  return {
+    ...item,
+    dirty,
+    deleted,
+    syncUpdatedAtLocal,
+    lastSyncedAt,
+    mediaSyncStatus
+  };
+}
+
+function syncComparableRecord(item = {}) {
+  if (!item || typeof item !== "object") return item;
+  const next = { ...item };
+  delete next.dirty;
+  delete next.syncUpdatedAtLocal;
+  delete next.lastSyncedAt;
+  delete next.mediaSyncStatus;
+  return next;
+}
+
+function recordsDifferForSync(currentRecord, previousRecord) {
+  return JSON.stringify(syncComparableRecord(currentRecord)) !== JSON.stringify(syncComparableRecord(previousRecord));
+}
+
+function prepareCollectionForSyncPersistence(currentItems = [], previousItems = [], entityType = "", normalizer = (value) => value) {
+  const previousById = new Map((Array.isArray(previousItems) ? previousItems : []).map((item) => [String(item?.id || "").trim(), item]));
+  const changeTimestamp = new Date().toISOString();
+  return (Array.isArray(currentItems) ? currentItems : []).map((item) => {
+    const normalized = normalizer(item);
+    const itemId = String(normalized?.id || "").trim();
+    const previous = itemId ? previousById.get(itemId) || null : null;
+    const pendingMedia = hasPendingEntityMedia(normalized, entityType);
+    if (!previous) {
+      return normalizeEntitySyncMeta({
+        ...normalized,
+        dirty: true,
+        syncUpdatedAtLocal: normalizeSyncTimestamp(normalized?.syncUpdatedAtLocal) || changeTimestamp,
+        mediaSyncStatus: pendingMedia ? "pending" : normalizeSyncMediaStatus(normalized?.mediaSyncStatus || "idle")
+      }, entityType);
+    }
+    const normalizedPrevious = normalizer(previous);
+    const changed = recordsDifferForSync(normalized, normalizedPrevious);
+    const nextDirty = Boolean(normalized?.dirty) || changed;
+    return normalizeEntitySyncMeta({
+      ...normalized,
+      dirty: nextDirty,
+      syncUpdatedAtLocal: nextDirty
+        ? (changed ? changeTimestamp : normalizeSyncTimestamp(normalized?.syncUpdatedAtLocal || normalizedPrevious?.syncUpdatedAtLocal || changeTimestamp))
+        : normalizeSyncTimestamp(normalized?.syncUpdatedAtLocal || normalizedPrevious?.syncUpdatedAtLocal || ""),
+      mediaSyncStatus: pendingMedia
+        ? "pending"
+        : normalizeSyncMediaStatus(normalized?.mediaSyncStatus || normalizedPrevious?.mediaSyncStatus || "idle")
+    }, entityType);
+  });
+}
+
+function prepareStateForSyncPersistence(currentState = {}, previousState = {}) {
+  const previousVarieties = Array.isArray(previousState?.varieties) ? previousState.varieties.map(normalizeVarietyRecord) : [];
+  const previousTasks = Array.isArray(previousState?.customTasks) ? previousState.customTasks.map((task) => normalizeTaskRecord(task, previousVarieties)) : [];
+  const previousJournal = Array.isArray(previousState?.journal) ? previousState.journal.map((entry) => normalizeJournalEntry(entry, previousVarieties)) : [];
+  const preparedCategories = prepareCollectionForSyncPersistence(
+    sanitizeCategoryHierarchy(ensureRootCategories((Array.isArray(currentState?.categories) ? currentState.categories : []).map(normalizeCategoryRecord).map(applyDefaultParenting))),
+    sanitizeCategoryHierarchy(ensureRootCategories((Array.isArray(previousState?.categories) ? previousState.categories : []).map(normalizeCategoryRecord).map(applyDefaultParenting))),
+    "category",
+    normalizeCategoryRecord
+  );
+  const preparedVarieties = prepareCollectionForSyncPersistence(
+    Array.isArray(currentState?.varieties) ? currentState.varieties : [],
+    previousVarieties,
+    "card",
+    normalizeVarietyRecord
+  );
+  const preparedTasks = prepareCollectionForSyncPersistence(
+    Array.isArray(currentState?.customTasks) ? currentState.customTasks : [],
+    previousTasks,
+    "task",
+    (task) => normalizeTaskRecord(task, preparedVarieties)
+  );
+  const preparedJournal = prepareCollectionForSyncPersistence(
+    Array.isArray(currentState?.journal) ? currentState.journal : [],
+    previousJournal,
+    "journal",
+    (entry) => normalizeJournalEntry(entry, preparedVarieties)
+  );
+  return {
+    categories: enforceFixedCategoryNames(preparedCategories),
+    varieties: preparedVarieties,
+    customTasks: preparedTasks,
+    journal: preparedJournal,
+    autoTasks: Array.isArray(currentState?.autoTasks) ? currentState.autoTasks : []
+  };
+}
+
+function localSyncRecordTimestamp(item = {}) {
+  return normalizeSyncTimestamp(item?.syncUpdatedAtLocal || item?.updatedAt || item?.lastSyncedAt || "");
+}
+
+function touchLocalSyncRecord(item = {}, entityType = "", options = {}) {
+  const timestamp = normalizeSyncTimestamp(options.timestamp || new Date().toISOString()) || new Date().toISOString();
+  const nextDeleted = options.deleted === undefined ? Boolean(item?.deleted) : Boolean(options.deleted);
+  const nextMediaStatus = options.mediaSyncStatus === undefined
+    ? (hasPendingEntityMedia(item, entityType) ? "pending" : normalizeSyncMediaStatus(item?.mediaSyncStatus || "idle"))
+    : normalizeSyncMediaStatus(options.mediaSyncStatus);
+  return normalizeEntitySyncMeta({
+    ...item,
+    dirty: options.dirty === undefined ? true : Boolean(options.dirty),
+    deleted: nextDeleted,
+    syncUpdatedAtLocal: timestamp,
+    mediaSyncStatus: nextMediaStatus
+  }, entityType);
+}
+
+function clearLocalSyncDirty(item = {}, entityType = "", options = {}) {
+  const syncedAt = normalizeSyncTimestamp(options.syncedAt || new Date().toISOString()) || new Date().toISOString();
+  return normalizeEntitySyncMeta({
+    ...item,
+    dirty: false,
+    lastSyncedAt: syncedAt,
+    mediaSyncStatus: options.mediaSyncStatus === undefined
+      ? item?.mediaSyncStatus
+      : normalizeSyncMediaStatus(options.mediaSyncStatus)
+  }, entityType);
+}
+
+function countPendingMediaForState(value = state) {
+  const categories = Array.isArray(value?.categories) ? value.categories : [];
+  const cards = Array.isArray(value?.varieties) ? value.varieties : [];
+  const journal = Array.isArray(value?.journal) ? value.journal : [];
+  return [
+    ...categories.map((item) => ({ item: normalizeCategoryRecord(item), entityType: "category" })),
+    ...cards.map((item) => ({ item: normalizeVarietyRecord(item), entityType: "card" })),
+    ...journal.map((item) => ({ item: normalizeJournalEntry(item, cards), entityType: "journal" }))
+  ].filter(({ item, entityType }) => {
+    const mediaStatus = normalizeSyncMediaStatus(item?.mediaSyncStatus);
+    if (mediaStatus === "uploading") return true;
+    return hasPendingEntityMedia(item, entityType) && ["pending", "error", "uploading"].includes(mediaStatus);
+  }).length;
+}
+
+function countDirtySyncRecords(value = state) {
+  return [
+    ...(Array.isArray(value?.categories) ? value.categories : []),
+    ...(Array.isArray(value?.varieties) ? value.varieties : []),
+    ...(Array.isArray(value?.customTasks) ? value.customTasks : []),
+    ...(Array.isArray(value?.journal) ? value.journal : [])
+  ].filter((item) => Boolean(item?.dirty)).length;
+}
+
+function softDeleteStateRecord(collectionKey = "", recordId = "", entityType = "", options = {}) {
+  const normalizedRecordId = String(recordId || "").trim();
+  if (!normalizedRecordId || !collectionKey) return false;
+  const sourceCollection = Array.isArray(state?.[collectionKey]) ? state[collectionKey] : [];
+  const existingRecord = sourceCollection.find((item) => String(item?.id || "").trim() === normalizedRecordId) || null;
+  if (!existingRecord) return false;
+  const previousUndoState = options?.previousUndoState === undefined
+    ? snapshotUndoStateValue()
+    : options.previousUndoState;
+  if (entityType === "journal") {
+    setUndoState({
+      type: "journal",
+      entry: clone(existingRecord)
+    });
+  } else if (entityType === "task") {
+    setUndoState({
+      type: "task",
+      task: clone(existingRecord)
+    });
+  }
+  let changed = false;
+  state[collectionKey] = sourceCollection.map((item) => {
+    if (String(item?.id || "").trim() !== normalizedRecordId) return item;
+    changed = true;
+    return touchLocalSyncRecord(item, entityType, { deleted: true });
+  });
+  return changed ? {
+    changed: true,
+    collectionKey,
+    previousItems: sourceCollection.slice(),
+    previousUndoState
+  } : false;
+}
 
 function normalizeTaskRecord(task = {}, varieties = []) {
   const linkedVarietyId = String(task.linkedVarietyId || "").trim();
@@ -276,7 +604,9 @@ function normalizeTaskRecord(task = {}, varieties = []) {
     normalizedLinkedCategoryIds = inferredCategoryId ? [inferredCategoryId] : [];
   }
   const linkedCategoryId = normalizedLinkedCategoryIds[0] || "";
-  return {
+  const seasonYear = inferRecordSeasonYear(task, [task.date]);
+  return normalizeEntitySyncMeta({
+    ...task,
     id: task.id || makeId("task"),
     text: String(task.text || "").trim(),
     date: String(task.date || "").trim(),
@@ -284,8 +614,9 @@ function normalizeTaskRecord(task = {}, varieties = []) {
     source: String(task.source || "").trim(),
     linkedCategoryIds: normalizedLinkedCategoryIds,
     linkedCategoryId,
-    linkedVarietyId
-  };
+    linkedVarietyId,
+    seasonYear
+  }, "task");
 }
 
 function normalizeTagList(value) {
@@ -663,7 +994,7 @@ function renderWalkMapDeferredShellMarkup(points = [], { compact = false, live =
   `;
 }
 
-function renderWalkMapInnerMarkup(points = [], { compact = false, live = false, photoCount = 0, collapsible = false } = {}) {
+function renderWalkMapInnerMarkup(points = [], { compact = false, live = false, photoCount = 0, photoEntryId = "", collapsible = false } = {}) {
   const safePoints = Array.isArray(points) ? points.filter((point) => Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)) : [];
   if (!safePoints.length) return "";
   return `
@@ -671,6 +1002,7 @@ function renderWalkMapInnerMarkup(points = [], { compact = false, live = false, 
       class="journal-walk__map ${compact ? "journal-walk__map--compact" : ""} ${live ? "journal-walk__map--live" : ""}"
       data-walk-map
       data-walk-map-photo-count="${escapeAttribute(String(Math.max(0, Number(photoCount) || 0)))}"
+      data-walk-map-photo-entry="${escapeAttribute(String(photoEntryId || "").trim())}"
       data-walk-map-points="${escapeAttribute(JSON.stringify(safePoints.map((point) => ({
         latitude: point.latitude,
         longitude: point.longitude
@@ -692,7 +1024,7 @@ function renderWalkMapInnerMarkup(points = [], { compact = false, live = false, 
   `;
 }
 
-function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCount = 0, deferred = false } = {}) {
+function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCount = 0, photoEntryId = "", deferred = false } = {}) {
   const points = walkMapPoints(walkValue);
   if (points.length < 1) return "";
   const encodedPoints = escapeAttribute(JSON.stringify(points.map((point) => ({
@@ -700,6 +1032,7 @@ function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCo
     longitude: point.longitude
   }))));
   const encodedPhotoCount = escapeAttribute(String(Math.max(0, Number(photoCount) || 0)));
+  const encodedPhotoEntryId = escapeAttribute(String(photoEntryId || "").trim());
 
   if (deferred) {
     return `
@@ -708,6 +1041,7 @@ function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCo
         data-walk-map-shell
         data-walk-map-points="${encodedPoints}"
         data-walk-map-photo-count="${encodedPhotoCount}"
+        data-walk-map-photo-entry="${encodedPhotoEntryId}"
       >
         ${renderWalkMapDeferredShellMarkup(points, { compact, live, photoCount })}
       </div>
@@ -720,8 +1054,9 @@ function renderWalkMapMarkup(walkValue, { compact = false, live = false, photoCo
       data-walk-map-shell
       data-walk-map-points="${encodedPoints}"
       data-walk-map-photo-count="${encodedPhotoCount}"
+      data-walk-map-photo-entry="${encodedPhotoEntryId}"
     >
-      ${renderWalkMapInnerMarkup(points, { compact, live, photoCount })}
+      ${renderWalkMapInnerMarkup(points, { compact, live, photoCount, photoEntryId })}
     </div>
   `;
 }
@@ -741,6 +1076,9 @@ function hydrateWalkMaps(root = document) {
     if (mapEl.dataset.walkMapReady === "true") return;
     const normalizedPoints = walkMapPointsFromElement(mapEl);
     const photoCount = Math.max(0, Number(mapEl.getAttribute("data-walk-map-photo-count") || 0) || 0);
+    const photoEntryId = walkMapPhotoEntryIdFromElement(mapEl);
+    const photoImages = walkMapPhotoImagesForEntry(photoEntryId);
+    const photoLabel = walkMapPhotoLabelForEntry(photoEntryId);
     if (normalizedPoints.length < 1) return;
 
     const map = window.L.map(mapEl, {
@@ -795,18 +1133,38 @@ function hydrateWalkMaps(root = document) {
       fillOpacity: 1
     }).addTo(map);
 
-    walkMapPhotoMarkerPoints(normalizedPoints, photoCount).forEach((point, index) => {
-      window.L.marker([Number(point.latitude), Number(point.longitude)], {
+    walkMapPhotoMarkerPoints(normalizedPoints, photoImages, photoCount).forEach((markerEntry) => {
+      const point = markerEntry?.point || null;
+      const photoIndex = Math.max(0, Number(markerEntry?.photoIndex) || 0);
+      const photoSource = String(markerEntry?.photoSource || "").trim();
+      if (!point) return;
+      const marker = window.L.marker([Number(point.latitude), Number(point.longitude)], {
         keyboard: false,
         zIndexOffset: 600,
         icon: window.L.divIcon({
           className: "journal-walk__photo-marker",
-          html: `<span style="display:grid;place-items:center;width:22px;height:22px;border-radius:999px;background:rgba(255,251,244,0.98);border:1px solid rgba(186,155,90,0.42);box-shadow:0 6px 14px rgba(52,41,25,0.16);font-size:12px;line-height:1;">\uD83D\uDCF7</span>`,
+          html: `<span style="display:grid;place-items:center;width:22px;height:22px;border-radius:999px;background:rgba(255,251,244,0.98);border:1px solid rgba(186,155,90,0.42);box-shadow:0 6px 14px rgba(52,41,25,0.16);font-size:11px;font-weight:800;line-height:1;color:#6d5329;">${escapeHtml(String(photoIndex + 1))}</span>`,
           iconSize: [22, 22],
           iconAnchor: [11, 11]
         }),
-        title: photoCount > 1 ? `Fotka ${index + 1}` : "Fotka"
+        title: photoCount > 1 ? `Fotka ${photoIndex + 1}` : "Fotka"
       }).addTo(map);
+      if (!photoSource) return;
+      marker.bindPopup(renderWalkMapPhotoPopupMarkup(photoSource, photoIndex), {
+        className: "journal-walk__photo-popup-shell",
+        closeButton: false,
+        offset: [0, -12],
+        maxWidth: 160
+      });
+      marker.on("popupopen", () => {
+        const popupEl = marker.getPopup()?.getElement();
+        const openButton = popupEl?.querySelector?.("[data-walk-map-photo-open]");
+        if (!(openButton instanceof HTMLButtonElement) || openButton.dataset.walkMapPhotoBound === "true") return;
+        openButton.dataset.walkMapPhotoBound = "true";
+        openButton.addEventListener("click", () => {
+          openImageLightbox(photoImages, photoIndex, photoLabel || "Fotka");
+        });
+      });
     });
 
     fitWalkMapViewport(map, {
@@ -916,7 +1274,9 @@ function normalizeJournalEntry(entry = {}, varieties = []) {
     linkedCategoryIds = inferredCategoryId ? [inferredCategoryId] : [];
   }
   const linkedCategoryId = linkedCategoryIds[0] || "";
-  return {
+  const seasonYear = inferRecordSeasonYear(entry, [entry.date]);
+  return normalizeEntitySyncMeta({
+    ...entry,
     id: entry.id || makeId("journal"),
     title: String(entry.title || "Zápis").trim(),
     text: String(entry.text || "").trim(),
@@ -940,12 +1300,14 @@ function normalizeJournalEntry(entry = {}, varieties = []) {
     video,
     videoPath,
     videoName: String(entry.videoName || "").trim(),
-    videoMimeType: String(entry.videoMimeType || "").trim()
-  };
+    videoMimeType: String(entry.videoMimeType || "").trim(),
+    seasonYear
+  }, "journal");
 }
 
 let state = loadState();
-let activeCategoryId = state.categories[0]?.id || null;
+let syncPersistenceBaseline = clone(state);
+let activeCategoryId = firstActiveCategoryId(state.categories);
 let activeFilter = "all";
 let isFocusedView = false;
 let derivedDataCacheVersion = 0;
@@ -977,6 +1339,13 @@ let homeWeatherTrendLoadPromise = null;
 let homeWeatherOverviewLoadPromise = null;
 let homeWeatherRefreshTimer = null;
 let authGatePreviousOverflow = null;
+let autoCloudPushTimer = null;
+let autoCloudPullTimer = null;
+let autoCloudSyncInFlight = false;
+let autoCloudPushPending = false;
+let autoCloudPullPending = false;
+let autoCloudPullForcePending = false;
+let autoCloudLastPullStartedAt = 0;
 
 const mainMenuEl = document.getElementById("main-menu");
 const catalogEl = document.getElementById("catalog");
@@ -988,6 +1357,7 @@ const favoriteListEl = document.getElementById("favorite-list");
 const avoidListEl = document.getElementById("avoid-list");
 const todayTasksEl = document.getElementById("today-tasks");
 const journalSidebarEl = document.getElementById("journal-sidebar");
+const activeSeasonTitleEl = document.getElementById("active-season-title");
 const customTaskListEl = document.getElementById("custom-task-list");
 const journalListEl = document.getElementById("journal-list");
 const detailModal = document.getElementById("detail-modal");
@@ -1022,6 +1392,7 @@ let mobileWeatherSoundEnabled = (() => {
   }
 })();
 let mobileWeatherSoundVolume = 1;
+let hiddenWeatherAudioVolume = null;
 try {
   localStorage.removeItem(MOBILE_WEATHER_SOUND_VOLUME_KEY);
 } catch (error) {
@@ -2416,12 +2787,30 @@ function syncMainMenuTouchScrollState() {
 
 function shouldPauseWeatherBackgroundLoop() {
   return Boolean(
-    detailModal?.open
+    (typeof document !== "undefined" && document.hidden)
+    || detailModal?.open
     || journalOverlayRoot()
     || imageLightboxEl?.open
     || authGateRoot()
     || isMobileCameraPickerOpen()
   );
+}
+
+function syncDocumentVisibilityRuntimeState() {
+  const isHidden = typeof document !== "undefined" && document.hidden;
+  state.paused = isHidden;
+  const audioEngine = window.weatherAudioEngine;
+  if (!audioEngine) return;
+  if (isHidden) {
+    if (hiddenWeatherAudioVolume === null) {
+      hiddenWeatherAudioVolume = mobileWeatherSoundVolume;
+    }
+    audioEngine.setMasterVolume?.(0);
+    return;
+  }
+  const restoreVolume = hiddenWeatherAudioVolume;
+  hiddenWeatherAudioVolume = null;
+  audioEngine.setMasterVolume?.(restoreVolume === null ? mobileWeatherSoundVolume : restoreVolume);
 }
 
 function syncWeatherBackgroundLoopVisibility() {
@@ -2455,26 +2844,71 @@ function walkMapPointsFromElement(mapEl) {
     : [];
 }
 
-function walkMapPhotoMarkerPoints(points = [], photoCount = 0) {
+function walkMapPhotoEntryIdFromElement(mapEl) {
+  return String(mapEl?.getAttribute?.("data-walk-map-photo-entry") || "").trim();
+}
+
+function walkMapPhotoImagesForEntry(entryId = "") {
+  const normalizedEntryId = String(entryId || "").trim();
+  if (!normalizedEntryId) return [];
+  const entry = state.journal.find((item) => String(item?.id || "").trim() === normalizedEntryId);
+  if (!entry) return [];
+  return journalImages(normalizeJournalEntry(entry, state.varieties));
+}
+
+function walkMapPhotoLabelForEntry(entryId = "") {
+  const normalizedEntryId = String(entryId || "").trim();
+  if (!normalizedEntryId) return "Fotka";
+  const entry = state.journal.find((item) => String(item?.id || "").trim() === normalizedEntryId);
+  if (!entry) return "Fotka";
+  return journalDisplayTitle(normalizeJournalEntry(entry, state.varieties)) || "Fotka";
+}
+
+function renderWalkMapPhotoPopupMarkup(photoSource = "", photoIndex = 0) {
+  const safeSource = String(photoSource || "").trim();
+  const safeIndex = Math.max(0, Number(photoIndex) || 0);
+  if (!safeSource) return "";
+  return `
+    <button class="journal-walk__photo-popup" type="button" data-walk-map-photo-open="${safeIndex}" aria-label="Otvoriť fotku ${safeIndex + 1}">
+      <img class="journal-walk__photo-popup-image" src="${escapeAttribute(safeSource)}" alt="${escapeAttribute(`Fotka ${safeIndex + 1}`)}" loading="lazy" decoding="async">
+      <span class="journal-walk__photo-popup-caption">Fotka ${safeIndex + 1}</span>
+    </button>
+  `;
+}
+
+function walkMapPhotoMarkerPoints(points = [], photoImages = [], photoCount = 0) {
   const normalizedPoints = Array.isArray(points) ? points.filter(Boolean) : [];
+  const normalizedPhotos = Array.isArray(photoImages)
+    ? photoImages.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
   const totalPoints = normalizedPoints.length;
-  const totalPhotos = Math.max(0, Number(photoCount) || 0);
+  const totalPhotos = normalizedPhotos.length || Math.max(0, Number(photoCount) || 0);
   if (totalPoints < 1 || totalPhotos < 1) return [];
 
-  const markerIndexes = new Set();
+  const markerIndexes = [];
   if (totalPhotos === 1) {
-    markerIndexes.add(Math.max(0, Math.floor((totalPoints - 1) / 2)));
+    markerIndexes.push(Math.max(0, Math.floor((totalPoints - 1) / 2)));
   } else {
-    for (let index = 0; index < totalPhotos; index += 1) {
-      const ratio = (index + 1) / (totalPhotos + 1);
-      markerIndexes.add(Math.max(0, Math.min(totalPoints - 1, Math.round(ratio * (totalPoints - 1)))));
+    for (let photoIndex = 0; photoIndex < totalPhotos; photoIndex += 1) {
+      const ratio = (photoIndex + 1) / (totalPhotos + 1);
+      markerIndexes.push(Math.max(0, Math.min(totalPoints - 1, Math.round(ratio * (totalPoints - 1)))));
     }
   }
 
-  return [...markerIndexes]
-    .sort((a, b) => a - b)
-    .map((index) => normalizedPoints[index])
-    .filter((point) => Number.isFinite(Number(point?.latitude)) && Number.isFinite(Number(point?.longitude)));
+  const usedPointIndexes = new Set();
+  return markerIndexes
+    .map((pointIndex, photoIndex) => ({ pointIndex, photoIndex }))
+    .filter(({ pointIndex }) => {
+      if (usedPointIndexes.has(pointIndex)) return false;
+      usedPointIndexes.add(pointIndex);
+      return true;
+    })
+    .map(({ pointIndex, photoIndex }) => ({
+      point: normalizedPoints[pointIndex],
+      photoIndex,
+      photoSource: normalizedPhotos[photoIndex] || ""
+    }))
+    .filter((item) => Number.isFinite(Number(item?.point?.latitude)) && Number.isFinite(Number(item?.point?.longitude)));
 }
 
 function constrainWalkMapBounds(bounds, { compact = false } = {}) {
@@ -2591,10 +3025,11 @@ function activateDeferredWalkMapShell(shell) {
   const live = shell.classList.contains("journal-walk__map-shell--live");
   const points = walkMapPointsFromElement(shell);
   const photoCount = Math.max(0, Number(shell.getAttribute("data-walk-map-photo-count") || 0) || 0);
+  const photoEntryId = walkMapPhotoEntryIdFromElement(shell);
   if (!points.length) return;
   shell.dataset.walkMapActivated = "true";
   shell.classList.remove("journal-walk__map-shell--deferred");
-  shell.innerHTML = renderWalkMapInnerMarkup(points, { compact, live, photoCount, collapsible: compact });
+  shell.innerHTML = renderWalkMapInnerMarkup(points, { compact, live, photoCount, photoEntryId, collapsible: compact });
   hydrateWalkMaps(shell);
   refreshWalkMaps(shell);
   bindWalkMapActivators(shell);
@@ -3048,8 +3483,8 @@ function invalidateDerivedDataCaches() {
 function ensureDerivedDataCache() {
   if (derivedDataCache.version === derivedDataCacheVersion) return derivedDataCache;
 
-  const categories = Array.isArray(state?.categories) ? state.categories : [];
-  const varieties = Array.isArray(state?.varieties) ? state.varieties : [];
+  const categories = activeSyncItems(Array.isArray(state?.categories) ? state.categories : []);
+  const varieties = activeSyncItems(Array.isArray(state?.varieties) ? state.varieties : []);
   const categoriesById = new Map(categories.map((item) => [item.id, item]));
   const childrenByParent = new Map();
   const sortSiblings = (items) => [...items].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "sk"));
@@ -3155,12 +3590,31 @@ wireStaticEvents();
 installBootRefreshMask();
 render();
 syncResponsiveAppShellClass();
+scheduleAutoCloudWakeSync({ delay: 1400, forcePull: true });
 window.addEventListener("resize", () => {
   scheduleGlobalViewportMaintenance({ resize: true });
 }, { passive: true });
 window.addEventListener("scroll", () => {
 scheduleGlobalViewportMaintenance({ scroll: true });
 }, { passive: true });
+window.addEventListener("focus", () => {
+  scheduleAutoCloudWakeSync({ delay: AUTO_CLOUD_PULL_DEBOUNCE_MS });
+});
+window.addEventListener("online", () => {
+  scheduleAutoCloudWakeSync({ delay: 800, forcePull: true });
+}, { passive: true });
+document.addEventListener("visibilitychange", () => {
+  syncDocumentVisibilityRuntimeState();
+  syncWeatherBackgroundLoopVisibility();
+  if (document.visibilityState === "visible") {
+    scheduleAutoCloudWakeSync({ delay: AUTO_CLOUD_PULL_DEBOUNCE_MS });
+    return;
+  }
+  if (hasPendingAutoCloudChanges(state)) {
+    scheduleAutoCloudPush({ delay: 250 });
+  }
+});
+syncDocumentVisibilityRuntimeState();
 scheduleImageBackgroundCleanup();
 
 function closeToolbarAddMenu({ skipHistory = true } = {}) {
@@ -3266,7 +3720,7 @@ function openMainMenuView(options = {}) {
 
 function normalizedJournalList() {
   if (!Array.isArray(state.journal)) return [];
-  return state.journal
+  return activeSyncItems(state.journal)
     .map((entry) => {
       try {
         return normalizeJournalEntry(entry || {}, state.varieties);
@@ -3386,7 +3840,7 @@ function renderJournalOverlayCard(entry, options = {}) {
   const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length, photoEntryId: normalizedEntry.id });
   const forceExpanded = Boolean(options?.forceExpanded);
   const safeText = String(normalizedEntry.text || "").trim();
   const titleInfo = journalPreviewTitleInfo(normalizedEntry, 72);
@@ -3406,7 +3860,7 @@ function renderJournalOverlayCard(entry, options = {}) {
   });
 
   if (isMobileShell && !forceExpanded) {
-    const compactGalleryPreviewCount = 4;
+    const compactGalleryPreviewCount = 5;
     const compactFooterChips = footerChips.slice(0, 2);
     const compactMediaMarkup = images.length || video
       ? `
@@ -3584,9 +4038,14 @@ function bindJournalOverlayCardActions(container) {
 
   container.querySelectorAll("[data-delete-journal-overlay]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.journal = state.journal.filter((entry) => String(entry?.id || "") !== button.dataset.deleteJournalOverlay);
-      if (!persist()) return;
+      const deleteResult = softDeleteStateRecord("journal", button.dataset.deleteJournalOverlay, "journal");
+      if (!deleteResult) return;
+      if (!persist()) {
+        rollbackSoftDeleteResult(deleteResult);
+        return;
+      }
       render();
+      showUndoDeleteToast("Zápis zmazaný");
       openJournalOverlayList(String(container.dataset.journalActiveTagKey || "").trim(), { historyMode: "preserve" });
     });
   });
@@ -3807,9 +4266,14 @@ function openJournalOverlayEntry(entryId = "", returnTagKey = "", options = {}) 
     });
   });
   root.querySelector("#journal-overlay-delete-entry")?.addEventListener("click", () => {
-    state.journal = state.journal.filter((item) => String(item?.id || "") !== normalizedEntryId);
-    if (!persist()) return;
+    const deleteResult = softDeleteStateRecord("journal", normalizedEntryId, "journal");
+    if (!deleteResult) return;
+    if (!persist()) {
+      rollbackSoftDeleteResult(deleteResult);
+      return;
+    }
     render();
+    showUndoDeleteToast("Zápis zmazaný");
     if (activeOverlayHistoryKind === "journal-entry" && typeof window !== "undefined" && window.history?.back) {
       window.history.back();
       return;
@@ -4550,7 +5014,15 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     });
   };
 
+  const WALK_GPS_MAX_ACCEPTED_ACCURACY_METERS = 45;
+  const WALK_GPS_MIN_CLEARANCE_METERS = 12;
+  const WALK_GPS_MAX_WALKING_SPEED_KMH = 12;
+
   const shouldAppendWalkGpsPoint = (nextPoint) => {
+    const accuracyMeters = Number(nextPoint?.accuracyMeters);
+    if (Number.isFinite(accuracyMeters) && accuracyMeters > WALK_GPS_MAX_ACCEPTED_ACCURACY_METERS) {
+      return false;
+    }
     const previousPoint = walkGpsPoints[walkGpsPoints.length - 1] || null;
     if (!previousPoint) return true;
     const distanceKm = walkGpsDistanceKm([previousPoint, nextPoint]) || 0;
@@ -4559,6 +5031,23 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     const secondsDiff = Number.isFinite(previousTime) && Number.isFinite(nextTime)
       ? Math.abs(nextTime - previousTime) / 1000
       : Number.POSITIVE_INFINITY;
+    const distanceMeters = distanceKm * 1000;
+    const previousAccuracyMeters = Number(previousPoint?.accuracyMeters);
+    const combinedAccuracyMeters = (Number.isFinite(previousAccuracyMeters) ? previousAccuracyMeters : 0)
+      + (Number.isFinite(accuracyMeters) ? accuracyMeters : 0);
+    const minimumClearanceMeters = Math.max(
+      WALK_GPS_MIN_CLEARANCE_METERS,
+      combinedAccuracyMeters * 0.9
+    );
+    if (distanceMeters <= minimumClearanceMeters) {
+      return false;
+    }
+    if (Number.isFinite(secondsDiff) && secondsDiff > 0) {
+      const speedKmh = distanceKm / (secondsDiff / 3600);
+      if (speedKmh > WALK_GPS_MAX_WALKING_SPEED_KMH) {
+        return false;
+      }
+    }
     return distanceKm >= 0.008 || secondsDiff >= 20;
   };
 
@@ -4652,7 +5141,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           }, {
             enableHighAccuracy: true,
             timeout: 20000,
-            maximumAge: 4000
+            maximumAge: 0
           });
           renderWalkGpsState();
           return;
@@ -4693,7 +5182,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           }, {
             enableHighAccuracy: true,
             timeout: 20000,
-            maximumAge: 4000
+            maximumAge: 0
           });
           walkGpsTone = "live";
           walkGpsMessage = "Prechádzka beží.";
@@ -5236,6 +5725,10 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
       stopWalkGpsTracking({ silent: true });
       render();
       openJournalReturnView();
+      showAppToast(editingEntry ? "Zápis uložený" : "Zápis pridaný", {
+        tone: "success",
+        detail: "Zmena je uložená a podľa potreby sa prenesie aj do cloudu."
+      });
     } catch (error) {
       setVideoUploadStatus({
         hidden: !pendingVideoFile && !existingVideo && !existingVideoPath,
@@ -5466,7 +5959,7 @@ function toolbarSearchMatches(query = "") {
     return Infinity;
   };
 
-  const categoryMatches = state.categories
+  const categoryMatches = activeCategoryRecords()
     .map((category) => {
       const name = String(category?.name || "").trim();
       const score = scoreText(name);
@@ -5481,7 +5974,7 @@ function toolbarSearchMatches(query = "") {
     })
     .filter(Boolean);
 
-  const cardMatches = state.varieties
+  const cardMatches = activeVarietyRecords()
     .map((item) => {
       const title = entryDisplayName(item);
       const score = scoreText(title);
@@ -5555,7 +6048,7 @@ function renderToolbarSearchResults() {
         openFocusedCategoryNavigation(id);
         return;
       }
-      const card = state.varieties.find((item) => item.id === id);
+      const card = findActiveVarietyById(id);
       if (card?.categoryId) {
         openFocusedCategoryNavigation(card.categoryId, { scrollToTop: false });
       } else {
@@ -5666,7 +6159,7 @@ function ensureToolbarSearch() {
       const target = event.target;
       if (!(target instanceof Element)) return;
       if (target.closest(
-        ".toolbar-add-menu, #open-main-menu, #toggle-worklog-panel, #toggle-journal-panel, #open-settings-panel, #toggle-mobile-preview, #toggle-weather-sound"
+        ".toolbar-add-menu, #open-main-menu, #toggle-worklog-panel, #toggle-journal-panel, #open-settings-panel, #open-sync-status-panel, #toggle-mobile-preview, #toggle-weather-sound"
       )) {
         return;
       }
@@ -5688,6 +6181,7 @@ function ensureToolbarSearch() {
 }
 
 function wireStaticEvents() {
+  ensureToolbarSyncStatusChip();
   const settingsPanelToggleEl = ensureSettingsToolbarButton();
   const mobilePreviewToggleEl = ensureMobilePreviewButton();
   const mobileWeatherSoundToggleEl = ensureMobileWeatherSoundButton();
@@ -6165,6 +6659,10 @@ function render() {
   updateUndoButton();
   updateRestoreResetButton();
   updateMenuVisibility();
+  if (activeSeasonTitleEl) {
+    activeSeasonTitleEl.textContent = `Sezóna ${currentSeasonYear()}`;
+  }
+  safeStep("stav synchronizácie", ensureToolbarSyncStatusChip);
   safeStep("vyhľadávanie v toolbare", ensureToolbarSearch);
   safeStep("hlavné menu", renderMainMenu);
   refreshMainMenuWeatherMini().catch(() => {});
@@ -6610,6 +7108,239 @@ function bindSettingsToolbarButton(button) {
   return button;
 }
 
+let appToastHideTimer = 0;
+let appToastCleanupTimer = 0;
+
+function clearAppToastTimers() {
+  if (typeof window === "undefined") return;
+  if (appToastHideTimer) {
+    window.clearTimeout(appToastHideTimer);
+    appToastHideTimer = 0;
+  }
+  if (appToastCleanupTimer) {
+    window.clearTimeout(appToastCleanupTimer);
+    appToastCleanupTimer = 0;
+  }
+}
+
+function ensureAppToastHost() {
+  if (typeof document === "undefined") return null;
+  let host = document.getElementById("app-toast-host");
+  if (host) return host;
+  host = document.createElement("div");
+  host.id = "app-toast-host";
+  host.className = "app-toast-host";
+  host.hidden = true;
+  host.setAttribute("aria-live", "polite");
+  host.setAttribute("aria-atomic", "true");
+  document.body?.appendChild(host);
+  return host;
+}
+
+function dismissAppToast(options = {}) {
+  if (typeof document === "undefined") return;
+  clearAppToastTimers();
+  const host = document.getElementById("app-toast-host");
+  if (!host) return;
+  const immediate = Boolean(options?.immediate);
+  const toast = host.querySelector(".app-toast");
+  const cleanup = () => {
+    host.innerHTML = "";
+    host.hidden = true;
+    host.classList.remove("is-visible");
+  };
+  if (!toast || immediate) {
+    cleanup();
+    return;
+  }
+  toast.classList.remove("is-visible");
+  host.classList.remove("is-visible");
+  if (typeof window === "undefined") {
+    cleanup();
+    return;
+  }
+  appToastCleanupTimer = window.setTimeout(() => {
+    cleanup();
+    appToastCleanupTimer = 0;
+  }, 220);
+}
+
+function showAppToast(message = "", options = {}) {
+  const text = String(message || "").trim();
+  if (!text) return null;
+  const host = ensureAppToastHost();
+  if (!host) return null;
+  dismissAppToast({ immediate: true });
+  const allowedTones = new Set(["success", "info", "warn", "error"]);
+  const tone = allowedTones.has(String(options?.tone || "").trim()) ? String(options.tone).trim() : "info";
+  const detail = String(options?.detail || "").trim();
+  const actionLabel = String(options?.actionLabel || "").trim();
+  const actionHandler = typeof options?.onAction === "function" ? options.onAction : null;
+  const durationMs = Number.isFinite(Number(options?.durationMs))
+    ? Math.max(0, Number(options.durationMs))
+    : (actionLabel ? 5200 : 2800);
+  const toast = document.createElement("section");
+  toast.className = `app-toast app-toast--${tone}`;
+  toast.setAttribute("role", tone === "error" ? "alert" : "status");
+  toast.innerHTML = `
+    <div class="app-toast__copy">
+      <p class="app-toast__message">${escapeHtml(text)}</p>
+      ${detail ? `<p class="app-toast__detail">${escapeHtml(detail)}</p>` : ""}
+    </div>
+    ${actionLabel ? `<button class="app-toast__action" type="button" data-app-toast-action>${escapeHtml(actionLabel)}</button>` : ""}
+  `;
+  host.hidden = false;
+  host.appendChild(toast);
+  if (actionLabel && actionHandler) {
+    toast.querySelector("[data-app-toast-action]")?.addEventListener("click", () => {
+      dismissAppToast({ immediate: true });
+      actionHandler();
+    });
+  }
+  if (typeof window !== "undefined") {
+    window.requestAnimationFrame(() => {
+      host.classList.add("is-visible");
+      toast.classList.add("is-visible");
+    });
+    if (durationMs > 0) {
+      appToastHideTimer = window.setTimeout(() => {
+        dismissAppToast();
+        appToastHideTimer = 0;
+      }, durationMs);
+    }
+  } else {
+    host.classList.add("is-visible");
+    toast.classList.add("is-visible");
+  }
+  return toast;
+}
+
+function showUndoDeleteToast(message = "Položka zmazaná") {
+  return showAppToast(message, {
+    tone: "info",
+    actionLabel: "Obnoviť",
+    durationMs: 5200,
+    onAction: () => undoLastDelete()
+  });
+}
+
+function currentToolbarSyncStatus() {
+  const preferences = loadSupabasePreferences();
+  const authMirror = loadSupabaseAuthMirror();
+  const syncMeta = loadSupabaseSyncMeta();
+  const cloudConfigured = Boolean(preferences.enabled && preferences.url && preferences.anonKey);
+  const cloudSignedIn = Boolean(authMirror.email);
+  const pendingChanges = Number(syncMeta.pendingDirtyCount || 0) > 0 || Number(syncMeta.pendingMediaCount || 0) > 0;
+  const syncBusy = Boolean(autoCloudSyncInFlight || autoCloudPushPending || autoCloudPullPending);
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+
+  if (!cloudConfigured) {
+    return {
+      label: "Len v zariadení",
+      tone: "local",
+      title: "Cloud ešte nie je zapnutý. Dáta sú zatiaľ len v tomto zariadení."
+    };
+  }
+
+  if (!cloudSignedIn) {
+    return {
+      label: "Treba sa prihlásiť",
+      tone: "warn",
+      title: "Cloud je pripravený, ale ešte treba prihlásenie do cloud účtu."
+    };
+  }
+
+  if (offline && pendingChanges) {
+    return {
+      label: "Čaká na internet",
+      tone: "warn",
+      title: "Zmeny sú uložené lokálne a do cloudu sa odošlú, keď bude znova internet."
+    };
+  }
+
+  if (syncBusy) {
+    return {
+      label: "Synchronizujem...",
+      tone: "sync",
+      title: "Appka práve potichu synchronizuje zmeny medzi zariadeniami."
+    };
+  }
+
+  if (pendingChanges) {
+    return {
+      label: "Ukladám zmeny...",
+      tone: "sync",
+      title: "Lokálne zmeny čakajú na odoslanie do cloudu."
+    };
+  }
+
+  if (syncMeta.lastSyncError) {
+    return {
+      label: "Skúsim znova",
+      tone: "warn",
+      title: syncMeta.lastSyncError
+    };
+  }
+
+  if (syncMeta.lastSuccessfulSyncAt) {
+    return {
+      label: "Synchronizované",
+      tone: "ok",
+      title: `Posledná úspešná synchronizácia prebehla ${formatDate(syncMeta.lastSuccessfulSyncAt)}.`
+    };
+  }
+
+  return {
+    label: "Cloud pripravený",
+    tone: "soft",
+    title: "Cloud je pripravený a ďalšie zmeny sa budú skúšať synchronizovať na pozadí."
+  };
+}
+
+function bindToolbarSyncStatusChip(button) {
+  if (!(button instanceof HTMLButtonElement) || button.dataset.boundSyncStatus === "true") return button;
+  button.dataset.boundSyncStatus = "true";
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    closeToolbarAddMenu();
+    openSettingsManager("", "", "cloud-sync");
+  });
+  return button;
+}
+
+function syncToolbarSyncStatusChip(button = document.getElementById("open-sync-status-panel")) {
+  if (!(button instanceof HTMLButtonElement)) return null;
+  const status = currentToolbarSyncStatus();
+  button.className = `toolbar-sync-status toolbar-sync-status--${status.tone}`;
+  button.innerHTML = `
+    <span class="toolbar-sync-status__dot" aria-hidden="true"></span>
+    <span class="toolbar-sync-status__label">${escapeHtml(status.label)}</span>
+  `;
+  button.setAttribute("aria-label", `Stav synchronizácie: ${status.label}`);
+  button.setAttribute("title", status.title);
+  return button;
+}
+
+function ensureToolbarSyncStatusChip() {
+  if (isTopStripResetMode() && !isHomeFloatingTopBarMode()) {
+    document.getElementById("open-sync-status-panel")?.remove();
+    return null;
+  }
+  const toolbarSlot = document.getElementById("menu-toolbar-settings-slot") || document.querySelector(".utility-bar__settings");
+  if (!toolbarSlot) return null;
+  let button = document.getElementById("open-sync-status-panel");
+  if (!button) {
+    button = document.createElement("button");
+    button.id = "open-sync-status-panel";
+    button.type = "button";
+    toolbarSlot.prepend(button);
+  } else if (button.parentElement !== toolbarSlot) {
+    toolbarSlot.prepend(button);
+  }
+  bindToolbarSyncStatusChip(button);
+  return syncToolbarSyncStatusChip(button);
+}
+
 function ensureSettingsToolbarButton() {
   if (isTopStripResetMode() && !isHomeFloatingTopBarMode()) {
     document.getElementById("open-settings-panel")?.remove();
@@ -6851,6 +7582,7 @@ function setMobileWeatherSoundVolume(value, { persist = true } = {}) {
 
 function syncResponsiveToolbarButtonPlacement() {
   if (typeof document === "undefined") return;
+  ensureToolbarSyncStatusChip();
   ensureSettingsToolbarButton();
   ensureMobilePreviewButton();
   ensureMobileWeatherSoundButton();
@@ -6999,17 +7731,6 @@ function ensureBottomNavMediaInput() {
 }
 
 function openBottomNavMediaChooser() {
-  const host = ensureMobileCameraPicker();
-  const captureInput = host?.querySelector("#mobile-camera-capture-input");
-  if (captureInput instanceof HTMLInputElement) {
-    captureInput.value = "";
-    captureInput.setAttribute("accept", IMAGE_FILE_ACCEPT);
-    captureInput.setAttribute("capture", "environment");
-    captureInput.setAttribute("multiple", "");
-    if (openNativeFilePicker(captureInput)) {
-      return;
-    }
-  }
   openMobileCameraPicker();
 }
 
@@ -8038,8 +8759,11 @@ function renderCatalog() {
   const inheritedSowingWindow = categoryDisplaySowingWindow(category.id);
   const categoryLineage = new Set([category.id, ...categoryAncestorIds(category)]);
   const showBreedingChips = categoryLineage.has("root-zahrada");
-  const useCompactCategorySummary = !inheritedNotes && !inheritedSowingWindow;
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+  const showFocusedMobileHeaderMeta = !(isMobileShell && isFocusedView);
+  const visibleCategoryNotes = showFocusedMobileHeaderMeta ? inheritedNotes : "";
+  const visibleCategorySowingWindow = showFocusedMobileHeaderMeta ? inheritedSowingWindow : "";
+  const useCompactCategorySummary = !visibleCategoryNotes && !visibleCategorySowingWindow;
   const categoryJournalThemeKey = `category:${category.id}`;
   const categoryJournalCount = journalEntriesForTag(normalizedJournalList(), categoryJournalThemeKey).length;
   const categoryJournalButtonMarkup = categoryJournalCount
@@ -8153,11 +8877,11 @@ function renderCatalog() {
               <div class="category-panel__title-row">
                 ${inlineCategoryBackMarkup}
                 <h3>${escapeHtml(category.name)}${showCategoryTitleCount ? ` <span class="category-panel__title-count">(${scopedCategoryVarieties.length})</span>` : ""}</h3>
-                ${inheritedSowingWindow || categoryJournalButtonMarkup ? `<div class="category-panel__hero-side">${categoryJournalButtonMarkup}${inheritedSowingWindow ? `<span class="tag category-panel__hero-tag">Odporúčaný výsev: ${escapeHtml(inheritedSowingWindow)}</span>` : ""}</div>` : ""}
+                ${visibleCategorySowingWindow || categoryJournalButtonMarkup ? `<div class="category-panel__hero-side">${categoryJournalButtonMarkup}${visibleCategorySowingWindow ? `<span class="tag category-panel__hero-tag">Odporúčaný výsev: ${escapeHtml(visibleCategorySowingWindow)}</span>` : ""}</div>` : ""}
               </div>
               ${inlineCategoryManageMarkup}
               ${inlineChildCategoriesMarkup}
-              ${inheritedNotes ? `<p class="category-panel__notes">${escapeHtml(inheritedNotes)}</p>` : ""}
+              ${visibleCategoryNotes ? `<p class="category-panel__notes">${escapeHtml(visibleCategoryNotes)}</p>` : ""}
             </div>
           </div>
           ${useInlineCategoryManage ? "" : categoryManageMarkup}
@@ -8303,13 +9027,15 @@ function renderCatalog() {
 }
 
 function renderHomeDashboard() {
-  const entries = journalEntriesNewestFirst();
+  const activeSeasonYearValue = currentSeasonYear();
+  const entries = activeSeasonJournalEntries();
   const latestEntry = entries[0] || null;
-  const latestPhotos = recentGalleryItems();
-  const seasonalMemory = seasonalMemoryCandidates()[0] || null;
+  const latestPhotos = recentGalleryItems(entries);
+  const anniversaryMoments = seasonalMemoryCandidates().slice(0, 3);
+  const featuredAnniversaryMoment = anniversaryMoments[0] || null;
   const thingRecords = buildThingRecords().slice(0, 6);
   const problemEntries = entries.filter((entry) => entry.entryType === "problem").slice(0, 2);
-  const weatherSnapshot = homeWeatherSnapshot || latestEntry?.weather || seasonalMemory?.weather || null;
+  const weatherSnapshot = homeWeatherSnapshot || latestEntry?.weather || featuredAnniversaryMoment?.weather || null;
   const weatherPreferences = loadWeatherPreferences();
   const weatherCardPlace = String(weatherSnapshot?.placeLabel || weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).split(",")[0].trim() || "Záhrada";
   const weatherCardTitle = `${weatherCardPlace} dnes`;
@@ -8319,9 +9045,9 @@ function renderHomeDashboard() {
     <div class="home-board">
       <section class="home-hero">
         <div class="home-hero__copy">
-          <p class="eyebrow">Dnes</p>
+          <p class="eyebrow">Sezóna ${escapeHtml(String(activeSeasonYearValue))}</p>
           <h2>Môj pokojný priestor pre záhradu, prírodu a spomienky</h2>
-          <p>Staré jadro ostáva zachované, len sa okolo neho skladá osobnejší domovský pohľad s denníkom, galériou, témami a sezónou.</p>
+          <p>Aktívna je sezóna ${escapeHtml(String(activeSeasonYearValue))}. Staršie roky ostávajú v histórii a domov ukazuje najmä to, čo sa deje teraz.</p>
         </div>
         <div class="home-hero__actions">
           <button class="button" type="button" data-open-home-add>Pridať zápis</button>
@@ -8337,7 +9063,7 @@ function renderHomeDashboard() {
               <h3>${escapeHtml(latestEntry?.title || "Zatiaľ bez zápisu")}</h3>
             </div>
           </div>
-          <p class="home-card__meta">${latestEntry ? escapeHtml(formatDate(latestEntry.date)) : "Pridaj prvý zápis a začneme si pamätať príbeh sezóny."}</p>
+          <p class="home-card__meta">${latestEntry ? escapeHtml(formatRelativeTime(latestEntry.date)) : "Pridaj prvý zápis a začneme si pamätať príbeh sezóny."}</p>
           <p class="home-card__text">${escapeHtml(trimText(latestEntry?.text || "Tvoje poznámky, fotky a súvislosti budú bývať práve tu.", 160))}</p>
           ${latestEntry ? `<div class="home-chip-row">${journalLinkChips(latestEntry).map(renderJournalChip).join("")}</div>` : ""}
         </article>
@@ -8354,17 +9080,26 @@ function renderHomeDashboard() {
           </div>
         </article>
 
-        <article class="home-card home-card--memory">
-          <div class="home-card__head">
-            <div>
-              <p class="eyebrow">Spomienka</p>
-              <h3>${escapeHtml(seasonalMemory?.title || "Pred rokom dnes")}</h3>
+        ${anniversaryMoments.length ? `
+          <article class="home-card home-card--memory">
+            <div class="home-card__head">
+              <div>
+                <p class="eyebrow">Pred rokom</p>
+                <h3>Čo sa dialo v tento deň</h3>
+              </div>
+              <span class="home-pill">${escapeHtml(countedLabel(anniversaryMoments.length, "1 moment", "momenty", "momentov"))}</span>
             </div>
-            ${seasonalMemory ? `<span class="home-pill">${escapeHtml(formatDate(seasonalMemory.date))}</span>` : ""}
-          </div>
-          <p class="home-card__text">${escapeHtml(seasonalMemory ? trimText(seasonalMemory.text || "Starší zápis z podobného dátumu.", 150) : "Keď pribudnú staršie roky, sem sa budú vracať spomienky z podobných dní a sezón.")}</p>
-          ${seasonalMemory?.images?.length ? `<button class="button button--ghost" type="button" data-open-home-memory>Otvoriť spomienku</button>` : ""}
-        </article>
+            <div class="home-entity-grid home-entity-grid--anniversary">
+              ${anniversaryMoments.map((entry) => `
+                <button class="home-entity-card" type="button" data-open-home-anniversary-entry="${escapeAttribute(entry.id)}">
+                  <span class="home-entity-card__type">${escapeHtml(formatRelativeTime(entry.date))}</span>
+                  <strong>${escapeHtml(entry.title || "Moment")}</strong>
+                  <span>${escapeHtml(trimText(entry.text || "Starší moment z rovnakého dňa.", 96))}</span>
+                </button>
+              `).join("")}
+            </div>
+          </article>
+        ` : ""}
 
         <article class="home-card">
           <div class="home-card__head">
@@ -8375,7 +9110,7 @@ function renderHomeDashboard() {
           </div>
           <div class="home-stack">
             ${problemEntries.length
-              ? problemEntries.map((entry) => `<div class="home-line"><strong>${escapeHtml(entry.title)}</strong><span>${escapeHtml(formatDate(entry.date))}</span></div>`).join("")
+              ? problemEntries.map((entry) => `<div class="home-line"><strong>${escapeHtml(entry.title)}</strong><span>${escapeHtml(formatRelativeTime(entry.date))}</span></div>`).join("")
               : '<p class="home-card__text">Škodcovia, plesne, poškodenia a iné problémy budú mať svoje miesto bez toho, aby rozhádzali zvyšok appky.</p>'}
           </div>
         </article>
@@ -8390,13 +9125,16 @@ function renderHomeDashboard() {
           ${latestPhotos.length ? `<button class="button button--ghost mini-list__more mini-list__more--inline" type="button" data-open-home-gallery>Otvoriť fotky</button>` : ""}
         </div>
         <div class="home-gallery">
-          ${latestPhotos.length
-            ? latestPhotos.slice(0, 6).map((item, index) => `
-              <button class="home-gallery__item" type="button" data-open-home-gallery-index="${index}" aria-label="Otvoriť fotku ${escapeAttribute(item.entryTitle)}">
-                <img src="${escapeAttribute(item.image)}" alt="${escapeAttribute(item.entryTitle)}" loading="lazy" decoding="async" fetchpriority="low">
-                <span class="home-gallery__label">${escapeHtml(item.entryTitle)}</span>
-              </button>
-            `).join("")
+            ${latestPhotos.length
+              ? latestPhotos.slice(0, 6).map((item, index) => `
+                <button class="home-gallery__item" type="button" data-open-home-gallery-index="${index}" aria-label="Otvoriť fotku ${escapeAttribute(item.entryTitle)}">
+                  <img src="${escapeAttribute(item.image)}" alt="${escapeAttribute(item.entryTitle)}" loading="lazy" decoding="async" fetchpriority="low">
+                  <span class="home-gallery__label">
+                    <strong class="home-gallery__title">${escapeHtml(item.entryTitle)}</strong>
+                    <span class="home-gallery__meta">${escapeHtml(formatRelativeTime(item.entryDate))}</span>
+                  </span>
+                </button>
+              `).join("")
             : '<div class="empty-state">Galéria bude žiť z denníkových fotiek, nie ako samostatný hlúpy album.</div>'}
         </div>
       </section>
@@ -8424,17 +9162,20 @@ function renderHomeDashboard() {
     </div>
   `;
 
-  bindHomeDashboard({ latestPhotoImages, latestPhotos, seasonalMemory });
+  bindHomeDashboard({ latestPhotoImages, latestPhotos });
   refreshHomeWeatherCard();
 }
 
-function bindHomeDashboard({ latestPhotoImages, latestPhotos, seasonalMemory }) {
+function bindHomeDashboard({ latestPhotoImages, latestPhotos }) {
   bindWeatherOverviewTriggers(catalogEl);
   catalogEl.querySelector("[data-open-home-add]")?.addEventListener("click", openJournalComposer);
   catalogEl.querySelector("[data-open-home-journal]")?.addEventListener("click", forceOpenJournalManager);
-  catalogEl.querySelector("[data-open-home-memory]")?.addEventListener("click", () => {
-    if (!seasonalMemory) return;
-    openImageLightbox(journalImages(seasonalMemory), 0, seasonalMemory.title || "Spomienka");
+  catalogEl.querySelectorAll("[data-open-home-anniversary-entry]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const entryId = String(button.getAttribute("data-open-home-anniversary-entry") || "").trim();
+      if (!entryId) return;
+      openJournalOverlayEntry(entryId);
+    });
   });
   catalogEl.querySelector("[data-open-home-gallery]")?.addEventListener("click", () => {
     if (!latestPhotoImages.length) return;
@@ -8463,10 +9204,18 @@ function bindThingLinks(container = document) {
 }
 
 function journalEntriesNewestFirst() {
-  return state.journal
+  return activeSyncItems(Array.isArray(state.journal) ? state.journal : [])
     .map((entry) => normalizeJournalEntry(entry, state.varieties))
     .slice()
     .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+}
+
+function activeSeasonJournalEntries(options = {}) {
+  const allEntries = journalEntriesNewestFirst();
+  const activeYear = currentSeasonYear();
+  const filteredEntries = allEntries.filter((entry) => normalizeSeasonYearValue(entry?.seasonYear, 0) === activeYear);
+  if (filteredEntries.length || options?.fallbackToAll === false) return filteredEntries;
+  return allEntries;
 }
 
 function journalImages(entry) {
@@ -8567,11 +9316,22 @@ function renderJournalVideoPlayer(videoSource = "", title = "Video", className =
   `;
 }
 
-function recentGalleryItems() {
+function recentGalleryItems(entries = activeSeasonJournalEntries()) {
+  const sourceEntries = Array.isArray(entries) && entries.length ? entries : journalEntriesNewestFirst();
+  const preferredItems = sourceEntries
+    .flatMap((entry) => journalImages(entry).map((image, index) => ({
+      entryId: entry.id,
+      entryTitle: entry.title || "Zápis",
+      entryDate: entry.date,
+      image,
+      index
+    })));
+  if (preferredItems.length) return preferredItems;
   return journalEntriesNewestFirst()
     .flatMap((entry) => journalImages(entry).map((image, index) => ({
       entryId: entry.id,
       entryTitle: entry.title || "Zápis",
+      entryDate: entry.date,
       image,
       index
     })));
@@ -8589,7 +9349,7 @@ function journalDateLabel(value) {
   const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return formatDate(raw);
-  const dateLabel = formatDate(normalized);
+  const dateLabel = formatRelativeTime(normalized);
   const timeLabel = normalized.includes("T")
     ? date.toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })
     : "";
@@ -10957,7 +11717,7 @@ function formatJournalWalkDuration(durationMinutes) {
   return `${hours} h ${minutes} min`;
 }
 
-function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0 } = {}) {
+function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0, photoEntryId = "" } = {}) {
   const walk = normalizeJournalWalk({ walk: walkValue }) || null;
   if (!walk) return "";
   const deferCompactMap = compact && Boolean(document.body?.classList.contains("app-mobile-shell"));
@@ -11021,7 +11781,7 @@ function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0 }
           `).join("")}
         </div>
       ` : ""}
-      ${renderWalkMapMarkup(walk, { compact, photoCount, deferred: deferCompactMap })}
+      ${renderWalkMapMarkup(walk, { compact, photoCount, photoEntryId, deferred: deferCompactMap })}
       ${previewPoints.length ? `
         <div class="journal-walk__points">
           ${previewPoints.map((point) => `<span class="journal-walk__point">${escapeHtml(point)}</span>`).join("")}
@@ -11046,7 +11806,7 @@ function weatherIconSymbol(weather) {
 }
 
 function journalLinkChips(entry) {
-  const linkedVariety = state.varieties.find((item) => item.id === entry.linkedVarietyId);
+  const linkedVariety = findActiveVarietyById(entry.linkedVarietyId);
   const linkedCategoryIds = normalizeIdList(entry.linkedCategoryIds?.length ? entry.linkedCategoryIds : entry.linkedCategoryId);
   const chips = [];
 
@@ -11074,7 +11834,7 @@ function journalLinkChips(entry) {
   }
 
   linkedCategoryIds.forEach((categoryId) => {
-    const category = state.categories.find((item) => item.id === categoryId);
+    const category = findActiveCategoryById(categoryId);
     if (category) {
       chips.push({
         label: `Kategória: ${category.name}`,
@@ -11446,9 +12206,9 @@ function setupJournalPhenomenaInput(formEl) {
 function taskLinkChips(task) {
   const linkedCategoryIds = normalizeIdList(task.linkedCategoryIds?.length ? task.linkedCategoryIds : task.linkedCategoryId);
   const linkedCategories = linkedCategoryIds
-    .map((id) => state.categories.find((item) => item.id === id))
+    .map((id) => findActiveCategoryById(id))
     .filter(Boolean);
-  const linkedVariety = state.varieties.find((item) => item.id === task.linkedVarietyId);
+  const linkedVariety = findActiveVarietyById(task.linkedVarietyId);
   return [
     ...linkedCategories.map((linkedCategory) => ({ label: `Kategória: ${linkedCategory.name}`, themeKey: `category:${linkedCategory.id}` })),
     linkedVariety ? { label: `Karta: ${entryDisplayName(linkedVariety)}`, themeKey: `variety:${linkedVariety.id}` } : null
@@ -11493,7 +12253,7 @@ function buildThingRecords() {
     });
   });
 
-  state.varieties.forEach((variety) => {
+  activeVarietyRecords().forEach((variety) => {
     pushRecord({
       key: `variety:${variety.id}`,
       title: entryDisplayName(variety),
@@ -11550,12 +12310,13 @@ function relatedTasksForTheme(record) {
   if (record.kind === "entry-type" || record.kind === "weather") return [];
   const titleKey = slugify(record.title || "");
   if (!titleKey) return [];
+  const visibleTasks = combinedTasks();
 
   if (record.kind === "variety") {
     const varietyId = record.key.replace("variety:", "");
-    const variety = state.varieties.find((item) => item.id === varietyId);
+    const variety = findActiveVarietyById(varietyId);
     const names = [record.title, variety?.name, variety?.type].filter(Boolean).map(slugify);
-    return sortTasks(state.customTasks.filter((task) => {
+    return sortTasks(visibleTasks.filter((task) => {
       if (task.linkedVarietyId === varietyId) return true;
       const text = slugify(task.text || "");
       return names.some((name) => name && text.includes(name));
@@ -11567,11 +12328,11 @@ function relatedTasksForTheme(record) {
     const categoryIds = [categoryId, ...collectDescendantCategoryIds(categoryId)];
     const categoryNames = new Set(
       categoryIds
-        .map((id) => state.categories.find((item) => item.id === id)?.name)
+        .map((id) => findActiveCategoryById(id)?.name)
         .filter(Boolean)
         .map(slugify)
     );
-    return sortTasks(state.customTasks.filter((task) => {
+    return sortTasks(visibleTasks.filter((task) => {
       const linkedCategoryIds = normalizeIdList(task.linkedCategoryIds?.length ? task.linkedCategoryIds : task.linkedCategoryId);
       if (linkedCategoryIds.some((id) => categoryIds.includes(id))) return true;
       const text = slugify(task.text || "");
@@ -11579,10 +12340,10 @@ function relatedTasksForTheme(record) {
     }));
   }
 
-  return sortTasks(state.customTasks.filter((task) => {
+  return sortTasks(visibleTasks.filter((task) => {
     const categoryMatch = normalizeIdList(task.linkedCategoryIds?.length ? task.linkedCategoryIds : task.linkedCategoryId)
-      .some((id) => slugify(state.categories.find((item) => item.id === id)?.name || "") === titleKey);
-    const varietyMatch = task.linkedVarietyId && slugify(entryDisplayName(state.varieties.find((item) => item.id === task.linkedVarietyId) || {})) === titleKey;
+      .some((id) => slugify(findActiveCategoryById(id)?.name || "") === titleKey);
+    const varietyMatch = task.linkedVarietyId && slugify(entryDisplayName(findActiveVarietyById(task.linkedVarietyId) || {})) === titleKey;
     return categoryMatch || varietyMatch || slugify(task.text || "").includes(titleKey);
   }));
 }
@@ -11749,12 +12510,15 @@ function renderCompactPreviewCard(item, {
   extraClassName = "",
   ariaLabel = ""
 } = {}) {
+  const isFocusedMobilePreviewCard = typeof document !== "undefined"
+    && document.body.classList.contains("app-mobile-shell")
+    && document.body.classList.contains("app-focused-mode");
   const title = entryDisplayName(item);
   const titleMarkup = inferBreedingType(item) === "hybrid"
     ? `${escapeHtml(title)} <span class="catalog-card__title-suffix">F1</span>`
     : escapeHtml(title);
   const meta = previewCardPrimaryMeta(item);
-  const badgesMarkup = previewCardBadges(item);
+  const badgesMarkup = isFocusedMobilePreviewCard ? "" : previewCardBadges(item);
   const ratingMarkup = Number(item.rating) > 0
     ? `<span class="catalog-card__rating-inline" aria-label="Hodnotenie ${Math.max(0, Math.min(5, Number(item.rating) || 0))} z 5">${renderStarRating(item.rating, true)}</span>`
     : "";
@@ -11825,11 +12589,12 @@ function renderGalleryEntryCard(variety) {
 }
 
 function renderOverview() {
-  const topVarieties = state.varieties
+  const visibleVarieties = activeSyncItems(state.varieties);
+  const topVarieties = visibleVarieties
     .filter((item) => item.top)
     .slice(0, 3);
-  const allTopVarieties = state.varieties.filter((item) => item.top);
-  const avoidVarieties = state.varieties.filter((item) => item.avoidNextYear);
+  const allTopVarieties = visibleVarieties.filter((item) => item.top);
+  const avoidVarieties = visibleVarieties.filter((item) => item.avoidNextYear);
   const avoidPreview = avoidVarieties.slice(0, 3);
   if (favoriteListEl) {
     favoriteListEl.innerHTML = allTopVarieties.length
@@ -11875,7 +12640,7 @@ function showManualSowingWindow(variety) {
 }
 
 function renderTasks() {
-  const customTasks = sortTasks(state.customTasks);
+  const customTasks = sortTasks(combinedTasks());
   if (!customTaskListEl) return;
   customTaskListEl.innerHTML = customTasks.length
     ? `
@@ -11914,7 +12679,7 @@ function renderJournal() {
       journalSidebarEl.innerHTML = latestEntries.length
         ? `
           ${latestEntries.map((entry) => renderJournalSidebarCard(entry)).join("")}
-          ${state.journal.length > latestEntries.length ? `<button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Zobraziť všetky zápisy (${state.journal.length})</button>` : ""}
+          ${journalEntries.length > latestEntries.length ? `<button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Zobraziť všetky zápisy (${journalEntries.length})</button>` : ""}
         `
         : '<div class="empty-state">Keď pridáš prvý zápis, ukáže sa aj tu.</div>';
     } catch (error) {
@@ -11940,9 +12705,14 @@ function renderJournal() {
     journalListEl.querySelectorAll("[data-delete-journal]").forEach((button) => {
       button.addEventListener("click", () => {
         const entryId = button.dataset.deleteJournal;
-        state.journal = state.journal.filter((entry) => entry.id !== entryId);
-        if (!persist()) return;
+        const deleteResult = softDeleteStateRecord("journal", entryId, "journal");
+        if (!deleteResult) return;
+        if (!persist()) {
+          rollbackSoftDeleteResult(deleteResult);
+          return;
+        }
         renderJournal();
+        showUndoDeleteToast("Zápis zmazaný");
       });
     });
   }
@@ -11989,7 +12759,7 @@ function renderJournalSidebarCard(entry) {
   const displayTitle = titleInfo.title || "Záhradný zápis";
   const safeId = String(normalizedEntry.id || "").trim() || makeId("journal");
   const walkTimeRange = normalizedEntry.entryType === "walk" ? walkTimeRangeLabel(normalizedEntry.walk) : "";
-  const sidebarDateLabel = [formatDate(normalizedEntry.date), walkTimeRange].filter(Boolean).join(" • ");
+  const sidebarDateLabel = [formatRelativeTime(normalizedEntry.date), walkTimeRange].filter(Boolean).join(" • ");
   const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
 
   if (!isMobileShell) {
@@ -12074,29 +12844,31 @@ function renderTaskSidebarCard(task) {
 }
 
 function latestJournalImages() {
-  return state.journal
-    .flatMap((entry) => {
-      const images = Array.isArray(entry.images) && entry.images.length
-        ? entry.images
-        : entry.image
-          ? [entry.image]
-          : [];
-      return images.map((image, index) => ({
-        entryId: entry.id,
-        entryTitle: entry.title || "Záhradný zápis",
-        entryDate: entry.date,
-        entryText: String(entry.text || "").trim(),
-        image,
-        index
-      }));
-    })
+  const mapEntriesToImages = (entries = []) => entries.flatMap((entry) => {
+    const images = Array.isArray(entry.images) && entry.images.length
+      ? entry.images
+      : entry.image
+        ? [entry.image]
+        : [];
+    return images.map((image, index) => ({
+      entryId: entry.id,
+      entryTitle: entry.title || "Záhradný zápis",
+      entryDate: entry.date,
+      entryText: String(entry.text || "").trim(),
+      image,
+      index
+    }));
+  });
+  const activeSeasonItems = mapEntriesToImages(activeSeasonJournalEntries({ fallbackToAll: false }));
+  const sourceItems = activeSeasonItems.length ? activeSeasonItems : mapEntriesToImages(normalizedJournalList());
+  return sourceItems
     .slice(0, 12);
 }
 
 function renderMemories() {
   if (!memoryStripEl) return;
   const memoryItems = latestJournalImages();
-  const totalJournalEntries = Array.isArray(state.journal) ? state.journal.length : 0;
+  const totalJournalEntries = activeSyncCount(state.journal);
 
   if (memoryCarouselIndex >= memoryItems.length) {
     memoryCarouselIndex = 0;
@@ -12113,6 +12885,7 @@ function renderMemories() {
           data-open-memory-entry="${escapeAttribute(memoryItems[memoryCarouselIndex].entryId)}"
         >
           <span class="memory-strip__backdrop" style="background-image:url('${escapeAttribute(memoryItems[memoryCarouselIndex].image)}')"></span>
+          <span class="memory-strip__subtitle">${escapeHtml(formatRelativeTime(memoryItems[memoryCarouselIndex].entryDate))}</span>
           <img src="${escapeAttribute(memoryItems[memoryCarouselIndex].image)}" alt="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}" loading="lazy" decoding="async" fetchpriority="low">
           ${memoryItems[memoryCarouselIndex].entryText
             ? `<span class="memory-strip__note">${escapeHtml(trimText(memoryItems[memoryCarouselIndex].entryText, 160))}</span>`
@@ -12403,14 +13176,16 @@ function weatherTrendBridgeTip(weather = insightWeatherSignals()) {
   const rainyDays = trendDays.filter((item) => Number(item.rainMm || 0) > 1).length;
   const totalRainMm = trendDays.reduce((sum, item) => sum + Number(item.rainMm || 0), 0);
   const maxRainMm = trendDays.reduce((max, item) => Math.max(max, Number(item.rainMm || 0)), 0);
-  const trendHint = weatherTrendInsight(trendDays);
+  const totalRainLabel = formatWeatherRain(totalRainMm) || "0 mm";
+  const maxRainLabel = formatWeatherRain(maxRainMm) || "0 mm";
+  const rainyDaysLabel = `${rainyDays} ${rainyDays === 1 ? "daždivý deň" : rainyDays >= 2 && rainyDays <= 4 ? "daždivé dni" : "daždivých dní"}`;
 
   if (rainyDays >= 4 || totalRainMm >= 16) {
     return {
       key: "weather-trend-bridge-wet",
       eyebrow: "Vývoj počasia",
-      title: "Minulé dni boli vlhšie než býva príjemné",
-      body: `Za posledných 7 dní spadlo približne ${formatWeatherRain(totalRainMm) || "viac zrážok"} a ${countedLabel(rainyDays, "deň bol daždivý", "dni boli daždivé", "dní bolo daždivých")}. To je dobrá správa pre preschnutú pôdu, ale oplatí sa sledovať slimáky, spodné listy a miesta, kde sa drží voda.`
+      title: `Za 7 dní: ${totalRainLabel}`,
+      body: `${rainyDaysLabel}. Max deň: ${maxRainLabel}.`
     };
   }
 
@@ -12418,8 +13193,8 @@ function weatherTrendBridgeTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-trend-bridge-dry",
       eyebrow: "Vývoj počasia",
-      title: "Minulé dni boli skôr suchšie",
-      body: `Za posledných 7 dní spadlo len približne ${formatWeatherRain(totalRainMm) || "málo zrážok"}. To je príjemnejšie na prácu a zber, ale nádoby, skleník a čerstvé výsevy budú potrebovať pozornejšie sledovanie vlhkosti.`
+      title: `Za 7 dní: ${totalRainLabel}`,
+      body: `${rainyDaysLabel}. Max deň: ${maxRainLabel}.`
     };
   }
 
@@ -12427,16 +13202,16 @@ function weatherTrendBridgeTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-trend-bridge-burst",
       eyebrow: "Vývoj počasia",
-      title: "Týždeň mal aspoň jeden silnejší dažďový zásah",
-      body: `${trendHint || "Počasie sa menilo nerovnomerne."} Po výraznejšom daždi sa oplatí skontrolovať zle odtekajúce miesta, povrch nádob a citlivejšie porasty, ktoré sa vedia po nárazovej vode rýchlo položiť alebo zahnívať.`
+      title: `Najsilnejší deň: ${maxRainLabel}`,
+      body: `Za 7 dní spolu ${totalRainLabel}.`
     };
   }
 
   return {
     key: "weather-trend-bridge-calm",
     eyebrow: "Vývoj počasia",
-    title: "Týždenný priebeh je zatiaľ pomerne pokojný",
-    body: `${trendHint || "Posledné dni boli skôr vyrovnané."} Ak nepríde náhla zmena, je to dobré okno na drobné práce, kontrolu rastu a dobehnutie vecí, ktoré odkladáš.`
+    title: `Za 7 dní: ${totalRainLabel}`,
+    body: `${rainyDaysLabel}. Max deň: ${maxRainLabel}.`
   };
 }
 
@@ -12798,7 +13573,7 @@ function syncOverviewHighlights() {
 }
 
 function renderTaskManagerList(taskList, taskCount, rerender) {
-  const tasks = sortTasks(state.customTasks);
+  const tasks = sortTasks(combinedTasks());
   if (taskCount) taskCount.textContent = countedLabel(tasks.length, "úloha", "úlohy", "úloh");
 
   taskList.innerHTML = tasks.length
@@ -12824,25 +13599,31 @@ function renderTaskManagerList(taskList, taskCount, rerender) {
 
   taskList.querySelectorAll("[data-delete-task]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.customTasks = state.customTasks.filter((item) => item.id !== button.dataset.deleteTask);
-      if (!persist()) return;
+      const deleteResult = softDeleteStateRecord("customTasks", button.dataset.deleteTask, "task");
+      if (!deleteResult) return;
+      if (!persist()) {
+        rollbackSoftDeleteResult(deleteResult);
+        return;
+      }
       render();
       rerender();
+      showUndoDeleteToast("Úloha zmazaná");
     });
   });
 }
 
 function renderJournalManagerList(journalList, journalCount, rerender) {
-  if (journalCount) journalCount.textContent = countedLabel(state.journal.length, "zápis", "zápisy", "zápisov");
+  const journalEntries = normalizedJournalList();
+  if (journalCount) journalCount.textContent = countedLabel(journalEntries.length, "zápis", "zápisy", "zápisov");
 
   try {
-    journalList.innerHTML = state.journal.length
-      ? state.journal.map((entry) => renderJournalManagerCard(entry)).join("")
+    journalList.innerHTML = journalEntries.length
+      ? journalEntries.map((entry) => renderJournalManagerCard(entry)).join("")
       : '<div class="empty-state empty-state--compact">Tvoje záznamy zo záhrady budú tu.</div>';
   } catch (error) {
     console.error("Zlyhal manažér denníka", error);
-    journalList.innerHTML = state.journal.length
-      ? state.journal.map((entry) => renderJournalManagerCard(entry)).join("")
+    journalList.innerHTML = journalEntries.length
+      ? journalEntries.map((entry) => renderJournalManagerCard(entry)).join("")
       : '<div class="empty-state empty-state--compact">Tvoje záznamy zo záhrady budú tu.</div>';
   }
 
@@ -12851,10 +13632,15 @@ function renderJournalManagerList(journalList, journalCount, rerender) {
 
   journalList.querySelectorAll("[data-delete-worklog-journal]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.journal = state.journal.filter((entry) => entry.id !== button.dataset.deleteWorklogJournal);
-      if (!persist()) return;
+      const deleteResult = softDeleteStateRecord("journal", button.dataset.deleteWorklogJournal, "journal");
+      if (!deleteResult) return;
+      if (!persist()) {
+        rollbackSoftDeleteResult(deleteResult);
+        return;
+      }
       render();
       rerender();
+      showUndoDeleteToast("Zápis zmazaný");
     });
   });
 
@@ -12947,7 +13733,7 @@ function openTaskManager() {
     }
 
     if (linkedVarietyWrap) linkedVarietyWrap.hidden = false;
-    const filteredVarieties = state.varieties
+    const filteredVarieties = activeVarietyRecords()
       .filter((item) => !allowedCategoryIds || allowedCategoryIds.has(item.categoryId))
       .slice()
       .sort((a, b) => entryDisplayName(a).localeCompare(entryDisplayName(b), "sk"));
@@ -13003,7 +13789,7 @@ function openTaskManager() {
   linkedVarietySelect?.addEventListener("change", () => {
     const varietyId = String(linkedVarietySelect.value || "").trim();
     if (!varietyId) return;
-    const variety = state.varieties.find((item) => item.id === varietyId);
+    const variety = findActiveVarietyById(varietyId);
     if (!variety) return;
     const nextCategoryId = String(variety.categoryId || "").trim();
     if (!nextCategoryId || !linkedCategorySelect) return;
@@ -13047,6 +13833,10 @@ function openTaskManager() {
     render();
     rerenderTaskManager();
     setTaskEditorOpen(false);
+    showAppToast("Úloha pridaná", {
+      tone: "success",
+      detail: "Úloha je uložená."
+    });
   });
 
   setTaskEditorOpen(false);
@@ -13526,22 +14316,22 @@ function openThingOverview(thingKey) {
   const photos = entries.flatMap((entry) => journalImages(entry));
   const linkedVarieties = [...new Map(
     entries
-      .map((entry) => state.varieties.find((item) => item.id === entry.linkedVarietyId))
+      .map((entry) => findActiveVarietyById(entry.linkedVarietyId))
       .filter(Boolean)
       .map((item) => [item.id, item])
   ).values()];
   const linkedCategories = [...new Map(
     entries
       .flatMap((entry) => normalizeIdList(entry.linkedCategoryIds?.length ? entry.linkedCategoryIds : entry.linkedCategoryId)
-        .map((categoryId) => state.categories.find((item) => item.id === categoryId)))
+        .map((categoryId) => findActiveCategoryById(categoryId)))
       .filter(Boolean)
       .map((item) => [item.id, item])
   ).values()];
   const directVariety = record.kind === "variety"
-    ? state.varieties.find((variety) => variety.id === record.key.replace("variety:", ""))
+    ? findActiveVarietyById(record.key.replace("variety:", ""))
     : null;
   const category = directVariety
-    ? state.categories.find((item) => item.id === directVariety.categoryId)
+    ? findActiveCategoryById(directVariety.categoryId)
     : null;
 
   resetDetailModalClasses();
@@ -13990,6 +14780,9 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
     }
     render();
     detailModal.close();
+    showAppToast(existing ? "Kategória uložená" : "Kategória pridaná", {
+      tone: "success"
+    });
   };
 
   categoryForm.addEventListener("submit", (event) => {
@@ -14009,8 +14802,9 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
     }
     if (deleteCategoryButton) {
       deleteCategoryButton.addEventListener("click", () => {
-        deleteCategory(existing.id);
-        detailModal.close();
+        if (deleteCategory(existing.id)) {
+          detailModal.close();
+        }
       });
     }
   }
@@ -14409,18 +15203,30 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     if (!persist()) return;
     render();
     detailModal.close();
+    showAppToast(existing ? "Karta uložená" : "Karta pridaná", {
+      tone: "success"
+    });
   });
 
   if (existing) {
     document.getElementById("delete-variety").addEventListener("click", () => {
+      const previousUndoState = snapshotUndoStateValue();
       setUndoState({
         type: "variety",
         variety: clone(existing)
       });
-      state.varieties = state.varieties.filter((item) => item.id !== existing.id);
-      if (!persist()) return;
+      const deleteResult = softDeleteStateRecord("varieties", existing.id, "card", { previousUndoState });
+      if (!deleteResult) {
+        restoreUndoStateSnapshot(previousUndoState);
+        return;
+      }
+      if (!persist()) {
+        rollbackSoftDeleteResult(deleteResult);
+        return;
+      }
       render();
       detailModal.close();
+      showUndoDeleteToast("Karta zmazaná");
     });
   }
 
@@ -14483,11 +15289,6 @@ function openBatchSowingManager(categoryId = activeCategoryId) {
     const nextCandidates = sourceCandidates();
     const nextIds = new Set(nextCandidates.map((item) => item.id));
     selectedIds.clear();
-    nextCandidates.forEach((item) => {
-      if (Boolean(item.sowedAt) || ["sown", "transplanted", "harvested"].includes(item.status)) {
-        selectedIds.add(item.id);
-      }
-    });
     currentFilterCategoryId = "all";
     return nextIds;
   };
@@ -14639,21 +15440,11 @@ function openBatchSowingManager(categoryId = activeCategoryId) {
     const formData = new FormData(form);
     const sowedAt = String(formData.get("sowedAt") || "");
     if (selectedIds.size && !sowedAt) return;
+    const selectedCandidateIds = new Set([...selectedIds].filter((id) => candidateIds.has(id)));
 
     state.varieties = state.varieties.map((item) => {
-      const isCandidate = candidateIds.has(item.id);
-      if (!isCandidate) return item;
-
-      if (!selectedIds.has(item.id)) {
-        const clearedStatusValues = finalizeVarietyStatusValues([], { harvestedAt: item.harvestedAt });
-        return {
-          ...item,
-          sowedAt: "",
-          transplantedAt: "",
-          statusValues: clearedStatusValues,
-          status: primaryStatusValue(clearedStatusValues)
-        };
-      }
+      if (!selectedCandidateIds.has(item.id)) return item;
+      if (Boolean(item.sowedAt) || ["sown", "transplanted", "harvested"].includes(item.status)) return item;
       const nextStatus = item.status === "transplanted" || item.status === "harvested"
         ? item.status
         : "sown";
@@ -14858,8 +15649,8 @@ function openBatchMoveManager(categoryId = activeCategoryId) {
 
 function deleteCategory(categoryId) {
   const deletedCategory = state.categories.find((item) => item.id === categoryId);
-  if (!deletedCategory) return;
-  if (ALWAYS_PROTECTED_CATEGORY_IDS.includes(categoryId)) return;
+  if (!deletedCategory) return false;
+  if (ALWAYS_PROTECTED_CATEGORY_IDS.includes(categoryId)) return false;
   const fallbackCategory = state.categories.find((item) => item.id === FALLBACK_CATEGORY_ID);
   const movedChildCategories = state.categories.filter((item) => item.parentCategoryId === categoryId);
   const movedVarieties = state.varieties.filter((item) => item.categoryId === categoryId);
@@ -14870,6 +15661,7 @@ function deleteCategory(categoryId) {
   const previousTasks = clone(state.customTasks);
   const previousJournal = clone(state.journal);
   const previousActiveCategoryId = activeCategoryId;
+  const previousUndoState = snapshotUndoStateValue();
 
   setUndoState({
     type: "category",
@@ -14883,14 +15675,19 @@ function deleteCategory(categoryId) {
   });
 
   state.categories = ensureRootCategories(state.categories
-    .filter((item) => item.id !== categoryId)
-    .map((item) => item.parentCategoryId === categoryId
-      ? {
+    .map((item) => {
+      if (item.id === categoryId) {
+        return touchLocalSyncRecord(item, "category", { deleted: true });
+      }
+      if (item.parentCategoryId === categoryId) {
+        return {
           ...item,
           parentCategoryId: item.id === FALLBACK_CATEGORY_ID ? "" : FALLBACK_CATEGORY_ID,
           group: item.id === FALLBACK_CATEGORY_ID ? (item.group || "Iné") : (fallbackCategory?.name || "Nezaradené")
-        }
-      : item));
+        };
+      }
+      return item;
+    }));
   state.varieties = state.varieties.map((item) => item.categoryId === categoryId
     ? { ...item, categoryId: FALLBACK_CATEGORY_ID }
     : item);
@@ -14921,13 +15718,16 @@ function deleteCategory(categoryId) {
     state.customTasks = previousTasks;
     state.journal = previousJournal;
     activeCategoryId = previousActiveCategoryId;
-    return;
+    restoreUndoStateSnapshot(previousUndoState);
+    return false;
   }
   render();
+  showUndoDeleteToast("Kategória zmazaná");
+  return true;
 }
 
 function combinedTasks() {
-  return [...state.customTasks];
+  return activeSyncItems(state.customTasks);
 }
 
 function refreshAutoTasks() {
@@ -14958,9 +15758,14 @@ function bindTaskActions(container) {
   container.querySelectorAll("[data-delete-task]").forEach((button) => {
     button.addEventListener("click", () => {
       const taskId = button.dataset.deleteTask;
-      state.customTasks = state.customTasks.filter((item) => item.id !== taskId);
-      if (!persist()) return;
+      const deleteResult = softDeleteStateRecord("customTasks", taskId, "task");
+      if (!deleteResult) return;
+      if (!persist()) {
+        rollbackSoftDeleteResult(deleteResult);
+        return;
+      }
       render();
+      showUndoDeleteToast("Úloha zmazaná");
     });
   });
 }
@@ -15090,7 +15895,7 @@ function countedLabel(count, one, few, many) {
   return `${count} ${many}`;
 }
 
-function worklogSummaryText(taskCount = state.customTasks.length, journalCount = state.journal.length) {
+function worklogSummaryText(taskCount = activeSyncCount(state.customTasks), journalCount = activeSyncCount(state.journal)) {
   return `${countedLabel(taskCount, "úloha", "úlohy", "úloh")} • ${countedLabel(journalCount, "zápis", "zápisy", "zápisov")}`;
 }
 
@@ -15500,6 +16305,12 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   const supabasePreferences = loadSupabasePreferences();
   const supabaseAuthMirror = loadSupabaseAuthMirror();
   const supabaseSyncMeta = loadSupabaseSyncMeta();
+  const localVisibleSummary = {
+    categories: activeSyncCount(state.categories),
+    cards: activeSyncCount(state.varieties),
+    tasks: activeSyncCount(state.customTasks),
+    journal: activeSyncCount(state.journal)
+  };
   const currentWeatherPlace = String(weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).trim() || GARDEN_WEATHER_PLACE;
   const hasLocalAccount = false;
   const isSignedIn = false;
@@ -15509,6 +16320,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     && supabaseBootstrapPreferences.url
     && supabaseBootstrapPreferences.anonKey
   );
+  const showSupabaseSection = !supabaseManagedInCode;
   const supabaseEnabled = Boolean(supabasePreferences.enabled && supabasePreferences.url && supabasePreferences.anonKey);
   const supabaseCloudSignedIn = Boolean(supabaseAuthMirror.email);
   const supabaseCloudReady = supabaseEnabled && supabaseCloudSignedIn;
@@ -15528,32 +16340,50 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   const supabaseStatusMessage = statusScope === "supabase"
     ? statusMessage
     : (supabaseManagedInCode
-      ? "Supabase je načítaný priamo z kódu cez supabase-config.js."
+      ? "Cloud pripojenie je načítané priamo z lokálneho nastavenia."
       : (supabaseEnabled
-      ? "Supabase je uložený ako pripravený backend pre ďalší krok."
-      : "Sem si vieš uložiť URL a anon key svojho Supabase projektu. Zatiaľ tým len pripravíme čistú cestu na cloud."));
+      ? "Cloud pripojenie je uložené a pripravené."
+      : "Sem si vieš uložiť údaje ku cloud projektu."));
   const cloudAccountStatusMessage = statusScope === "cloud-account"
     ? statusMessage
     : (supabaseEnabled
       ? (supabaseCloudSignedIn
-        ? `Cloud účet je prihlásený ako ${supabaseAuthMirror.email}.`
-        : "Supabase je pripravený. Keď chceš, vieš si tu už založiť alebo prihlásiť cloud účet.")
-      : "Najprv si ulož Supabase projekt, potom sem doplníme cloud účet.");
+        ? `Do cloudu si prihlásená ako ${supabaseAuthMirror.email}.`
+        : "Cloud je pripravený. Tu sa vieš prihlásiť alebo si vytvoriť účet.")
+      : "Najprv nastav cloud pripojenie, potom sa tu prihlásiš.");
   const cloudSyncStatusMessage = statusScope === "cloud-sync"
     ? statusMessage
-    : (supabaseCloudReady
-      ? (supabaseSyncMeta.lastSyncedAt
-        ? `Posledné ručné zrkadlenie do cloudu prebehlo ${formatDate(supabaseSyncMeta.lastSyncedAt)}.`
-        : "Cloud účet je pripravený. Upload teraz zrkadlí cloud podľa lokálu a import načíta cloud späť do appky.")
-      : (supabaseEnabled
-        ? "Najprv sa prihlás do cloud účtu a potom spusti prvý ručný sync."
-        : "Najprv si ulož Supabase projekt, potom sem doplníme prvý sync."));
+    : (() => {
+      if (!supabaseCloudReady) {
+        return supabaseEnabled
+          ? "Keď sa prihlásiš do cloud účtu, zmeny sa budú skúšať synchronizovať priebežne na pozadí. Tlačidlá nižšie ostávajú ako záloha."
+          : "Najprv si priprav cloud pripojenie. Keď bude účet prihlásený, sync pôjde priebežne na pozadí.";
+      }
+      if (supabaseSyncMeta.lastSyncError) {
+        return `${supabaseSyncMeta.lastSuccessfulSyncAt ? `Posledná úspešná synchronizácia bola ${formatDate(supabaseSyncMeta.lastSuccessfulSyncAt)}. ` : ""}Cloud ešte hlási problém: ${supabaseSyncMeta.lastSyncError}`;
+      }
+      if (supabaseSyncMeta.lastSuccessfulSyncAt) {
+        return `Posledná synchronizácia s cloudom prebehla ${formatDate(supabaseSyncMeta.lastSuccessfulSyncAt)}. Na pozadí ešte čaká ${countedLabel(supabaseSyncMeta.pendingDirtyCount, "1 lokálna zmena", "lokálne zmeny", "lokálnych zmien")} a ${countedLabel(supabaseSyncMeta.pendingMediaCount, "1 obrázok", "obrázky", "obrázkov")}.`;
+      }
+      return "Cloud účet je pripravený. Zmeny sa budú skúšať synchronizovať priebežne na pozadí, tlačidlá nižšie sú len záloha.";
+    })();
   const weatherTone = statusScope === "weather" ? tone : "";
   const accountTone = statusScope === "account" ? tone : "";
   const backupTone = statusScope === "backup" ? tone : "";
   const supabaseTone = statusScope === "supabase" ? tone : "";
-  const cloudAccountTone = statusScope === "cloud-account" ? tone : "";
-  const cloudSyncTone = statusScope === "cloud-sync" ? tone : "";
+  const cloudTone = (statusScope === "cloud-account" || statusScope === "cloud-sync") ? tone : "";
+  const cloudStatusMessage = statusScope === "cloud-account"
+    ? cloudAccountStatusMessage
+    : cloudSyncStatusMessage;
+  const cloudPanelSummaryLabel = supabaseCloudReady
+    ? "Synchronizácia beží na pozadí"
+    : (supabaseEnabled
+      ? "Treba sa prihlásiť"
+      : "Najprv pripojiť cloud");
+  const cloudPanelDefaultOpen = statusScope === "cloud-account"
+    || statusScope === "cloud-sync"
+    || (supabaseEnabled && !supabaseCloudSignedIn)
+    || supabaseCloudReady;
   const settingsTopbarMarkup = isMobileSettingsShell ? `
     <div class="settings-topbar-shell journal-overlay-shell__topline has-topbar">
       <button class="back-button journal-overlay-shell__back settings-topbar__back" type="button" data-settings-back aria-label="Krok späť">Späť</button>
@@ -15573,7 +16403,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
         </div>
         <div class="settings-hero__meta">
           <div class="settings-hero__pill">${escapeHtml(currentWeatherPlace)}</div>
-          <div class="settings-hero__pill">${escapeHtml(supabaseEnabled ? "Supabase pripravený" : "Supabase zatiaľ nie")}</div>
+          <div class="settings-hero__pill">${escapeHtml(supabaseEnabled ? "Cloud pripravený" : "Cloud zatiaľ nie")}</div>
           <div class="settings-hero__pill">${escapeHtml(supabaseCloudSignedIn ? `Cloud: ${supabaseAuthMirror.email}` : "Cloud: zatiaľ nie")}</div>
         </div>
       </section>
@@ -15584,11 +16414,11 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     <div class="settings-sheet">
       ${settingsHeroMarkup}
       <div class="settings-grid">
-        <section class="settings-panel" data-settings-section="weather" ${(!statusScope || statusScope === "weather") ? "data-settings-default-open" : ""}>
+        <section class="settings-panel" data-settings-section="weather" ${statusScope === "weather" ? "data-settings-default-open" : ""}>
           <div class="settings-panel__head">
             <div>
               <p class="eyebrow">Počasie</p>
-              <h3>Miesto pre synchronizáciu</h3>
+              <h3>Miesto pre počasie</h3>
             </div>
           </div>
           <form id="settings-weather-form" class="settings-form">
@@ -15608,7 +16438,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
           <div class="settings-panel__head">
             <div>
               <p class="eyebrow">Záloha a prenos</p>
-              <h3>Export a import dát</h3>
+              <h3>Záloha dát</h3>
             </div>
           </div>
           <div class="settings-form">
@@ -15621,16 +16451,17 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
             <p class="settings-panel__status ${backupTone ? `is-${backupTone}` : ""}" data-settings-backup-status>${escapeHtml(backupStatusMessage)}</p>
           </div>
         </section>
+        ${showSupabaseSection ? `
         <section class="settings-panel settings-panel--wide" data-settings-section="supabase" ${(statusScope === "supabase" || !supabaseEnabled) ? "data-settings-default-open" : ""}>
           <div class="settings-panel__head">
             <div>
-              <p class="eyebrow">Backend</p>
-              <h3>Supabase</h3>
+              <p class="eyebrow">Cloud</p>
+              <h3>Cloud pripojenie</h3>
             </div>
           </div>
           ${supabaseManagedInCode ? `
             <div class="settings-form">
-              <p class="settings-panel__help">Supabase už ide priamo z lokálneho <code>supabase-config.js</code>. Preto tu už netreba ručne vypĺňať URL ani anon key.</p>
+              <p class="settings-panel__help">Cloud pripojenie už ide z lokálneho nastavenia. Tu ho netreba znovu vypĺňať.</p>
               <div class="settings-panel__actions">
                 <button class="button button--ghost" type="button" data-test-supabase ${supabaseEnabled ? "" : "hidden"}>Otestovať spojenie</button>
               </div>
@@ -15646,7 +16477,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
                 <span>Supabase anon key</span>
                 <input name="supabaseAnonKey" type="text" value="${escapeAttribute(supabasePreferences.anonKey || "")}" placeholder="Sem vlož anon public key" autocomplete="off" spellcheck="false">
               </label>
-              <p class="settings-panel__help">Týmto ešte nič nemigruješ. Len si uložíš projekt, aby sme potom vedeli napojiť prihlásenie, dáta a obrázky bez ďalšej prestavby appky.</p>
+              <p class="settings-panel__help">Tu len uložíš údaje ku cloud projektu, aby sa appka vedela pripojiť.</p>
               <div class="settings-panel__actions">
                 <button class="button" type="submit">Uložiť Supabase</button>
                 <button class="button button--ghost" type="button" data-test-supabase ${supabaseEnabled ? "" : "hidden"}>Otestovať spojenie</button>
@@ -15656,66 +16487,59 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
             </form>
           `}
         </section>
-        <section class="settings-panel" data-settings-section="cloud-account" ${(statusScope === "cloud-account" || (supabaseEnabled && !supabaseCloudSignedIn)) ? "data-settings-default-open" : ""}>
+        ` : ""}
+        <section class="settings-panel settings-panel--wide" data-settings-section="cloud" ${cloudPanelDefaultOpen ? "data-settings-default-open" : ""}>
           <div class="settings-panel__head">
             <div>
-              <p class="eyebrow">Cloud účet</p>
-              <h3>Supabase Auth</h3>
-            </div>
-          </div>
-          <form id="settings-cloud-account-form" class="settings-form">
-            ${supabaseCloudSignedIn ? `
-              <div class="settings-panel__storage-meta settings-panel__account-meta">
-                <span>Cloud e-mail</span>
-                <strong>${escapeHtml(supabaseAuthMirror.email)}</strong>
-                <span>Provider</span>
-                <strong>${escapeHtml(supabaseAuthMirror.provider || "email")}</strong>
-              </div>
-            ` : ""}
-            <div class="settings-panel__account-grid">
-              <label class="field-block field-block--full">
-                <span>E-mail do cloudu</span>
-                <input name="cloudEmail" type="email" value="${escapeAttribute(supabaseAuthMirror.email || "")}" placeholder="napr. ja@mojazahrada.sk" autocomplete="username" ${supabaseEnabled ? "" : "disabled"}>
-              </label>
-              <label class="field-block field-block--full">
-                <span>Heslo do cloudu</span>
-                <input name="cloudPassword" type="password" placeholder="Aspoň 6 znakov" autocomplete="current-password" ${supabaseEnabled ? "" : "disabled"}>
-              </label>
-            </div>
-            <div class="settings-panel__actions">
-              <button class="button" type="button" data-cloud-signup ${supabaseEnabled ? "" : "disabled"}>Vytvoriť cloud účet</button>
-              <button class="button button--ghost" type="button" data-cloud-signin ${supabaseEnabled ? "" : "disabled"}>Prihlásiť cloud účet</button>
-              <button class="button button--ghost" type="button" data-cloud-signout ${supabaseCloudSignedIn ? "" : "hidden"}>Odhlásiť cloud účet</button>
-            </div>
-            <p class="settings-panel__help">Toto je už reálny cloud účet v Supabase. Dáta naň ešte nemigrujeme, ale pripravujeme tým čistý základ pre ďalší krok.</p>
-            <p class="settings-panel__status ${cloudAccountTone ? `is-${cloudAccountTone}` : ""}" data-settings-cloud-account-status>${escapeHtml(cloudAccountStatusMessage)}</p>
-          </form>
-        </section>
-        <section class="settings-panel settings-panel--wide" data-settings-section="cloud-sync" ${(statusScope === "cloud-sync" || supabaseCloudReady) ? "data-settings-default-open" : ""}>
-          <div class="settings-panel__head">
-            <div>
-              <p class="eyebrow">Cloud dáta</p>
-              <h3>Prvý sync do Supabase</h3>
+              <p class="eyebrow">Cloud</p>
+              <h3>Cloud</h3>
             </div>
           </div>
           <div class="settings-form">
             <div class="settings-panel__storage-meta settings-panel__account-meta">
+              <span>Stav</span>
+              <strong>${escapeHtml(cloudPanelSummaryLabel)}</strong>
+              <span>Cloud e-mail</span>
+              <strong>${escapeHtml(supabaseAuthMirror.email || "zatiaľ nie")}</strong>
               <span>Kategórie</span>
-              <strong>${escapeHtml(String(state.categories.length))}</strong>
+              <strong>${escapeHtml(String(localVisibleSummary.categories))}</strong>
               <span>Karty</span>
-              <strong>${escapeHtml(String(state.varieties.length))}</strong>
+              <strong>${escapeHtml(String(localVisibleSummary.cards))}</strong>
               <span>Úlohy</span>
-              <strong>${escapeHtml(String(state.customTasks.length))}</strong>
+              <strong>${escapeHtml(String(localVisibleSummary.tasks))}</strong>
               <span>Denník</span>
-              <strong>${escapeHtml(String(state.journal.length))}</strong>
+              <strong>${escapeHtml(String(localVisibleSummary.journal))}</strong>
             </div>
-            <p class="settings-panel__help">Upload teraz zrkadlí cloud podľa lokálu. Nové a upravené dáta nahrá, ale z cloudu odstráni aj to, čo už lokálne neexistuje. Načítanie z cloudu sa pýta na potvrdenie a ešte predtým uloží lokálnu poistnú zálohu.</p>
-            <div class="settings-panel__actions">
-              <button class="button button--ghost" type="button" data-cloud-sync-compare ${supabaseCloudReady ? "" : "disabled"}>Porovnať lokálne a cloud</button>
-              <button class="button" type="button" data-cloud-sync-upload ${supabaseCloudReady ? "" : "disabled"}>Nahrať dáta do cloudu</button>
-              <button class="button button--ghost" type="button" data-cloud-sync-download ${supabaseCloudReady ? "" : "disabled"}>Načítať dáta z cloudu</button>
-            </div>
-            <p class="settings-panel__status ${cloudSyncTone ? `is-${cloudSyncTone}` : ""}" data-settings-cloud-sync-status>${escapeHtml(cloudSyncStatusMessage)}</p>
+            <form id="settings-cloud-account-form" class="settings-form">
+              <div class="settings-panel__account-grid">
+                <label class="field-block field-block--full">
+                  <span>E-mail do cloudu</span>
+                  <input name="cloudEmail" type="email" value="${escapeAttribute(supabaseAuthMirror.email || "")}" placeholder="napr. ja@mojazahrada.sk" autocomplete="username" ${supabaseEnabled ? "" : "disabled"}>
+                </label>
+                <label class="field-block field-block--full">
+                  <span>Heslo do cloudu</span>
+                  <input name="cloudPassword" type="password" placeholder="Aspoň 6 znakov" autocomplete="current-password" ${supabaseEnabled ? "" : "disabled"}>
+                </label>
+              </div>
+              <div class="settings-panel__actions">
+                <button class="button" type="button" data-cloud-signup ${supabaseEnabled ? "" : "disabled"}>Vytvoriť cloud účet</button>
+                <button class="button button--ghost" type="button" data-cloud-signin ${supabaseEnabled ? "" : "disabled"}>Prihlásiť cloud účet</button>
+                <button class="button button--ghost" type="button" data-cloud-signout ${supabaseCloudSignedIn ? "" : "hidden"}>Odhlásiť cloud účet</button>
+              </div>
+              <p class="settings-panel__help">Prihlás sa raz a potom sa zmeny budú skúšať synchronizovať priebežne na pozadí medzi mobilom a PC.</p>
+              <p class="settings-panel__status ${cloudTone ? `is-${cloudTone}` : ""}" data-settings-cloud-status>${escapeHtml(cloudStatusMessage)}</p>
+            </form>
+            <details class="settings-advanced-block" ${statusScope === "cloud-sync" ? "open" : ""}>
+              <summary>Riešenie problémov</summary>
+              <div class="settings-advanced-block__body">
+                <p class="settings-panel__help">Keď sa niečo zasekne, tu vieš cloud porovnať alebo spustiť ručný prenos. Pred načítaním z cloudu sa vždy najprv uloží lokálna poistná záloha.</p>
+                <div class="settings-panel__actions">
+                  <button class="button button--ghost" type="button" data-cloud-sync-compare ${supabaseCloudReady ? "" : "disabled"}>Porovnať lokálne a cloud</button>
+                  <button class="button" type="button" data-cloud-sync-upload ${supabaseCloudReady ? "" : "disabled"}>Uložiť do cloudu</button>
+                  <button class="button button--ghost" type="button" data-cloud-sync-download ${supabaseCloudReady ? "" : "disabled"}>Načítať z cloudu</button>
+                </div>
+              </div>
+            </details>
           </div>
         </section>
       </div>
@@ -15857,7 +16681,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
       configuredAt: supabasePreferences.configuredAt || new Date().toISOString(),
       lastCheckedAt: new Date().toISOString()
     })) {
-      openSettingsManager("Supabase projekt je uložený. V ďalšom kroku naň napojíme účet, dáta a obrázky.", "success", "supabase");
+      openSettingsManager("Cloud pripojenie je uložené. Keď sa prihlásiš, zmeny sa môžu synchronizovať aj na pozadí.", "success", "supabase");
       return;
     }
     openSettingsManager("Supabase nastavenie sa teraz nepodarilo uložiť.", "error", "supabase");
@@ -15876,7 +16700,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
       const result = await testSupabaseConnection();
       openSettingsManager(
         result.hasSession
-          ? "Supabase spojenie funguje a už tam vidím aj aktívnu session."
+          ? "Cloud spojenie funguje a už tam vidím aj aktívne prihlásenie."
           : "Supabase spojenie funguje. Session tam ešte nie je, čo je zatiaľ v poriadku.",
         "success",
         "supabase"
@@ -15927,7 +16751,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     }
     try {
       const result = await supabaseSignInEmail(email, password);
-      openSettingsManager(`Cloud účet ${result.userEmail} je prihlásený.`, "success", "cloud-account");
+      openSettingsManager(`Cloud účet ${result.userEmail} je prihlásený. Automatická synchronizácia je pripravená.`, "success", "cloud-account");
     } catch (error) {
       openSettingsManager(error instanceof Error ? error.message : "Cloud prihlásenie sa teraz nepodarilo.", "error", "cloud-account");
     }
@@ -15936,7 +16760,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   cloudSignoutButton?.addEventListener("click", async () => {
     try {
       await supabaseSignOut();
-      openSettingsManager("Cloud účet som odhlásila.", "success", "cloud-account");
+      openSettingsManager("Cloud účet som odhlásila. Automatická synchronizácia je zatiaľ vypnutá.", "success", "cloud-account");
     } catch (error) {
       openSettingsManager(error instanceof Error ? error.message : "Cloud odhlásenie sa teraz nepodarilo.", "error", "cloud-account");
     }
@@ -15949,10 +16773,10 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     try {
       const summary = await fetchSupabaseStateSummary();
       const localSummary = {
-        categories: state.categories.length,
-        cards: state.varieties.length,
-        tasks: state.customTasks.length,
-        journal: state.journal.length
+        categories: activeSyncCount(state.categories),
+        cards: activeSyncCount(state.varieties),
+        tasks: activeSyncCount(state.customTasks),
+        journal: activeSyncCount(state.journal)
       };
       const countsMatch = localSummary.categories === summary.categories
         && localSummary.cards === summary.cards
@@ -15962,7 +16786,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
         ? formatDate(summary.latestUpdatedAt)
         : "zatiaľ bez dátumu";
       openSettingsManager(
-        `${countsMatch ? "Lokálne dáta a cloud momentálne sedia na počtoch." : "Lokálne dáta a cloud sa teraz líšia v počtoch."} Lokálne: ${localSummary.categories}/${localSummary.cards}/${localSummary.tasks}/${localSummary.journal}. Cloud: ${summary.categories}/${summary.cards}/${summary.tasks}/${summary.journal}. Cloud médiá v buckete: ${summary.imageFiles}. Posledná cloud zmena: ${latestCloudLabel}.`,
+        `${countsMatch ? "Lokálne dáta a cloud sa momentálne zhodujú v počtoch." : "Lokálne dáta a cloud sa momentálne nezhodujú v počtoch."} Lokálne: ${localSummary.categories}/${localSummary.cards}/${localSummary.tasks}/${localSummary.journal}. Cloud: ${summary.categories}/${summary.cards}/${summary.tasks}/${summary.journal}. Obrázky v cloude: ${summary.imageFiles}. Posledná zmena v cloude: ${latestCloudLabel}.`,
         countsMatch ? "success" : "",
         "cloud-sync"
       );
@@ -15974,7 +16798,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   });
 
   cloudSyncUploadButton?.addEventListener("click", async () => {
-    const shouldContinue = window.confirm("Nahrať dáta do cloudu a zrkadliť cloud podľa aktuálneho lokálu? Z cloudu sa odstránia kategórie, karty, úlohy, zápisy a cloud obrázky, ktoré už lokálne neexistujú.");
+    const shouldContinue = window.confirm("Nahrať lokálne zmeny do cloudu? Odošlú sa upravené dáta a nové obrázky.");
     if (!shouldContinue) return;
 
     const previousLabel = cloudSyncUploadButton.textContent;
@@ -15983,7 +16807,9 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
     try {
       const result = await syncStateToSupabase();
       openSettingsManager(
-        `Cloud zrkadlenie je hotové. Nahrala som ${countedLabel(result.categories, "kategóriu", "kategórie", "kategórií")}, ${countedLabel(result.cards, "kartu", "karty", "kariet")}, ${countedLabel(result.tasks, "úlohu", "úlohy", "úloh")}, ${countedLabel(result.journal, "zápis", "zápisy", "zápisov")} a ${countedLabel(result.uploadedImages, "fotku", "fotky", "fotiek")}. Z cloudu som odstránila ${countedLabel(result.deletedCategories, "kategóriu", "kategórie", "kategórií")}, ${countedLabel(result.deletedCards, "kartu", "karty", "kariet")}, ${countedLabel(result.deletedTasks, "úlohu", "úlohy", "úloh")}, ${countedLabel(result.deletedJournal, "zápis", "zápisy", "zápisov")} a ${countedLabel(result.deletedImages, "mediálny súbor", "mediálne súbory", "mediálnych súborov")}.`,
+        `${result.mediaErrors?.length
+          ? "Zmeny v dátach sú uložené, ale niektoré obrázky ešte čakajú na ďalší pokus. "
+          : "Synchronizácia s cloudom je hotová. "}Odoslala som ${countedLabel(result.categories, "zmenu kategórie", "zmeny kategórií", "zmien kategórií")}, ${countedLabel(result.cards, "zmenu karty", "zmeny kariet", "zmien kariet")}, ${countedLabel(result.tasks, "zmenu úlohy", "zmeny úloh", "zmien úloh")} a ${countedLabel(result.journal, "zmenu zápisu", "zmeny zápisov", "zmien zápisov")}. Obrázky: ${countedLabel(result.uploadedImages, "1 obrázok", "obrázky", "obrázkov")}.${result.mediaErrors?.length ? ` Prvý problém: ${result.mediaErrors[0]}` : ""}`,
         "success",
         "cloud-sync"
       );
@@ -15995,7 +16821,7 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   });
 
   cloudSyncDownloadButton?.addEventListener("click", async () => {
-    const shouldContinue = window.confirm("Načítať dáta z cloudu a prepísať nimi aktuálne lokálne dáta? Predtým sa uloží lokálna poistná záloha.");
+    const shouldContinue = window.confirm("Načítať dáta z cloudu a zlúčiť ich s lokálnymi? Predtým sa uloží lokálna poistná záloha.");
     if (!shouldContinue) return;
 
     const previousLabel = cloudSyncDownloadButton.textContent;
@@ -16260,7 +17086,7 @@ function findExistingBirdCards(match = {}) {
   const speciesCode = String(match?.speciesCode || "").trim();
   const commonName = normalizeBirdLookupText(match?.comName || "");
   const latinName = normalizeBirdLookupText(match?.sciName || "");
-  return state.varieties.filter((item) => {
+  return activeVarietyRecords().filter((item) => {
     if (cardType(item) !== "bird") return false;
     if (speciesCode && String(item?.birdSpeciesCode || "").trim() === speciesCode) return true;
     if (commonName && normalizeBirdLookupText(item?.name || "") === commonName) return true;
@@ -16340,7 +17166,7 @@ function linkedVarietyOptions(current, selectedCategoryIds = "") {
   const allowedCategoryIds = normalizedCategoryIds.length
     ? new Set(normalizedCategoryIds.flatMap((categoryId) => [categoryId, ...collectDescendantCategoryIds(categoryId)]))
     : null;
-  return state.varieties
+  return activeVarietyRecords()
     .filter((item) => !allowedCategoryIds || allowedCategoryIds.has(item.categoryId))
     .slice()
     .sort((a, b) => entryDisplayName(a).localeCompare(entryDisplayName(b), "sk"))
@@ -17048,18 +17874,30 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       if (!persist()) return;
       render();
       detailModal.close();
+      showAppToast(existing ? "Karta uložená" : "Karta pridaná", {
+        tone: "success"
+      });
     });
 
     document.getElementById("delete-card")?.addEventListener("click", () => {
       if (!existing) return;
+      const previousUndoState = snapshotUndoStateValue();
       setUndoState({
         type: "variety",
         variety: clone(existing)
       });
-      state.varieties = state.varieties.filter((item) => item.id !== existing.id);
-      if (!persist()) return;
+      const deleteResult = softDeleteStateRecord("varieties", existing.id, "card", { previousUndoState });
+      if (!deleteResult) {
+        restoreUndoStateSnapshot(previousUndoState);
+        return;
+      }
+      if (!persist()) {
+        rollbackSoftDeleteResult(deleteResult);
+        return;
+      }
       render();
       detailModal.close();
+      showUndoDeleteToast("Karta zmazaná");
     });
 
     preview.addEventListener("click", () => {
@@ -17167,7 +18005,7 @@ function categoryBreadcrumb(categoryId) {
 }
 
 function ensureActiveCategory() {
-  const validCategories = state.categories;
+  const validCategories = activeSyncItems(state.categories);
   if (!validCategories.find((item) => item.id === activeCategoryId)) {
     activeCategoryId = validCategories[0]?.id || null;
   }
@@ -17225,19 +18063,10 @@ function normalizePersistedState(parsed = {}) {
   const normalizedVarieties = (parsed.varieties || clone(seedVarieties)).map(normalizeVarietyRecord);
   const normalizedTasks = (parsed.customTasks || clone(seedTasks)).map((task) => normalizeTaskRecord(task, normalizedVarieties));
   const normalizedJournal = (parsed.journal || clone(seedJournal)).map((entry) => normalizeJournalEntry(entry, normalizedVarieties));
-  const categories = sanitizeCategoryHierarchy(ensureRootCategories((parsed.categories || clone(seedCategories)).map((item) => ({
-    group: "Moje kategórie",
-    parentCategoryId: "",
-    nodeType: "kind",
-    color: "#7e9f4b",
-    image: "",
-    recommendedSowingWindow: "",
-    sowedAt: "",
-    ...item
-  })).map(applyDefaultParenting)));
+  const categories = sanitizeCategoryHierarchy(ensureRootCategories((parsed.categories || clone(seedCategories)).map(normalizeCategoryRecord).map(applyDefaultParenting)));
   const promoted = promoteLegacyNamedCategories(categories, normalizedVarieties, normalizedTasks, normalizedJournal);
   return {
-    categories: enforceFixedCategoryNames(promoted.categories),
+    categories: enforceFixedCategoryNames(promoted.categories.map(normalizeCategoryRecord)),
     varieties: promoted.varieties,
     customTasks: promoted.customTasks,
     journal: promoted.journal,
@@ -17346,7 +18175,7 @@ async function importStateFromFile(file) {
   state = nextState;
   invalidateDerivedDataCaches();
   if (!state.categories.some((item) => item.id === activeCategoryId)) {
-    activeCategoryId = state.categories[0]?.id || null;
+    activeCategoryId = firstActiveCategoryId(state.categories);
   }
   if (!persist()) {
     state = normalizePersistedState(previousState);
@@ -17357,9 +18186,9 @@ async function importStateFromFile(file) {
   }
   render();
   return {
-    varieties: state.varieties.length,
-    tasks: state.customTasks.length,
-    journal: state.journal.length
+    varieties: activeSyncCount(state.varieties),
+    tasks: activeSyncCount(state.customTasks),
+    journal: activeSyncCount(state.journal)
   };
 }
 
@@ -17387,13 +18216,13 @@ function defaultState() {
   const normalizedTasks = clone(seedTasks).map((task) => normalizeTaskRecord(task, normalizedVarieties));
   const normalizedJournal = clone(seedJournal).map((entry) => normalizeJournalEntry(entry, normalizedVarieties));
   const promoted = promoteLegacyNamedCategories(
-    sanitizeCategoryHierarchy(clone(seedCategories)),
+    sanitizeCategoryHierarchy(clone(seedCategories).map(normalizeCategoryRecord)),
     normalizedVarieties,
     normalizedTasks,
     normalizedJournal
   );
   return {
-    categories: enforceFixedCategoryNames(promoted.categories),
+    categories: enforceFixedCategoryNames(promoted.categories.map(normalizeCategoryRecord)),
     varieties: promoted.varieties,
     customTasks: promoted.customTasks,
     journal: promoted.journal,
@@ -17431,14 +18260,14 @@ function migrateLegacyState(legacy) {
   const normalizedTasks = (legacy.customTasks || clone(seedTasks)).map((task) => normalizeTaskRecord(task, normalizedVarieties));
   const normalizedJournal = (legacy.journal || clone(seedJournal)).map((entry) => normalizeJournalEntry(entry, normalizedVarieties));
   const promoted = promoteLegacyNamedCategories(
-    sanitizeCategoryHierarchy(ensureRootCategories(categories.map((item) => ({ group: "Moje kategórie", parentCategoryId: "", nodeType: "kind", color: "#7e9f4b", image: "", recommendedSowingWindow: "", sowedAt: "", ...item })).map(applyDefaultParenting))),
+    sanitizeCategoryHierarchy(ensureRootCategories(categories.map(normalizeCategoryRecord).map(applyDefaultParenting))),
     normalizedVarieties,
     normalizedTasks,
     normalizedJournal
   );
 
   return {
-    categories: enforceFixedCategoryNames(promoted.categories),
+    categories: enforceFixedCategoryNames(promoted.categories.map(normalizeCategoryRecord)),
     varieties: promoted.varieties,
     customTasks: promoted.customTasks,
     journal: promoted.journal,
@@ -17446,12 +18275,169 @@ function migrateLegacyState(legacy) {
   };
 }
 
-function persist() {
+function clearAutoCloudSyncSchedules() {
+  if (autoCloudPushTimer) {
+    clearTimeout(autoCloudPushTimer);
+    autoCloudPushTimer = null;
+  }
+  if (autoCloudPullTimer) {
+    clearTimeout(autoCloudPullTimer);
+    autoCloudPullTimer = null;
+  }
+  autoCloudPushPending = false;
+  autoCloudPullPending = false;
+  autoCloudPullForcePending = false;
+  syncToolbarSyncStatusChip();
+}
+
+function hasPendingAutoCloudChanges(value = state) {
+  return countDirtySyncRecords(value) > 0 || countPendingMediaForState(value) > 0;
+}
+
+function hasConfiguredAutoCloudSync() {
+  try {
+    const preferences = loadSupabasePreferences();
+    return Boolean(preferences.enabled && preferences.url && preferences.anonKey);
+  } catch (error) {
+    return false;
+  }
+}
+
+async function ensureAutoCloudSession() {
+  if (!hasConfiguredAutoCloudSync()) return false;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  try {
+    const client = configuredSupabaseClient();
+    const { data, error } = await client.auth.getSession();
+    if (error) return false;
+    const sessionUser = data?.session?.user || null;
+    if (!sessionUser?.id) {
+      clearSupabaseAuthMirror();
+      return false;
+    }
+    saveSupabaseAuthMirror({
+      userId: sessionUser.id,
+      email: sessionUser.email || "",
+      signedInAt: data?.session?.created_at || new Date().toISOString(),
+      provider: "email"
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function flushAutoCloudSyncQueue() {
+  if (autoCloudSyncInFlight) return;
+  autoCloudSyncInFlight = true;
+  syncToolbarSyncStatusChip();
+  try {
+    while (autoCloudPushPending || autoCloudPullPending) {
+      if (autoCloudPushPending) {
+        autoCloudPushPending = false;
+        if (hasPendingAutoCloudChanges(state) && await ensureAutoCloudSession()) {
+          try {
+            await syncStateToSupabase();
+          } catch (error) {
+            // Auto-sync ostáva tichý, detail chyby už je uložený v sync meta.
+          }
+        }
+      }
+
+      if (!autoCloudPullPending) continue;
+      const force = autoCloudPullForcePending;
+      autoCloudPullPending = false;
+      autoCloudPullForcePending = false;
+
+      if (hasPendingAutoCloudChanges(state)) {
+        scheduleAutoCloudPush({ delay: AUTO_CLOUD_PUSH_DEBOUNCE_MS });
+        continue;
+      }
+
+      const now = Date.now();
+      if (!force && autoCloudLastPullStartedAt && now - autoCloudLastPullStartedAt < AUTO_CLOUD_PULL_THROTTLE_MS) {
+        continue;
+      }
+
+      if (await ensureAutoCloudSession()) {
+        autoCloudLastPullStartedAt = Date.now();
+        try {
+          await importStateFromSupabase();
+        } catch (error) {
+          // Auto-sync ostáva tichý, detail chyby už je uložený v sync meta.
+        }
+      }
+    }
+  } finally {
+    autoCloudSyncInFlight = false;
+    syncToolbarSyncStatusChip();
+    if (autoCloudPushPending || autoCloudPullPending) {
+      void flushAutoCloudSyncQueue();
+    }
+  }
+}
+
+function scheduleAutoCloudPush(options = {}) {
+  const delayCandidate = Number(options.delay);
+  const delay = Number.isFinite(delayCandidate) ? Math.max(0, delayCandidate) : AUTO_CLOUD_PUSH_DEBOUNCE_MS;
+  if (!hasConfiguredAutoCloudSync() || !hasPendingAutoCloudChanges(state)) return;
+  autoCloudPushPending = true;
+  syncToolbarSyncStatusChip();
+  if (autoCloudPushTimer) {
+    clearTimeout(autoCloudPushTimer);
+  }
+  autoCloudPushTimer = setTimeout(() => {
+    autoCloudPushTimer = null;
+    void flushAutoCloudSyncQueue();
+  }, delay);
+}
+
+function scheduleAutoCloudPull(options = {}) {
+  const delayCandidate = Number(options.delay);
+  const delay = Number.isFinite(delayCandidate) ? Math.max(0, delayCandidate) : AUTO_CLOUD_PULL_DEBOUNCE_MS;
+  const force = Boolean(options.force);
+  if (!hasConfiguredAutoCloudSync()) return;
+  if (hasPendingAutoCloudChanges(state)) {
+    scheduleAutoCloudPush({ delay: Math.min(delay, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
+    return;
+  }
+  autoCloudPullPending = true;
+  autoCloudPullForcePending = autoCloudPullForcePending || force;
+  syncToolbarSyncStatusChip();
+  if (autoCloudPullTimer) {
+    clearTimeout(autoCloudPullTimer);
+  }
+  autoCloudPullTimer = setTimeout(() => {
+    autoCloudPullTimer = null;
+    void flushAutoCloudSyncQueue();
+  }, delay);
+}
+
+function scheduleAutoCloudWakeSync(options = {}) {
+  const delayCandidate = Number(options.delay);
+  const delay = Number.isFinite(delayCandidate) ? Math.max(0, delayCandidate) : AUTO_CLOUD_PULL_DEBOUNCE_MS;
+  const forcePull = Boolean(options.forcePull);
+  if (hasPendingAutoCloudChanges(state)) {
+    scheduleAutoCloudPush({ delay: Math.min(delay, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
+    return;
+  }
+  scheduleAutoCloudPull({ delay, force: forcePull });
+}
+
+function persist(options = {}) {
+  if (!options?.skipSyncPreparation) {
+    state = prepareStateForSyncPersistence(state, syncPersistenceBaseline);
+  }
   const serializedState = JSON.stringify(serializeStateSnapshot());
   try {
     localStorage.removeItem(RESET_BACKUP_KEY);
     localStorage.setItem(STORAGE_KEY, serializedState);
+    syncPersistenceBaseline = clone(state);
+    mergeSupabaseSyncMetaPatch({}, state);
     invalidateDerivedDataCaches();
+    if (!options?.skipAutoSync) {
+      scheduleAutoCloudPush();
+    }
     return true;
   } catch (error) {
     alert("Uloženie sa nepodarilo. Dáta sú už asi príliš veľké pre úložisko prehliadača. Najčastejšie to robia fotky.");
@@ -17491,7 +18477,7 @@ function renderJournalItem(entry, deleteAttr, editAttr = "") {
   const editAttribute = editAttr ? `${editAttr}="${escapeAttribute(entry.id)}"` : "";
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length, photoEntryId: normalizedEntry.id });
   const displayTitle = journalDisplayTitle(normalizedEntry);
   const titleOnlyClass = !images.length && !video && !String(normalizedEntry.text || "").trim() && !walkMarkup ? "journal-item--title-only" : "";
   const chips = journalDisplayChips(normalizedEntry);
@@ -17558,7 +18544,7 @@ function renderJournalManagerCard(entry, deleteAttr = "data-delete-worklog-journ
   const rawDate = String(normalizedEntry.date || todayISO()).trim() || todayISO();
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length, photoEntryId: normalizedEntry.id });
   const chips = journalDisplayChips(normalizedEntry);
   const deleteAttribute = deleteAttr ? `${deleteAttr}="${escapeAttribute(rawId)}"` : "";
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
@@ -17654,7 +18640,7 @@ function renderJournalItemSimple(entry, deleteAttr = "", editAttr = "") {
   const editAttribute = editAttr ? `${editAttr}="${escapeAttribute(entry.id)}"` : "";
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length, photoEntryId: normalizedEntry.id });
   const previewText = trimText(normalizedEntry.text || "", 180);
   const displayTitle = journalDisplayTitle(normalizedEntry);
 
@@ -17709,7 +18695,7 @@ function renderJournalItemEmergency(entry, deleteAttr = "", editAttr = "") {
   const editAttribute = editAttr ? `${editAttr}="${escapeAttribute(entry.id)}"` : "";
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length });
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length, photoEntryId: normalizedEntry.id });
   const previewText = trimText(normalizedEntry.text || "", 220);
   const displayTitle = journalDisplayTitle(normalizedEntry);
 
@@ -17973,7 +18959,6 @@ function cardViewSectionsMarkup(item) {
 function cardViewHeaderMetaMarkup(item) {
   const resolvedType = cardType(item);
   const parts = [];
-  const ratingText = cardViewRatingText(item);
   if (resolvedType === "variety") {
     const sowedAt = String(item.sowedAt || "").trim();
     const transplantedAt = String(item.transplantedAt || "").trim();
@@ -17989,8 +18974,18 @@ function cardViewHeaderMetaMarkup(item) {
     const recordedAt = String(item.recordedAt || "").trim();
     if (recordedAt) parts.push(escapeHtml(`${cardDateLabel(resolvedType)} ${formatDate(recordedAt)}`));
   }
-  if (ratingText) parts.push(`Hodnotenie <span class="card-view-head__rating-stars">${escapeHtml(ratingText)}</span>`);
   return parts.length ? `<p class="card-view-head__summary">${parts.join(" • ")}</p>` : "";
+}
+
+function cardViewHeaderRatingMarkup(item) {
+  const ratingText = cardViewRatingText(item);
+  if (!ratingText) return "";
+  return `
+    <div class="card-view-head__rating-row">
+      <span class="card-view-head__rating-label">Hodnotenie</span>
+      <span class="card-view-head__rating-stars">${escapeHtml(ratingText)}</span>
+    </div>
+  `;
 }
 
 function openStoredCardView(varietyId) {
@@ -18005,6 +19000,7 @@ function openStoredCardView(varietyId) {
     ? categoryName(existing.categoryId)
     : cardTypeLabel(resolvedType);
   const headerMetaMarkup = cardViewHeaderMetaMarkup(existing);
+  const headerRatingMarkup = cardViewHeaderRatingMarkup(existing);
   const summaryMetaMarkup = resolvedType === "variety" && entryKind(existing) === "detail"
     ? cardViewSummaryTextMarkup(existing)
     : (() => {
@@ -18070,6 +19066,7 @@ function openStoredCardView(varietyId) {
             </div>
           </div>
           ${headerMetaMarkup}
+          ${headerRatingMarkup}
           ${summaryMetaMarkup}
         </div>
         <div class="card-view-sections">
@@ -19014,6 +20011,49 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("sk-SK", { day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
+function parseAppDate(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const normalized = raw.includes("T") ? raw : `${raw}T12:00:00`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function calendarDayStamp(date) {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function calendarDayDiff(laterDate, earlierDate) {
+  return Math.round((calendarDayStamp(laterDate) - calendarDayStamp(earlierDate)) / 86400000);
+}
+
+function calendarWeekStamp(date) {
+  const weekday = (date.getDay() + 6) % 7;
+  return calendarDayStamp(date) - weekday * 86400000;
+}
+
+function formatRelativeTime(value) {
+  const date = parseAppDate(value);
+  if (!date) return "bez dátumu";
+
+  const now = new Date();
+  const diffDays = calendarDayDiff(now, date);
+  if (diffDays < 0) return formatDate(value);
+  if (diffDays === 0) return "dnes";
+  if (diffDays === 1) return "včera";
+  if (diffDays <= 3) return `pred ${diffDays} dňami`;
+
+  const sameWeek = calendarWeekStamp(now) === calendarWeekStamp(date) && now.getFullYear() === date.getFullYear();
+  if (sameWeek) return "tento týždeň";
+  if (diffDays < 30) return `pred ${diffDays} dňami`;
+
+  const yearDiff = now.getFullYear() - date.getFullYear();
+  if (yearDiff === 1) return "minulý rok";
+  if (yearDiff > 1) return `pred ${yearDiff} rokmi`;
+
+  return formatDate(value);
+}
+
 function sortTasks(tasks) {
   return [...tasks].sort((a, b) => {
     const doneDiff = Number(a.done) - Number(b.done);
@@ -19332,7 +20372,8 @@ function normalizeVarietyRecord(item) {
   const mushroomGatheringValues = normalizeTagList(item?.mushroomGatheringValues?.length ? item.mushroomGatheringValues : item?.mushroomGathering);
   const affectedCategoryIds = normalizeIdList(item?.affectedCategoryIds?.length ? item.affectedCategoryIds : item?.affectedCategoryId);
   const relatedCategoryIds = normalizeIdList(item?.relatedCategoryIds?.length ? item.relatedCategoryIds : item?.relatedCategoryId);
-  return {
+  const seasonYear = inferRecordSeasonYear(item, [item?.recordedAt, item?.harvestedAt, item?.transplantedAt, item?.sowedAt]);
+  return normalizeEntitySyncMeta({
     entryKind: "detail",
     cardType: "variety",
     sowingWindowAuto: inferSowingWindowAuto(item),
@@ -19377,8 +20418,9 @@ function normalizeVarietyRecord(item) {
     relatedCategoryIds,
     relatedCategoryId: relatedCategoryIds[0] || String(item?.relatedCategoryId || "").trim(),
     images,
-    image: images[0] || cardPlaceholderImage(item?.cardType || "variety")
-  };
+    image: images[0] || cardPlaceholderImage(item?.cardType || "variety"),
+    seasonYear
+  }, "card");
 }
 
 function cardType(item) {
@@ -20237,16 +21279,18 @@ function normalizeImageBackgroundDataUrl(dataUrl) {
 
       context.fillStyle = "#ffffff";
       context.fillRect(0, 0, canvas.width, canvas.height);
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
       context.drawImage(image, 0, 0);
       const changed = whitenEdgeBackgroundOnCanvas(canvas);
-      resolve(changed ? canvas.toDataURL("image/jpeg", 0.82) : dataUrl);
+      resolve(changed ? canvas.toDataURL("image/jpeg", 0.92) : dataUrl);
     };
     image.onerror = () => resolve(dataUrl);
     image.src = dataUrl;
   });
 }
 
-function fileToOptimizedDataUrl(file, maxDimension = 1200, quality = 0.82) {
+function fileToOptimizedDataUrl(file, maxDimension = 1200, quality = 0.92) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -20265,6 +21309,8 @@ function fileToOptimizedDataUrl(file, maxDimension = 1200, quality = 0.82) {
         }
         context.fillStyle = "#ffffff";
         context.fillRect(0, 0, width, height);
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
         context.drawImage(image, 0, 0, width, height);
         whitenEdgeBackgroundOnCanvas(canvas);
         resolve(canvas.toDataURL("image/jpeg", quality));
@@ -20430,28 +21476,15 @@ function clearUndoState() {
 
 function undoLastDelete() {
   if (!lastDeleted) return;
+  const undoSnapshot = clone(lastDeleted);
+  const previousState = serializeStateSnapshot();
+  const previousActiveCategoryId = activeCategoryId;
 
-  if (lastDeleted.type === "category" && lastDeleted.category) {
-    const deletedCategories = Array.isArray(lastDeleted.categories) && lastDeleted.categories.length
-      ? lastDeleted.categories
-      : [lastDeleted.category];
-    const existingCategoryIds = new Set(state.categories.map((item) => item.id));
+  if (undoSnapshot.type === "category" && undoSnapshot.category) {
+    const deletedCategories = Array.isArray(undoSnapshot.categories) && undoSnapshot.categories.length
+      ? undoSnapshot.categories
+      : [undoSnapshot.category];
     deletedCategories.forEach((item) => {
-      if (!existingCategoryIds.has(item.id)) {
-        state.categories.push(clone(item));
-      }
-    });
-
-    (lastDeleted.varieties || []).forEach((item) => {
-      const existingVarietyIndex = state.varieties.findIndex((entry) => entry.id === item.id);
-      if (existingVarietyIndex >= 0) {
-        state.varieties[existingVarietyIndex] = clone(item);
-        return;
-      }
-      state.varieties.push(clone(item));
-    });
-
-    (lastDeleted.movedCategories || []).forEach((item) => {
       const existingCategoryIndex = state.categories.findIndex((entry) => entry.id === item.id);
       if (existingCategoryIndex >= 0) {
         state.categories[existingCategoryIndex] = clone(item);
@@ -20460,7 +21493,25 @@ function undoLastDelete() {
       state.categories.push(clone(item));
     });
 
-    (lastDeleted.customTasks || []).forEach((item) => {
+    (undoSnapshot.varieties || []).forEach((item) => {
+      const existingVarietyIndex = state.varieties.findIndex((entry) => entry.id === item.id);
+      if (existingVarietyIndex >= 0) {
+        state.varieties[existingVarietyIndex] = clone(item);
+        return;
+      }
+      state.varieties.push(clone(item));
+    });
+
+    (undoSnapshot.movedCategories || []).forEach((item) => {
+      const existingCategoryIndex = state.categories.findIndex((entry) => entry.id === item.id);
+      if (existingCategoryIndex >= 0) {
+        state.categories[existingCategoryIndex] = clone(item);
+        return;
+      }
+      state.categories.push(clone(item));
+    });
+
+    (undoSnapshot.customTasks || []).forEach((item) => {
       const existingTaskIndex = state.customTasks.findIndex((entry) => entry.id === item.id);
       if (existingTaskIndex >= 0) {
         state.customTasks[existingTaskIndex] = clone(item);
@@ -20469,7 +21520,7 @@ function undoLastDelete() {
       state.customTasks.push(clone(item));
     });
 
-    (lastDeleted.journal || []).forEach((item) => {
+    (undoSnapshot.journal || []).forEach((item) => {
       const existingJournalIndex = state.journal.findIndex((entry) => entry.id === item.id);
       if (existingJournalIndex >= 0) {
         state.journal[existingJournalIndex] = clone(item);
@@ -20478,20 +21529,53 @@ function undoLastDelete() {
       state.journal.push(clone(item));
     });
 
-    activeCategoryId = deletedCategories[0]?.id || lastDeleted.previousActiveCategoryId || lastDeleted.category.id;
+    activeCategoryId = deletedCategories[0]?.id || undoSnapshot.previousActiveCategoryId || undoSnapshot.category.id;
   }
 
-  if (lastDeleted.type === "variety" && lastDeleted.variety) {
-    if (!state.varieties.some((item) => item.id === lastDeleted.variety.id)) {
-      state.varieties.push(clone(lastDeleted.variety));
+  if (undoSnapshot.type === "variety" && undoSnapshot.variety) {
+    const existingVarietyIndex = state.varieties.findIndex((item) => item.id === undoSnapshot.variety.id);
+    if (existingVarietyIndex >= 0) {
+      state.varieties[existingVarietyIndex] = clone(undoSnapshot.variety);
+    } else {
+      state.varieties.push(clone(undoSnapshot.variety));
     }
-    activeCategoryId = lastDeleted.variety.categoryId;
+    activeCategoryId = undoSnapshot.variety.categoryId;
+  }
+
+  if (undoSnapshot.type === "journal" && undoSnapshot.entry) {
+    const restoredEntry = touchLocalSyncRecord(clone(undoSnapshot.entry), "journal", { deleted: false });
+    const existingJournalIndex = state.journal.findIndex((item) => item.id === restoredEntry.id);
+    if (existingJournalIndex >= 0) {
+      state.journal[existingJournalIndex] = restoredEntry;
+    } else {
+      state.journal.unshift(restoredEntry);
+    }
+  }
+
+  if (undoSnapshot.type === "task" && undoSnapshot.task) {
+    const restoredTask = touchLocalSyncRecord(clone(undoSnapshot.task), "task", { deleted: false });
+    const existingTaskIndex = state.customTasks.findIndex((item) => item.id === restoredTask.id);
+    if (existingTaskIndex >= 0) {
+      state.customTasks[existingTaskIndex] = restoredTask;
+    } else {
+      state.customTasks.unshift(restoredTask);
+    }
   }
 
   refreshAutoTasks();
+  if (!persist()) {
+    state = normalizePersistedState(previousState);
+    invalidateDerivedDataCaches();
+    activeCategoryId = previousActiveCategoryId;
+    restoreUndoStateSnapshot(undoSnapshot);
+    render();
+    return;
+  }
   clearUndoState();
-  if (!persist()) return;
   render();
+  showAppToast("Obnovené", {
+    tone: "success"
+  });
 }
 
 function updateUndoButton() {
@@ -20517,10 +21601,10 @@ function updateMenuVisibility() {
     mainMenuQuickEl.hidden = !isFocusedView;
   }
   if (batchSowingQuickEl) {
-    batchSowingQuickEl.hidden = !state.varieties.length;
+    batchSowingQuickEl.hidden = !activeSyncCount(state.varieties);
   }
   if (batchMoveQuickEl) {
-    batchMoveQuickEl.hidden = !state.varieties.length;
+    batchMoveQuickEl.hidden = !activeSyncCount(state.varieties);
   }
   updateCatalogHeader();
   syncMobileTopStripVisibility();
@@ -20624,6 +21708,7 @@ function saveSupabasePreferences(value = {}) {
   const normalized = normalizeSupabasePreferences(value);
   try {
     localStorage.setItem(SUPABASE_PREFERENCES_KEY, JSON.stringify(normalized));
+    syncToolbarSyncStatusChip();
     return true;
   } catch (error) {
     return false;
@@ -20660,6 +21745,7 @@ function loadSupabaseAuthMirror() {
 function saveSupabaseAuthMirror(value = {}) {
   try {
     localStorage.setItem(SUPABASE_AUTH_MIRROR_KEY, JSON.stringify(normalizeSupabaseAuthMirror(value)));
+    syncToolbarSyncStatusChip();
     return true;
   } catch (error) {
     return false;
@@ -20669,6 +21755,7 @@ function saveSupabaseAuthMirror(value = {}) {
 function clearSupabaseAuthMirror() {
   try {
     localStorage.removeItem(SUPABASE_AUTH_MIRROR_KEY);
+    syncToolbarSyncStatusChip();
   } catch (error) {
     return;
   }
@@ -20678,6 +21765,13 @@ function normalizeSupabaseSyncMeta(value = {}) {
   if (!value || typeof value !== "object") {
     return {
       lastSyncedAt: "",
+      lastPushAt: "",
+      lastPullAt: "",
+      lastSuccessfulSyncAt: "",
+      pendingDirtyCount: 0,
+      pendingMediaCount: 0,
+      lastSyncError: "",
+      lastSyncMode: "",
       categories: 0,
       cards: 0,
       tasks: 0,
@@ -20687,6 +21781,13 @@ function normalizeSupabaseSyncMeta(value = {}) {
   }
   return {
     lastSyncedAt: String(value.lastSyncedAt || "").trim(),
+    lastPushAt: String(value.lastPushAt || "").trim(),
+    lastPullAt: String(value.lastPullAt || "").trim(),
+    lastSuccessfulSyncAt: String(value.lastSuccessfulSyncAt || "").trim(),
+    pendingDirtyCount: Number.isFinite(Number(value.pendingDirtyCount)) ? Number(value.pendingDirtyCount) : 0,
+    pendingMediaCount: Number.isFinite(Number(value.pendingMediaCount)) ? Number(value.pendingMediaCount) : 0,
+    lastSyncError: String(value.lastSyncError || "").trim(),
+    lastSyncMode: ["push", "pull", "merge"].includes(String(value.lastSyncMode || "").trim()) ? String(value.lastSyncMode || "").trim() : "",
     categories: Number.isFinite(Number(value.categories)) ? Number(value.categories) : 0,
     cards: Number.isFinite(Number(value.cards)) ? Number(value.cards) : 0,
     tasks: Number.isFinite(Number(value.tasks)) ? Number(value.tasks) : 0,
@@ -20712,6 +21813,19 @@ function saveSupabaseSyncMeta(value = {}) {
   } catch (error) {
     return false;
   }
+}
+
+function mergeSupabaseSyncMetaPatch(patch = {}, value = state) {
+  const current = loadSupabaseSyncMeta();
+  const next = normalizeSupabaseSyncMeta({
+    ...current,
+    ...patch,
+    pendingDirtyCount: countDirtySyncRecords(value),
+    pendingMediaCount: countPendingMediaForState(value)
+  });
+  saveSupabaseSyncMeta(next);
+  syncToolbarSyncStatusChip();
+  return next;
 }
 
 function supabaseLibrary() {
@@ -20758,6 +21872,9 @@ async function testSupabaseConnection() {
     enabled: true,
     lastCheckedAt: new Date().toISOString()
   });
+  if (data?.session?.user?.id) {
+    scheduleAutoCloudWakeSync({ delay: 500, forcePull: true });
+  }
   return {
     hasSession: Boolean(data?.session)
   };
@@ -20780,6 +21897,9 @@ async function supabaseSignUpEmail(email = "", password = "") {
       signedInAt: data?.session?.created_at || new Date().toISOString(),
       provider: "email"
     });
+    if (data?.session?.user?.id) {
+      scheduleAutoCloudWakeSync({ delay: 400, forcePull: true });
+    }
   }
   return {
     userEmail,
@@ -20803,6 +21923,7 @@ async function supabaseSignInEmail(email = "", password = "") {
     signedInAt: data?.session?.created_at || new Date().toISOString(),
     provider: "email"
   });
+  scheduleAutoCloudWakeSync({ delay: 300, forcePull: true });
   return {
     userEmail
   };
@@ -20814,6 +21935,8 @@ async function supabaseSignOut() {
   if (error) {
     throw new Error(error.message || "Cloud odhlásenie sa nepodarilo.");
   }
+  clearAutoCloudSyncSchedules();
+  autoCloudLastPullStartedAt = 0;
   supabaseResolvedImageUrlCache.clear();
   clearSupabaseAuthMirror();
 }
@@ -21081,450 +22204,811 @@ async function resolveSupabaseStorageImages(client, values = []) {
   return resolved.filter(Boolean);
 }
 
-async function syncStateToSupabase() {
-  const client = configuredSupabaseClient();
-  const user = await requireSupabaseSessionUser(client);
-  const localProfile = loadLocalAuthProfile();
-  const weatherPreferences = loadWeatherPreferences();
-  const normalizedCards = state.varieties.map(normalizeVarietyRecord);
-  const normalizedTasks = state.customTasks.map((task) => normalizeTaskRecord(task, normalizedCards));
-  const normalizedJournal = state.journal.map((entry) => normalizeJournalEntry(entry, normalizedCards));
-  let uploadedImages = 0;
+function normalizeSupabaseSyncError(error, fallbackMessage = "") {
+  const message = String(error?.message || fallbackMessage || "").trim() || fallbackMessage || "Cloud sync sa nepodarilo dokončiť.";
+  if (/deleted_at/i.test(message) && /(column|schema cache|does not exist|could not find)/i.test(message)) {
+    return "V Supabase ešte chýba stĺpec deleted_at. Najprv prosím spusti pripravenú SQL migráciu pre incremental sync.";
+  }
+  return message;
+}
 
-  const countUploadedImage = (originalSource, nextSource) => {
+function syncRecordsPendingPush(items = []) {
+  return (Array.isArray(items) ? items : []).filter((item) => Boolean(item?.dirty) || !String(item?.lastSyncedAt || "").trim());
+}
+
+function sanitizeSupabaseMediaValue(value = "", userId = "") {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  const extractedStoragePath = extractSupabaseStoragePath(normalized);
+  if (extractedStoragePath) return extractedStoragePath;
+  if (String(userId || "").trim() && normalized.startsWith(`${String(userId || "").trim()}/`)) {
+    return normalized;
+  }
+  if (normalized.startsWith("blob:")) return "";
+  if (isProcessableImageDataUrl(normalized)) return "";
+  return normalized;
+}
+
+function sanitizeSupabaseMediaList(values = [], userId = "") {
+  return [...new Set((Array.isArray(values) ? values : [values])
+    .map((value) => sanitizeSupabaseMediaValue(value, userId))
+    .filter(Boolean))];
+}
+
+function prepareCategoryRowForSupabase(userId, category, options = {}) {
+  const normalized = normalizeCategoryRecord(category);
+  const deletedAt = options.deletedAt === undefined
+    ? (Boolean(normalized.deleted) ? new Date().toISOString() : null)
+    : options.deletedAt;
+  const imagePath = sanitizeSupabaseMediaValue(normalized.image, userId);
+  return {
+    user_id: userId,
+    client_id: String(normalized?.id || "").trim(),
+    parent_client_id: String(normalized?.parentCategoryId || "").trim(),
+    name: String(normalized?.name || "").trim(),
+    node_type: String(normalized?.nodeType || "kind").trim() || "kind",
+    group_name: String(normalized?.group || "").trim(),
+    order_index: Number.isFinite(Number(normalized?.order)) ? Number(normalized.order) : 0,
+    color: String(normalized?.color || "#7e9f4b").trim() || "#7e9f4b",
+    image_path: imagePath,
+    notes: String(normalized?.notes || "").trim(),
+    recommended_sowing_window: String(normalized?.recommendedSowingWindow || "").trim(),
+    sowed_at: String(normalized?.sowedAt || "").trim(),
+    deleted_at: deletedAt,
+    data: {
+      ...normalized,
+      image: imagePath,
+      deleted: Boolean(normalized.deleted)
+    }
+  };
+}
+
+function prepareCardRowForSupabase(userId, card, options = {}) {
+  const normalized = normalizeVarietyRecord(card);
+  const deletedAt = options.deletedAt === undefined
+    ? (Boolean(normalized.deleted) ? new Date().toISOString() : null)
+    : options.deletedAt;
+  const images = sanitizeSupabaseMediaList(normalizeVarietyImages(normalized), userId);
+  return {
+    user_id: userId,
+    client_id: String(normalized?.id || "").trim(),
+    category_client_id: String(normalized?.categoryId || "").trim(),
+    entry_kind: String(normalized?.entryKind || "detail").trim() || "detail",
+    card_type: String(normalized?.cardType || "variety").trim() || "variety",
+    name: String(normalized?.name || "").trim(),
+    detail_type: String(normalized?.type || "").trim(),
+    status: String(normalized?.status || "").trim(),
+    notes: String(normalized?.notes || "").trim(),
+    place: "",
+    places: [],
+    top: Boolean(normalized?.top),
+    rating: Number.isFinite(Number(normalized?.rating)) ? Number(normalized.rating) : 0,
+    image_path: images[0] || "",
+    images,
+    sowing_window: String(normalized?.sowingWindow || "").trim(),
+    sowing_window_auto: Boolean(normalized?.sowingWindowAuto),
+    sowed_at: safeSupabaseDate(normalized?.sowedAt),
+    transplanted_at: safeSupabaseDate(normalized?.transplantedAt),
+    harvested_at: safeSupabaseDate(normalized?.harvestedAt),
+    deleted_at: deletedAt,
+    data: {
+      ...normalized,
+      images,
+      image: images[0] || "",
+      deleted: Boolean(normalized.deleted)
+    }
+  };
+}
+
+function prepareTaskRowForSupabase(userId, task, options = {}) {
+  const normalized = normalizeTaskRecord(task, state.varieties);
+  const deletedAt = options.deletedAt === undefined
+    ? (Boolean(normalized.deleted) ? new Date().toISOString() : null)
+    : options.deletedAt;
+  return {
+    user_id: userId,
+    client_id: String(normalized?.id || "").trim(),
+    text: String(normalized?.text || "").trim(),
+    due_on: safeSupabaseDate(normalized?.date),
+    done: Boolean(normalized?.done),
+    source: String(normalized?.source || "").trim(),
+    linked_category_ids: Array.isArray(normalized?.linkedCategoryIds) ? normalized.linkedCategoryIds : [],
+    linked_variety_id: String(normalized?.linkedVarietyId || "").trim(),
+    deleted_at: deletedAt,
+    data: {
+      ...normalized,
+      deleted: Boolean(normalized.deleted)
+    }
+  };
+}
+
+function prepareJournalRowForSupabase(userId, entry, options = {}) {
+  const normalized = normalizeJournalEntry(entry, state.varieties);
+  const deletedAt = options.deletedAt === undefined
+    ? (Boolean(normalized.deleted) ? new Date().toISOString() : null)
+    : options.deletedAt;
+  const images = sanitizeSupabaseMediaList(journalImages(normalized), userId);
+  const videoPath = sanitizeSupabaseMediaValue(String(normalized?.videoPath || normalized?.video || "").trim(), userId);
+  return {
+    user_id: userId,
+    client_id: String(normalized?.id || "").trim(),
+    title: String(normalized?.title || "Zápis").trim() || "Zápis",
+    body: String(normalized?.text || "").trim(),
+    entry_type: String(normalized?.entryType || "note").trim() || "note",
+    entry_at: safeSupabaseTimestamp(normalized?.date),
+    mood: serializeMoodValues(normalized?.mood),
+    place: "",
+    tags: Array.isArray(normalized?.tags) ? normalized.tags : [],
+    weather: normalized?.weather && typeof normalized.weather === "object" ? normalized.weather : {},
+    linked_category_ids: Array.isArray(normalized?.linkedCategoryIds) ? normalized.linkedCategoryIds : [],
+    linked_variety_id: String(normalized?.linkedVarietyId || "").trim(),
+    linked_entity_name: String(normalized?.linkedEntityName || "").trim(),
+    image_path: images[0] || "",
+    images,
+    deleted_at: deletedAt,
+    data: {
+      ...normalized,
+      images,
+      image: images[0] || "",
+      videoPath,
+      video: videoPath || sanitizeSupabaseMediaValue(String(normalized?.video || "").trim(), userId),
+      deleted: Boolean(normalized.deleted)
+    }
+  };
+}
+
+async function upsertSupabaseRows(client, tableName, rows = []) {
+  if (!rows.length) return;
+  const chunks = chunkItems(rows, 100);
+  for (const chunk of chunks) {
+    const { error } = await client
+      .from(tableName)
+      .upsert(chunk, { onConflict: "user_id,client_id" });
+    if (error) {
+      throw new Error(normalizeSupabaseSyncError(error, `Tabuľku ${tableName} sa nepodarilo zosynchronizovať.`));
+    }
+  }
+}
+
+function markCollectionRecordsAsSynced(items = [], syncedIds = new Set(), entityType = "", normalizer = (value) => value, syncedAt = "") {
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const normalized = normalizer(item);
+    const itemId = String(normalized?.id || "").trim();
+    if (!itemId || !syncedIds.has(itemId)) return normalized;
+    return clearLocalSyncDirty(normalized, entityType, { syncedAt });
+  });
+}
+
+function updateStateCollectionRecord(collectionKey = "", recordId = "", updater = (value) => value) {
+  const normalizedRecordId = String(recordId || "").trim();
+  if (!normalizedRecordId || !collectionKey) return false;
+  let changed = false;
+  state[collectionKey] = (Array.isArray(state?.[collectionKey]) ? state[collectionKey] : []).map((item) => {
+    if (String(item?.id || "").trim() !== normalizedRecordId) return item;
+    changed = true;
+    return updater(item);
+  });
+  return changed;
+}
+
+async function pushStateCollectionsToSupabase(client, user) {
+  const normalizedCategories = (Array.isArray(state.categories) ? state.categories : []).map(normalizeCategoryRecord);
+  const normalizedCards = (Array.isArray(state.varieties) ? state.varieties : []).map(normalizeVarietyRecord);
+  const normalizedTasks = (Array.isArray(state.customTasks) ? state.customTasks : []).map((task) => normalizeTaskRecord(task, normalizedCards));
+  const normalizedJournal = (Array.isArray(state.journal) ? state.journal : []).map((entry) => normalizeJournalEntry(entry, normalizedCards));
+  const dirtyCategories = syncRecordsPendingPush(normalizedCategories);
+  const dirtyCards = syncRecordsPendingPush(normalizedCards);
+  const dirtyTasks = syncRecordsPendingPush(normalizedTasks);
+  const dirtyJournal = syncRecordsPendingPush(normalizedJournal);
+  const tombstoneTimestamp = new Date().toISOString();
+  const categoryRows = dirtyCategories.map((item) => prepareCategoryRowForSupabase(user.id, item, {
+    deletedAt: item.deleted ? tombstoneTimestamp : null
+  }));
+  const cardRows = dirtyCards.map((item) => prepareCardRowForSupabase(user.id, item, {
+    deletedAt: item.deleted ? tombstoneTimestamp : null
+  }));
+  const taskRows = dirtyTasks.map((item) => prepareTaskRowForSupabase(user.id, item, {
+    deletedAt: item.deleted ? tombstoneTimestamp : null
+  }));
+  const journalRows = dirtyJournal.map((item) => prepareJournalRowForSupabase(user.id, item, {
+    deletedAt: item.deleted ? tombstoneTimestamp : null
+  }));
+
+  if (!categoryRows.length && !cardRows.length && !taskRows.length && !journalRows.length) {
+    return {
+      categories: 0,
+      cards: 0,
+      tasks: 0,
+      journal: 0,
+      deletedCategories: 0,
+      deletedCards: 0,
+      deletedTasks: 0,
+      deletedJournal: 0
+    };
+  }
+
+  await upsertSupabaseRows(client, "categories", categoryRows);
+  await upsertSupabaseRows(client, "cards", cardRows);
+  await upsertSupabaseRows(client, "tasks", taskRows);
+  await upsertSupabaseRows(client, "journal_entries", journalRows);
+
+  const syncedAt = new Date().toISOString();
+  state.categories = markCollectionRecordsAsSynced(
+    state.categories,
+    new Set(categoryRows.map((row) => row.client_id)),
+    "category",
+    normalizeCategoryRecord,
+    syncedAt
+  );
+  state.varieties = markCollectionRecordsAsSynced(
+    state.varieties,
+    new Set(cardRows.map((row) => row.client_id)),
+    "card",
+    normalizeVarietyRecord,
+    syncedAt
+  );
+  state.customTasks = markCollectionRecordsAsSynced(
+    state.customTasks,
+    new Set(taskRows.map((row) => row.client_id)),
+    "task",
+    (task) => normalizeTaskRecord(task, state.varieties),
+    syncedAt
+  );
+  state.journal = markCollectionRecordsAsSynced(
+    state.journal,
+    new Set(journalRows.map((row) => row.client_id)),
+    "journal",
+    (entry) => normalizeJournalEntry(entry, state.varieties),
+    syncedAt
+  );
+
+  if (!persist({ skipSyncPreparation: true, skipAutoSync: true })) {
+    throw new Error("Cloud zmeny sa uložili, ale lokálny sync stav sa nepodarilo zapísať.");
+  }
+
+  return {
+    categories: categoryRows.length,
+    cards: cardRows.length,
+    tasks: taskRows.length,
+    journal: journalRows.length,
+    deletedCategories: categoryRows.filter((row) => Boolean(row.deleted_at)).length,
+    deletedCards: cardRows.filter((row) => Boolean(row.deleted_at)).length,
+    deletedTasks: taskRows.filter((row) => Boolean(row.deleted_at)).length,
+    deletedJournal: journalRows.filter((row) => Boolean(row.deleted_at)).length
+  };
+}
+
+async function processSupabaseMediaQueue(client, user) {
+  let uploadedImages = 0;
+  let stateChanged = false;
+  const mediaErrors = [];
+
+  const countUploadedSource = (originalSource, nextSource) => {
     if (isProcessableImageDataUrl(originalSource) && nextSource && nextSource !== originalSource) {
       uploadedImages += 1;
     }
   };
 
-  const profilePayload = {
-    id: user.id,
-    email: String(user.email || "").trim().toLowerCase(),
-    display_name: localAuthDisplayName(localProfile) || String(user.user_metadata?.display_name || "").trim(),
-    avatar_path: "",
-    preferences: {
-      weatherPlace: String(weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).trim() || GARDEN_WEATHER_PLACE,
-      localAccountEnabled: Boolean(localProfile?.enabled)
-    }
-  };
-
-  const profileResult = await client
-    .from("profiles")
-    .upsert(profilePayload, { onConflict: "id" });
-
-  if (profileResult.error) {
-    throw new Error(profileResult.error.message || "Profil sa do Supabase nepodarilo uložiť.");
-  }
-
-  const categoryRows = [];
-  for (const category of state.categories) {
-    const originalImage = String(category?.image || "").trim();
-    const syncedImage = originalImage
-      ? await uploadProcessableImageToSupabase(client, {
+  for (const category of (Array.isArray(state.categories) ? state.categories : []).map(normalizeCategoryRecord)) {
+    if (category.deleted || !hasPendingEntityMedia(category, "category")) continue;
+    updateStateCollectionRecord("categories", category.id, (item) => normalizeCategoryRecord({
+      ...item,
+      mediaSyncStatus: "uploading"
+    }));
+    try {
+      const syncedImage = await uploadProcessableImageToSupabase(client, {
         userId: user.id,
         entity: "categories",
         clientId: String(category?.id || "category").trim(),
         index: 0,
-        source: originalImage
-      })
-      : "";
-    countUploadedImage(originalImage, syncedImage);
-    categoryRows.push({
-      user_id: user.id,
-      client_id: String(category?.id || "").trim(),
-      parent_client_id: String(category?.parentCategoryId || "").trim(),
-      name: String(category?.name || "").trim(),
-      node_type: String(category?.nodeType || "kind").trim() || "kind",
-      group_name: String(category?.group || "").trim(),
-      order_index: Number.isFinite(Number(category?.order)) ? Number(category.order) : 0,
-      color: String(category?.color || "#7e9f4b").trim() || "#7e9f4b",
-      image_path: syncedImage,
-      notes: String(category?.notes || "").trim(),
-      recommended_sowing_window: String(category?.recommendedSowingWindow || "").trim(),
-      sowed_at: String(category?.sowedAt || "").trim(),
-      data: {
-        ...category,
+        source: String(category?.image || "").trim()
+      });
+      countUploadedSource(String(category?.image || "").trim(), syncedImage);
+      updateStateCollectionRecord("categories", category.id, (item) => touchLocalSyncRecord({
+        ...normalizeCategoryRecord(item),
         image: syncedImage
-      }
-    });
+      }, "category", { mediaSyncStatus: "done" }));
+      stateChanged = true;
+    } catch (error) {
+      mediaErrors.push(normalizeSupabaseSyncError(error, "Cloud obrázok kategórie sa nepodarilo nahrať."));
+      updateStateCollectionRecord("categories", category.id, (item) => normalizeCategoryRecord({
+        ...item,
+        mediaSyncStatus: "error"
+      }));
+      stateChanged = true;
+    }
   }
 
-  const cardRows = [];
-  for (const card of normalizedCards) {
-    const originalImages = normalizeVarietyImages(card);
-    const syncedImages = [];
-    for (let index = 0; index < originalImages.length; index += 1) {
-      const syncedImage = await uploadProcessableImageToSupabase(client, {
-        userId: user.id,
-        entity: "cards",
-        clientId: String(card?.id || "card").trim(),
-        index,
-        source: originalImages[index]
-      });
-      countUploadedImage(originalImages[index], syncedImage);
-      if (syncedImage) syncedImages.push(syncedImage);
-    }
-    cardRows.push({
-      user_id: user.id,
-      client_id: String(card?.id || "").trim(),
-      category_client_id: String(card?.categoryId || "").trim(),
-      entry_kind: String(card?.entryKind || "detail").trim() || "detail",
-      card_type: String(card?.cardType || "variety").trim() || "variety",
-      name: String(card?.name || "").trim(),
-      detail_type: String(card?.type || "").trim(),
-      status: String(card?.status || "").trim(),
-      notes: String(card?.notes || "").trim(),
-      place: "",
-      places: [],
-      top: Boolean(card?.top),
-      rating: Number.isFinite(Number(card?.rating)) ? Number(card.rating) : 0,
-      image_path: syncedImages[0] || "",
-      images: syncedImages,
-      sowing_window: String(card?.sowingWindow || "").trim(),
-      sowing_window_auto: Boolean(card?.sowingWindowAuto),
-      sowed_at: safeSupabaseDate(card?.sowedAt),
-      transplanted_at: safeSupabaseDate(card?.transplantedAt),
-      harvested_at: safeSupabaseDate(card?.harvestedAt),
-      data: {
-        ...card,
+  for (const card of (Array.isArray(state.varieties) ? state.varieties : []).map(normalizeVarietyRecord)) {
+    if (card.deleted || !hasPendingEntityMedia(card, "card")) continue;
+    updateStateCollectionRecord("varieties", card.id, (item) => normalizeVarietyRecord({
+      ...item,
+      mediaSyncStatus: "uploading"
+    }));
+    try {
+      const originalImages = normalizeVarietyImages(card);
+      const syncedImages = [];
+      for (let index = 0; index < originalImages.length; index += 1) {
+        const syncedImage = await uploadProcessableImageToSupabase(client, {
+          userId: user.id,
+          entity: "cards",
+          clientId: String(card?.id || "card").trim(),
+          index,
+          source: originalImages[index]
+        });
+        countUploadedSource(originalImages[index], syncedImage);
+        if (syncedImage) syncedImages.push(syncedImage);
+      }
+      updateStateCollectionRecord("varieties", card.id, (item) => touchLocalSyncRecord({
+        ...normalizeVarietyRecord(item),
         images: syncedImages,
         image: syncedImages[0] || ""
-      }
-    });
+      }, "card", { mediaSyncStatus: "done" }));
+      stateChanged = true;
+    } catch (error) {
+      mediaErrors.push(normalizeSupabaseSyncError(error, `Cloud obrázky karty ${entryDisplayName(card)} sa nepodarilo nahrať.`));
+      updateStateCollectionRecord("varieties", card.id, (item) => normalizeVarietyRecord({
+        ...item,
+        mediaSyncStatus: "error"
+      }));
+      stateChanged = true;
+    }
   }
 
-  const taskRows = normalizedTasks.map((task) => ({
-    user_id: user.id,
-    client_id: String(task?.id || "").trim(),
-    text: String(task?.text || "").trim(),
-    due_on: safeSupabaseDate(task?.date),
-    done: Boolean(task?.done),
-    source: String(task?.source || "").trim(),
-    linked_category_ids: Array.isArray(task?.linkedCategoryIds) ? task.linkedCategoryIds : [],
-    linked_variety_id: String(task?.linkedVarietyId || "").trim(),
-    data: { ...task }
-  }));
-
-  const journalRows = [];
-  for (const entry of normalizedJournal) {
-    const originalImages = journalImages(entry);
-    const originalVideo = journalVideo(entry);
-    const rawVideoPath = String(entry?.videoPath || "").trim();
-    const syncedImages = [];
-    for (let index = 0; index < originalImages.length; index += 1) {
-      const syncedImage = await uploadProcessableImageToSupabase(client, {
-        userId: user.id,
-        entity: "journal",
-        clientId: String(entry?.id || "journal").trim(),
-        index,
-        source: originalImages[index]
-      });
-      countUploadedImage(originalImages[index], syncedImage);
-      if (syncedImage) syncedImages.push(syncedImage);
-    }
-    const syncedVideoPath = originalVideo
-      ? await uploadProcessableImageToSupabase(client, {
-        userId: user.id,
-        entity: "journal",
-        clientId: String(entry?.id || "journal").trim(),
-        index: 999,
-        source: rawVideoPath || originalVideo
-      })
-      : "";
-    journalRows.push({
-      user_id: user.id,
-      client_id: String(entry?.id || "").trim(),
-      title: String(entry?.title || "Zápis").trim() || "Zápis",
-      body: String(entry?.text || "").trim(),
-      entry_type: String(entry?.entryType || "note").trim() || "note",
-      entry_at: safeSupabaseTimestamp(entry?.date),
-      mood: serializeMoodValues(entry?.mood),
-      place: "",
-      tags: Array.isArray(entry?.tags) ? entry.tags : [],
-      weather: entry?.weather && typeof entry.weather === "object" ? entry.weather : {},
-      linked_category_ids: Array.isArray(entry?.linkedCategoryIds) ? entry.linkedCategoryIds : [],
-      linked_variety_id: String(entry?.linkedVarietyId || "").trim(),
-      linked_entity_name: String(entry?.linkedEntityName || "").trim(),
-      image_path: syncedImages[0] || "",
-      images: syncedImages,
-      data: {
-        ...entry,
+  for (const entry of (Array.isArray(state.journal) ? state.journal : []).map((item) => normalizeJournalEntry(item, state.varieties))) {
+    if (entry.deleted || !hasPendingEntityMedia(entry, "journal")) continue;
+    updateStateCollectionRecord("journal", entry.id, (item) => normalizeJournalEntry({
+      ...item,
+      mediaSyncStatus: "uploading"
+    }, state.varieties));
+    try {
+      const originalImages = journalImages(entry);
+      const syncedImages = [];
+      for (let index = 0; index < originalImages.length; index += 1) {
+        const syncedImage = await uploadProcessableImageToSupabase(client, {
+          userId: user.id,
+          entity: "journal",
+          clientId: String(entry?.id || "journal").trim(),
+          index,
+          source: originalImages[index]
+        });
+        countUploadedSource(originalImages[index], syncedImage);
+        if (syncedImage) syncedImages.push(syncedImage);
+      }
+      updateStateCollectionRecord("journal", entry.id, (item) => touchLocalSyncRecord({
+        ...normalizeJournalEntry(item, state.varieties),
         images: syncedImages,
-        image: syncedImages[0] || "",
-        videoPath: syncedVideoPath || rawVideoPath || "",
-        video: syncedVideoPath || rawVideoPath || originalVideo || "",
-        videoName: String(entry?.videoName || "").trim(),
-        videoMimeType: String(entry?.videoMimeType || "").trim()
-      }
-    });
-  }
-
-  const upsertTableRows = async (tableName, rows) => {
-    if (!rows.length) return;
-    const chunks = chunkItems(rows, 100);
-    for (const chunk of chunks) {
-      const { error } = await client
-        .from(tableName)
-        .upsert(chunk, { onConflict: "user_id,client_id" });
-      if (error) {
-        throw new Error(error.message || `Tabuľku ${tableName} sa nepodarilo zosynchronizovať.`);
-      }
-    }
-  };
-
-  const deleteMissingTableRows = async (tableName, localClientIds = []) => {
-    const { data, error } = await client
-      .from(tableName)
-      .select("client_id");
-
-    if (error) {
-      throw new Error(error.message || `Tabuľku ${tableName} sa nepodarilo pripraviť na zrkadlenie.`);
-    }
-
-    const localIdSet = new Set(localClientIds.map((value) => String(value || "").trim()).filter(Boolean));
-    const idsToDelete = (Array.isArray(data) ? data : [])
-      .map((row) => String(row?.client_id || "").trim())
-      .filter(Boolean)
-      .filter((clientId) => !localIdSet.has(clientId));
-
-    if (!idsToDelete.length) return 0;
-
-    const chunks = chunkItems(idsToDelete, 100);
-    for (const chunk of chunks) {
-      const { error: deleteError } = await client
-        .from(tableName)
-        .delete()
-        .in("client_id", chunk);
-
-      if (deleteError) {
-        throw new Error(deleteError.message || `Tabuľku ${tableName} sa nepodarilo zrkadliť podľa lokálu.`);
-      }
-    }
-
-    return idsToDelete.length;
-  };
-
-  await upsertTableRows("categories", categoryRows);
-  await upsertTableRows("cards", cardRows);
-  await upsertTableRows("tasks", taskRows);
-  await upsertTableRows("journal_entries", journalRows);
-
-  const deletedCategories = await deleteMissingTableRows("categories", categoryRows.map((row) => row.client_id));
-  const deletedCards = await deleteMissingTableRows("cards", cardRows.map((row) => row.client_id));
-  const deletedTasks = await deleteMissingTableRows("tasks", taskRows.map((row) => row.client_id));
-  const deletedJournal = await deleteMissingTableRows("journal_entries", journalRows.map((row) => row.client_id));
-
-  const desiredStoragePaths = new Set([
-    ...categoryRows.flatMap((row) => [row.image_path]),
-    ...cardRows.flatMap((row) => [row.image_path, ...(Array.isArray(row.images) ? row.images : [])]),
-    ...journalRows.flatMap((row) => [row.image_path, ...(Array.isArray(row.images) ? row.images : []), String(row?.data?.videoPath || "").trim()])
-  ].map((value) => String(value || "").trim()).filter((value) => value.startsWith(`${user.id}/`)));
-
-  const existingStoragePaths = await listSupabaseStorageFiles(client, user.id);
-  const storagePathsToDelete = existingStoragePaths.filter((path) => !desiredStoragePaths.has(path));
-
-  if (storagePathsToDelete.length) {
-    const chunks = chunkItems(storagePathsToDelete, 100);
-    for (const chunk of chunks) {
-      const { error } = await client.storage
-        .from(SUPABASE_IMAGE_BUCKET)
-        .remove(chunk);
-
-      if (error) {
-        throw new Error(normalizeSupabaseStorageError(error, "Cloud obrázky sa nepodarilo zrkadliť podľa lokálu."));
-      }
+        image: syncedImages[0] || ""
+      }, "journal", { mediaSyncStatus: "done" }));
+      stateChanged = true;
+    } catch (error) {
+      mediaErrors.push(normalizeSupabaseSyncError(error, `Cloud médiá denníka ${entry.title || "Zápis"} sa nepodarilo nahrať.`));
+      updateStateCollectionRecord("journal", entry.id, (item) => normalizeJournalEntry({
+        ...item,
+        mediaSyncStatus: "error"
+      }, state.varieties));
+      stateChanged = true;
     }
   }
 
-  const result = {
-    lastSyncedAt: new Date().toISOString(),
-    categories: categoryRows.length,
-    cards: cardRows.length,
-    tasks: taskRows.length,
-    journal: journalRows.length,
+  if (stateChanged && !persist({ skipSyncPreparation: true, skipAutoSync: true })) {
+    throw new Error("Cloud médiá sa spracovali, ale lokálny stav médií sa nepodarilo bezpečne uložiť.");
+  }
+
+  return {
     uploadedImages,
-    deletedCategories,
-    deletedCards,
-    deletedTasks,
-    deletedJournal,
-    deletedImages: storagePathsToDelete.length
+    mediaErrors
   };
-  saveSupabaseSyncMeta(result);
-  return result;
+}
+
+function cloudRowTimestamp(row = {}, fallbackData = {}) {
+  return normalizeSyncTimestamp(row?.updated_at || fallbackData?.syncUpdatedAtLocal || fallbackData?.updatedAt || row?.created_at || "");
+}
+
+function normalizeCloudMergeRecord(record = {}, entityType = "", options = {}) {
+  const syncedAt = normalizeSyncTimestamp(options.syncedAt || new Date().toISOString()) || new Date().toISOString();
+  const cloudTimestamp = normalizeSyncTimestamp(options.cloudTimestamp || "");
+  const mediaSyncStatus = options.mediaSyncStatus === undefined
+    ? (hasPendingEntityMedia(record, entityType) ? "pending" : "done")
+    : options.mediaSyncStatus;
+  return clearLocalSyncDirty(normalizeEntitySyncMeta({
+    ...record,
+    deleted: Boolean(options.deleted),
+    syncUpdatedAtLocal: cloudTimestamp || localSyncRecordTimestamp(record) || syncedAt
+  }, entityType), entityType, {
+    syncedAt,
+    mediaSyncStatus
+  });
+}
+
+function mergeSupabaseCollection(localItems = [], cloudRecords = [], { entityType = "", normalizeLocal = (value) => value, syncedAt = "" } = {}) {
+  const normalizedLocalItems = (Array.isArray(localItems) ? localItems : []).map((item) => normalizeLocal(item));
+  const localById = new Map(normalizedLocalItems.map((item) => [String(item?.id || "").trim(), item]).filter(([id]) => id));
+  const merged = [];
+  const cloudIds = new Set();
+
+  (Array.isArray(cloudRecords) ? cloudRecords : []).forEach((cloudRecord) => {
+    const row = cloudRecord?.row || {};
+    const normalizedCloudItem = normalizeLocal(cloudRecord?.item || {});
+    const clientId = String(normalizedCloudItem?.id || row?.client_id || "").trim();
+    if (!clientId) return;
+    cloudIds.add(clientId);
+
+    const localItem = localById.get(clientId) || null;
+    const cloudDeleted = Boolean(row?.deleted_at);
+    const cloudTimestamp = cloudRowTimestamp(row, normalizedCloudItem);
+
+    if (!localItem) {
+      merged.push(normalizeCloudMergeRecord(normalizedCloudItem, entityType, {
+        syncedAt,
+        deleted: cloudDeleted,
+        cloudTimestamp
+      }));
+      return;
+    }
+
+    if (Boolean(localItem.deleted) && !cloudDeleted) {
+      merged.push(normalizeLocal(localItem));
+      return;
+    }
+
+    if (cloudDeleted) {
+      merged.push(normalizeCloudMergeRecord({
+        ...localItem,
+        ...normalizedCloudItem
+      }, entityType, {
+        syncedAt,
+        deleted: true,
+        cloudTimestamp
+      }));
+      return;
+    }
+
+    const localTimestamp = localSyncRecordTimestamp(localItem);
+    const localWins = Boolean(localItem.deleted)
+      || (Boolean(localItem.dirty) && (!cloudTimestamp || !localTimestamp || localTimestamp >= cloudTimestamp))
+      || (!Boolean(localItem.dirty) && Boolean(localTimestamp) && !cloudTimestamp)
+      || (!Boolean(localItem.dirty) && Boolean(localTimestamp) && Boolean(cloudTimestamp) && localTimestamp > cloudTimestamp);
+
+    if (localWins) {
+      merged.push(normalizeLocal(localItem));
+      return;
+    }
+
+    merged.push(normalizeCloudMergeRecord({
+      ...localItem,
+      ...normalizedCloudItem,
+      deleted: false
+    }, entityType, {
+      syncedAt,
+      deleted: false,
+      cloudTimestamp
+    }));
+  });
+
+  normalizedLocalItems.forEach((item) => {
+    const clientId = String(item?.id || "").trim();
+    if (!clientId || cloudIds.has(clientId)) return;
+    merged.push(normalizeLocal(item));
+  });
+
+  return merged;
+}
+
+async function syncStateToSupabase() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    const offlineMessage = "Si offline. Cloud sync som len odložila a lokálne zmeny ostali pripravené na ďalší pokus.";
+    mergeSupabaseSyncMetaPatch({
+      lastSyncError: offlineMessage,
+      lastSyncMode: "push"
+    });
+    throw new Error(offlineMessage);
+  }
+
+  const client = configuredSupabaseClient();
+  const user = await requireSupabaseSessionUser(client);
+  const localProfile = loadLocalAuthProfile();
+  const weatherPreferences = loadWeatherPreferences();
+
+  try {
+    const profilePayload = {
+      id: user.id,
+      email: String(user.email || "").trim().toLowerCase(),
+      display_name: localAuthDisplayName(localProfile) || String(user.user_metadata?.display_name || "").trim(),
+      avatar_path: "",
+      preferences: {
+        weatherPlace: String(weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).trim() || GARDEN_WEATHER_PLACE,
+        localAccountEnabled: Boolean(localProfile?.enabled)
+      }
+    };
+
+    const profileResult = await client
+      .from("profiles")
+      .upsert(profilePayload, { onConflict: "id" });
+
+    if (profileResult.error) {
+      throw new Error(profileResult.error.message || "Profil sa do Supabase nepodarilo uložiť.");
+    }
+
+    const firstPush = await pushStateCollectionsToSupabase(client, user);
+    const mediaResult = await processSupabaseMediaQueue(client, user);
+    const secondPush = await pushStateCollectionsToSupabase(client, user);
+    const finishedAt = new Date().toISOString();
+
+    mergeSupabaseSyncMetaPatch({
+      lastSyncedAt: finishedAt,
+      lastPushAt: finishedAt,
+      lastSuccessfulSyncAt: finishedAt,
+      lastSyncMode: "push",
+      lastSyncError: mediaResult.mediaErrors[0] || "",
+      categories: activeSyncCount(state.categories),
+      cards: activeSyncCount(state.varieties),
+      tasks: activeSyncCount(state.customTasks),
+      journal: activeSyncCount(state.journal),
+      uploadedImages: mediaResult.uploadedImages
+    });
+
+    return {
+      lastSyncedAt: finishedAt,
+      categories: firstPush.categories + secondPush.categories,
+      cards: firstPush.cards + secondPush.cards,
+      tasks: firstPush.tasks + secondPush.tasks,
+      journal: firstPush.journal + secondPush.journal,
+      uploadedImages: mediaResult.uploadedImages,
+      deletedCategories: firstPush.deletedCategories + secondPush.deletedCategories,
+      deletedCards: firstPush.deletedCards + secondPush.deletedCards,
+      deletedTasks: firstPush.deletedTasks + secondPush.deletedTasks,
+      deletedJournal: firstPush.deletedJournal + secondPush.deletedJournal,
+      mediaErrors: mediaResult.mediaErrors
+    };
+  } catch (error) {
+    mergeSupabaseSyncMetaPatch({
+      lastSyncError: error instanceof Error ? error.message : "Cloud sync sa nepodarilo dokončiť.",
+      lastSyncMode: "push"
+    });
+    throw error;
+  }
 }
 
 async function importStateFromSupabase() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    const offlineMessage = "Si offline. Cloud načítanie som odložila a lokálne dáta som nechala bez zmeny.";
+    mergeSupabaseSyncMetaPatch({
+      lastSyncError: offlineMessage,
+      lastSyncMode: "pull"
+    });
+    throw new Error(offlineMessage);
+  }
+
   const client = configuredSupabaseClient();
   await requireSupabaseSessionUser(client);
 
-  const [
-    categoriesResult,
-    cardsResult,
-    tasksResult,
-    journalResult
-  ] = await Promise.all([
-    client.from("categories").select("*").order("order_index", { ascending: true }),
-    client.from("cards").select("*").order("created_at", { ascending: true }),
-    client.from("tasks").select("*").order("due_on", { ascending: true }),
-    client.from("journal_entries").select("*").order("entry_at", { ascending: false })
-  ]);
+  try {
+    const [
+      categoriesResult,
+      cardsResult,
+      tasksResult,
+      journalResult
+    ] = await Promise.all([
+      client.from("categories").select("*").order("order_index", { ascending: true }),
+      client.from("cards").select("*").order("created_at", { ascending: true }),
+      client.from("tasks").select("*").order("due_on", { ascending: true }),
+      client.from("journal_entries").select("*").order("entry_at", { ascending: false })
+    ]);
 
-  if (categoriesResult.error) throw new Error(categoriesResult.error.message || "Kategórie sa z cloudu nepodarilo načítať.");
-  if (cardsResult.error) throw new Error(cardsResult.error.message || "Karty sa z cloudu nepodarilo načítať.");
-  if (tasksResult.error) throw new Error(tasksResult.error.message || "Úlohy sa z cloudu nepodarilo načítať.");
-  if (journalResult.error) throw new Error(journalResult.error.message || "Denník sa z cloudu nepodarilo načítať.");
+    if (categoriesResult.error) throw new Error(categoriesResult.error.message || "Kategórie sa z cloudu nepodarilo načítať.");
+    if (cardsResult.error) throw new Error(cardsResult.error.message || "Karty sa z cloudu nepodarilo načítať.");
+    if (tasksResult.error) throw new Error(tasksResult.error.message || "Úlohy sa z cloudu nepodarilo načítať.");
+    if (journalResult.error) throw new Error(journalResult.error.message || "Denník sa z cloudu nepodarilo načítať.");
 
-  const categoryRows = Array.isArray(categoriesResult.data) ? categoriesResult.data : [];
-  const cardRows = Array.isArray(cardsResult.data) ? cardsResult.data : [];
-  const taskRows = Array.isArray(tasksResult.data) ? tasksResult.data : [];
-  const journalRows = Array.isArray(journalResult.data) ? journalResult.data : [];
+    const categoryRows = Array.isArray(categoriesResult.data) ? categoriesResult.data : [];
+    const cardRows = Array.isArray(cardsResult.data) ? cardsResult.data : [];
+    const taskRows = Array.isArray(tasksResult.data) ? tasksResult.data : [];
+    const journalRows = Array.isArray(journalResult.data) ? journalResult.data : [];
 
-  if (!categoryRows.length && !cardRows.length && !taskRows.length && !journalRows.length) {
-    throw new Error("V cloude zatiaľ nevidím žiadne dáta na načítanie.");
-  }
+    if (!categoryRows.length && !cardRows.length && !taskRows.length && !journalRows.length) {
+      throw new Error("V cloude zatiaľ nevidím žiadne dáta na načítanie.");
+    }
 
-  const importedCategories = await Promise.all(categoryRows.map(async (row) => {
-    const fallbackData = row?.data && typeof row.data === "object" ? row.data : {};
-    const resolvedImage = await resolveSupabaseStorageImage(client, String(row?.image_path || fallbackData.image || "").trim());
-    return {
-      ...fallbackData,
-      id: String(row?.client_id || fallbackData.id || "").trim(),
-      parentCategoryId: String(row?.parent_client_id || fallbackData.parentCategoryId || "").trim(),
-      name: String(row?.name || fallbackData.name || "").trim(),
-      nodeType: String(row?.node_type || fallbackData.nodeType || "kind").trim() || "kind",
-      group: String(row?.group_name || fallbackData.group || "").trim(),
-      order: Number.isFinite(Number(row?.order_index)) ? Number(row.order_index) : Number(fallbackData.order || 0),
-      color: String(row?.color || fallbackData.color || "#7e9f4b").trim() || "#7e9f4b",
-      image: resolvedImage || String(row?.image_path || fallbackData.image || "").trim(),
-      notes: String(row?.notes || fallbackData.notes || "").trim(),
-      recommendedSowingWindow: String(row?.recommended_sowing_window || fallbackData.recommendedSowingWindow || "").trim(),
-      sowedAt: String(row?.sowed_at || fallbackData.sowedAt || "").trim()
-    };
-  }));
+    const cloudCategories = await Promise.all(categoryRows.map(async (row) => {
+      const fallbackData = row?.data && typeof row.data === "object" ? row.data : {};
+      const resolvedImage = await resolveSupabaseStorageImage(client, String(row?.image_path || fallbackData.image || "").trim());
+      return {
+        row,
+        item: normalizeCategoryRecord({
+          ...fallbackData,
+          id: String(row?.client_id || fallbackData.id || "").trim(),
+          parentCategoryId: String(row?.parent_client_id || fallbackData.parentCategoryId || "").trim(),
+          name: String(row?.name || fallbackData.name || "").trim(),
+          nodeType: String(row?.node_type || fallbackData.nodeType || "kind").trim() || "kind",
+          group: String(row?.group_name || fallbackData.group || "").trim(),
+          order: Number.isFinite(Number(row?.order_index)) ? Number(row.order_index) : Number(fallbackData.order || 0),
+          color: String(row?.color || fallbackData.color || "#7e9f4b").trim() || "#7e9f4b",
+          image: resolvedImage || String(row?.image_path || fallbackData.image || "").trim(),
+          notes: String(row?.notes || fallbackData.notes || "").trim(),
+          recommendedSowingWindow: String(row?.recommended_sowing_window || fallbackData.recommendedSowingWindow || "").trim(),
+          sowedAt: String(row?.sowed_at || fallbackData.sowedAt || "").trim(),
+          deleted: Boolean(row?.deleted_at || fallbackData.deleted)
+        })
+      };
+    }));
 
-  const importedCards = await Promise.all(cardRows.map(async (row) => {
-    const fallbackData = row?.data && typeof row.data === "object" ? row.data : {};
-    const imageValues = Array.isArray(row?.images) && row.images.length
-      ? row.images
-      : (Array.isArray(fallbackData.images) ? fallbackData.images : [row?.image_path || fallbackData.image || ""]);
-    const resolvedImages = await resolveSupabaseStorageImages(client, imageValues);
-    const finalImages = resolvedImages.length
-      ? resolvedImages
-      : imageValues.map((value) => String(value || "").trim()).filter(Boolean);
-    return {
-      ...fallbackData,
-      id: String(row?.client_id || fallbackData.id || "").trim(),
-      categoryId: String(row?.category_client_id || fallbackData.categoryId || "").trim(),
-      entryKind: String(row?.entry_kind || fallbackData.entryKind || "detail").trim() || "detail",
-      cardType: String(row?.card_type || fallbackData.cardType || "variety").trim() || "variety",
-      name: String(row?.name || fallbackData.name || "").trim(),
-      type: String(row?.detail_type || fallbackData.type || "").trim(),
-      status: String(row?.status || fallbackData.status || "").trim(),
-      notes: String(row?.notes || fallbackData.notes || "").trim(),
-      place: "",
-      places: [],
-      top: row?.top === undefined ? Boolean(fallbackData.top) : Boolean(row.top),
-      rating: Number.isFinite(Number(row?.rating)) ? Number(row.rating) : Number(fallbackData.rating || 0),
-      image: finalImages[0] || "",
-      images: finalImages,
-      sowingWindow: String(row?.sowing_window || fallbackData.sowingWindow || "").trim(),
-      sowingWindowAuto: row?.sowing_window_auto === undefined ? Boolean(fallbackData.sowingWindowAuto) : Boolean(row.sowing_window_auto),
-      sowedAt: String(row?.sowed_at || fallbackData.sowedAt || "").trim(),
-      transplantedAt: String(row?.transplanted_at || fallbackData.transplantedAt || "").trim(),
-      harvestedAt: String(row?.harvested_at || fallbackData.harvestedAt || "").trim()
-    };
-  }));
+    const cloudCards = await Promise.all(cardRows.map(async (row) => {
+      const fallbackData = row?.data && typeof row.data === "object" ? row.data : {};
+      const imageValues = Array.isArray(row?.images) && row.images.length
+        ? row.images
+        : (Array.isArray(fallbackData.images) ? fallbackData.images : [row?.image_path || fallbackData.image || ""]);
+      const resolvedImages = await resolveSupabaseStorageImages(client, imageValues);
+      const finalImages = resolvedImages.length
+        ? resolvedImages
+        : imageValues.map((value) => String(value || "").trim()).filter(Boolean);
+      return {
+        row,
+        item: normalizeVarietyRecord({
+          ...fallbackData,
+          id: String(row?.client_id || fallbackData.id || "").trim(),
+          categoryId: String(row?.category_client_id || fallbackData.categoryId || "").trim(),
+          entryKind: String(row?.entry_kind || fallbackData.entryKind || "detail").trim() || "detail",
+          cardType: String(row?.card_type || fallbackData.cardType || "variety").trim() || "variety",
+          name: String(row?.name || fallbackData.name || "").trim(),
+          type: String(row?.detail_type || fallbackData.type || "").trim(),
+          status: String(row?.status || fallbackData.status || "").trim(),
+          notes: String(row?.notes || fallbackData.notes || "").trim(),
+          place: "",
+          places: [],
+          top: row?.top === undefined ? Boolean(fallbackData.top) : Boolean(row.top),
+          rating: Number.isFinite(Number(row?.rating)) ? Number(row.rating) : Number(fallbackData.rating || 0),
+          image: finalImages[0] || "",
+          images: finalImages,
+          sowingWindow: String(row?.sowing_window || fallbackData.sowingWindow || "").trim(),
+          sowingWindowAuto: row?.sowing_window_auto === undefined ? Boolean(fallbackData.sowingWindowAuto) : Boolean(row.sowing_window_auto),
+          sowedAt: String(row?.sowed_at || fallbackData.sowedAt || "").trim(),
+          transplantedAt: String(row?.transplanted_at || fallbackData.transplantedAt || "").trim(),
+          harvestedAt: String(row?.harvested_at || fallbackData.harvestedAt || "").trim(),
+          deleted: Boolean(row?.deleted_at || fallbackData.deleted)
+        })
+      };
+    }));
 
-  const importedTasks = taskRows.map((row) => {
-    const fallbackData = row?.data && typeof row.data === "object" ? row.data : {};
-    const linkedCategoryIds = Array.isArray(row?.linked_category_ids)
-      ? row.linked_category_ids
-      : (Array.isArray(fallbackData.linkedCategoryIds) ? fallbackData.linkedCategoryIds : []);
-    return {
-      ...fallbackData,
-      id: String(row?.client_id || fallbackData.id || "").trim(),
-      text: String(row?.text || fallbackData.text || "").trim(),
-      date: String(row?.due_on || fallbackData.date || "").trim(),
-      done: row?.done === undefined ? Boolean(fallbackData.done) : Boolean(row.done),
-      source: String(row?.source || fallbackData.source || "").trim(),
-      linkedCategoryIds,
-      linkedCategoryId: linkedCategoryIds[0] || String(fallbackData.linkedCategoryId || "").trim(),
-      linkedVarietyId: String(row?.linked_variety_id || fallbackData.linkedVarietyId || "").trim()
-    };
-  });
+    const cloudTasks = taskRows.map((row) => {
+      const fallbackData = row?.data && typeof row.data === "object" ? row.data : {};
+      const linkedCategoryIds = Array.isArray(row?.linked_category_ids)
+        ? row.linked_category_ids
+        : (Array.isArray(fallbackData.linkedCategoryIds) ? fallbackData.linkedCategoryIds : []);
+      return {
+        row,
+        item: {
+          ...fallbackData,
+          id: String(row?.client_id || fallbackData.id || "").trim(),
+          text: String(row?.text || fallbackData.text || "").trim(),
+          date: String(row?.due_on || fallbackData.date || "").trim(),
+          done: row?.done === undefined ? Boolean(fallbackData.done) : Boolean(row.done),
+          source: String(row?.source || fallbackData.source || "").trim(),
+          linkedCategoryIds,
+          linkedCategoryId: linkedCategoryIds[0] || String(fallbackData.linkedCategoryId || "").trim(),
+          linkedVarietyId: String(row?.linked_variety_id || fallbackData.linkedVarietyId || "").trim(),
+          deleted: Boolean(row?.deleted_at || fallbackData.deleted)
+        }
+      };
+    });
 
-  const importedJournal = await Promise.all(journalRows.map(async (row) => {
-    const fallbackData = row?.data && typeof row.data === "object" ? row.data : {};
-    const imageValues = Array.isArray(row?.images) && row.images.length
-      ? row.images
-      : (Array.isArray(fallbackData.images) ? fallbackData.images : [row?.image_path || fallbackData.image || ""]);
-    const resolvedImages = await resolveSupabaseStorageImages(client, imageValues);
-    const finalImages = resolvedImages.length
-      ? resolvedImages
-      : imageValues.map((value) => String(value || "").trim()).filter(Boolean);
-    const rawVideoPath = String(fallbackData.videoPath || "").trim() || extractSupabaseStoragePath(String(fallbackData.video || "").trim());
-    const resolvedVideo = rawVideoPath
-      ? await resolveSupabaseStorageImage(client, rawVideoPath)
-      : String(fallbackData.video || "").trim();
-    const linkedCategoryIds = Array.isArray(row?.linked_category_ids)
-      ? row.linked_category_ids
-      : (Array.isArray(fallbackData.linkedCategoryIds) ? fallbackData.linkedCategoryIds : []);
-    return {
-      ...fallbackData,
-      id: String(row?.client_id || fallbackData.id || "").trim(),
-      title: String(row?.title || fallbackData.title || "Zápis").trim() || "Zápis",
-      text: String(row?.body || fallbackData.text || "").trim(),
-      date: String(row?.entry_at || fallbackData.date || "").trim(),
-      entryType: String(row?.entry_type || fallbackData.entryType || "note").trim() || "note",
-      mood: serializeMoodValues(row?.mood || fallbackData.mood || ""),
-      place: "",
-      tags: Array.isArray(row?.tags) ? row.tags : (Array.isArray(fallbackData.tags) ? fallbackData.tags : []),
-      weather: row?.weather && typeof row.weather === "object" ? row.weather : (fallbackData.weather && typeof fallbackData.weather === "object" ? fallbackData.weather : null),
-      linkedCategoryIds,
-      linkedCategoryId: linkedCategoryIds[0] || String(fallbackData.linkedCategoryId || "").trim(),
-      linkedVarietyId: String(row?.linked_variety_id || fallbackData.linkedVarietyId || "").trim(),
-      linkedEntityName: String(row?.linked_entity_name || fallbackData.linkedEntityName || "").trim(),
-      image: finalImages[0] || "",
-      images: finalImages,
-      video: resolvedVideo,
-      videoPath: rawVideoPath,
-      videoName: String(fallbackData.videoName || "").trim(),
-      videoMimeType: String(fallbackData.videoMimeType || "").trim()
-    };
-  }));
+    const cloudJournal = await Promise.all(journalRows.map(async (row) => {
+      const fallbackData = row?.data && typeof row.data === "object" ? row.data : {};
+      const imageValues = Array.isArray(row?.images) && row.images.length
+        ? row.images
+        : (Array.isArray(fallbackData.images) ? fallbackData.images : [row?.image_path || fallbackData.image || ""]);
+      const resolvedImages = await resolveSupabaseStorageImages(client, imageValues);
+      const finalImages = resolvedImages.length
+        ? resolvedImages
+        : imageValues.map((value) => String(value || "").trim()).filter(Boolean);
+      const rawVideoPath = String(fallbackData.videoPath || "").trim() || extractSupabaseStoragePath(String(fallbackData.video || "").trim());
+      const resolvedVideo = rawVideoPath
+        ? await resolveSupabaseStorageImage(client, rawVideoPath)
+        : String(fallbackData.video || "").trim();
+      const linkedCategoryIds = Array.isArray(row?.linked_category_ids)
+        ? row.linked_category_ids
+        : (Array.isArray(fallbackData.linkedCategoryIds) ? fallbackData.linkedCategoryIds : []);
+      return {
+        row,
+        item: {
+          ...fallbackData,
+          id: String(row?.client_id || fallbackData.id || "").trim(),
+          title: String(row?.title || fallbackData.title || "Zápis").trim() || "Zápis",
+          text: String(row?.body || fallbackData.text || "").trim(),
+          date: String(row?.entry_at || fallbackData.date || "").trim(),
+          entryType: String(row?.entry_type || fallbackData.entryType || "note").trim() || "note",
+          mood: serializeMoodValues(row?.mood || fallbackData.mood || ""),
+          place: "",
+          tags: Array.isArray(row?.tags) ? row.tags : (Array.isArray(fallbackData.tags) ? fallbackData.tags : []),
+          weather: row?.weather && typeof row.weather === "object" ? row.weather : (fallbackData.weather && typeof fallbackData.weather === "object" ? fallbackData.weather : null),
+          linkedCategoryIds,
+          linkedCategoryId: linkedCategoryIds[0] || String(fallbackData.linkedCategoryId || "").trim(),
+          linkedVarietyId: String(row?.linked_variety_id || fallbackData.linkedVarietyId || "").trim(),
+          linkedEntityName: String(row?.linked_entity_name || fallbackData.linkedEntityName || "").trim(),
+          image: finalImages[0] || "",
+          images: finalImages,
+          video: resolvedVideo,
+          videoPath: rawVideoPath,
+          videoName: String(fallbackData.videoName || "").trim(),
+          videoMimeType: String(fallbackData.videoMimeType || "").trim(),
+          deleted: Boolean(row?.deleted_at || fallbackData.deleted)
+        }
+      };
+    }));
 
-  const previousState = serializeStateSnapshot();
-  const previousActiveCategoryId = activeCategoryId;
-  const nextState = normalizePersistedState({
-    categories: importedCategories,
-    varieties: importedCards,
-    customTasks: importedTasks,
-    journal: importedJournal,
-    autoTasks: Array.isArray(previousState.autoTasks) ? previousState.autoTasks : []
-  });
+    const previousState = serializeStateSnapshot();
+    const previousActiveCategoryId = activeCategoryId;
+    const syncedAt = new Date().toISOString();
+    saveImportBackupSnapshot(previousState);
 
-  saveImportBackupSnapshot(previousState);
-  state = nextState;
-  invalidateDerivedDataCaches();
-  if (!state.categories.some((item) => item.id === activeCategoryId)) {
-    activeCategoryId = state.categories[0]?.id || null;
-  }
+    const mergedCategories = mergeSupabaseCollection(previousState.categories, cloudCategories, {
+      entityType: "category",
+      normalizeLocal: normalizeCategoryRecord,
+      syncedAt
+    });
+    const mergedVarieties = mergeSupabaseCollection(previousState.varieties, cloudCards, {
+      entityType: "card",
+      normalizeLocal: normalizeVarietyRecord,
+      syncedAt
+    });
+    const mergedTasks = mergeSupabaseCollection(previousState.customTasks, cloudTasks, {
+      entityType: "task",
+      normalizeLocal: (task) => normalizeTaskRecord(task, mergedVarieties),
+      syncedAt
+    });
+    const mergedJournal = mergeSupabaseCollection(previousState.journal, cloudJournal, {
+      entityType: "journal",
+      normalizeLocal: (entry) => normalizeJournalEntry(entry, mergedVarieties),
+      syncedAt
+    });
 
-  if (!persist()) {
-    state = normalizePersistedState(previousState);
+    state = normalizePersistedState({
+      categories: mergedCategories,
+      varieties: mergedVarieties,
+      customTasks: mergedTasks,
+      journal: mergedJournal,
+      autoTasks: Array.isArray(previousState.autoTasks) ? previousState.autoTasks : []
+    });
     invalidateDerivedDataCaches();
-    activeCategoryId = previousActiveCategoryId;
-    persist();
-    throw new Error("Cloud dáta sa načítali, ale nový lokálny stav sa nepodarilo bezpečne uložiť.");
-  }
+    if (!activeSyncItems(state.categories).some((item) => item.id === activeCategoryId)) {
+      activeCategoryId = firstActiveCategoryId(state.categories);
+    }
 
-  render();
-  return {
-    categories: importedCategories.length,
-    cards: importedCards.length,
-    tasks: importedTasks.length,
-    journal: importedJournal.length
-  };
+    if (!persist({ skipSyncPreparation: true, skipAutoSync: true })) {
+      state = normalizePersistedState(previousState);
+      invalidateDerivedDataCaches();
+      activeCategoryId = previousActiveCategoryId;
+      persist({ skipSyncPreparation: true, skipAutoSync: true });
+      throw new Error("Cloud dáta sa načítali, ale nový lokálny merge stav sa nepodarilo bezpečne uložiť.");
+    }
+
+    const finishedAt = new Date().toISOString();
+    mergeSupabaseSyncMetaPatch({
+      lastSyncedAt: finishedAt,
+      lastPullAt: finishedAt,
+      lastSuccessfulSyncAt: finishedAt,
+      lastSyncMode: "merge",
+      lastSyncError: "",
+      categories: activeSyncCount(state.categories),
+      cards: activeSyncCount(state.varieties),
+      tasks: activeSyncCount(state.customTasks),
+      journal: activeSyncCount(state.journal)
+    });
+
+    render();
+    return {
+      categories: cloudCategories.length,
+      cards: cloudCards.length,
+      tasks: cloudTasks.length,
+      journal: cloudJournal.length
+    };
+  } catch (error) {
+    mergeSupabaseSyncMetaPatch({
+      lastSyncError: error instanceof Error ? error.message : "Cloud dáta sa nepodarilo načítať.",
+      lastSyncMode: "pull"
+    });
+    throw error;
+  }
 }
 
 async function fetchSupabaseStateSummary() {
@@ -21532,13 +23016,19 @@ async function fetchSupabaseStateSummary() {
   const user = await requireSupabaseSessionUser(client);
 
   const countTable = async (tableName) => {
-    const { count, error } = await client
+    const activeQuery = await client
       .from(tableName)
-      .select("id", { count: "exact", head: true });
-    if (error) {
-      throw new Error(error.message || `Tabuľku ${tableName} sa nepodarilo porovnať.`);
+      .select("client_id, deleted_at");
+    if (!activeQuery.error) {
+      return (Array.isArray(activeQuery.data) ? activeQuery.data : []).filter((row) => !row?.deleted_at).length;
     }
-    return Number.isFinite(Number(count)) ? Number(count) : 0;
+    const fallbackQuery = await client
+      .from(tableName)
+      .select("client_id");
+    if (fallbackQuery.error) {
+      throw new Error(fallbackQuery.error.message || `Tabuľku ${tableName} sa nepodarilo porovnať.`);
+    }
+    return Array.isArray(fallbackQuery.data) ? fallbackQuery.data.length : 0;
   };
 
   const latestUpdatedAtForTable = async (tableName) => {
