@@ -47,9 +47,10 @@ const LEAFLET_CSS_INTEGRITY = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BM
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const LEAFLET_JS_INTEGRITY = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
 const SUPABASE_SIGNED_IMAGE_CACHE_MS = 1000 * 60 * 30;
-const AUTO_CLOUD_PUSH_DEBOUNCE_MS = 1800;
+const AUTO_CLOUD_PUSH_DEBOUNCE_MS = 700;
 const AUTO_CLOUD_PULL_DEBOUNCE_MS = 1200;
 const AUTO_CLOUD_PULL_THROTTLE_MS = 15000;
+const AUTO_CLOUD_BACKGROUND_PULL_MS = 1000 * 8;
 const UNDO_KEY = "moja-zahrada-undo-v1";
 const RESET_BACKUP_KEY = "moja-zahrada-reset-backup-v1";
 const IMAGE_BACKGROUND_MIGRATION_KEY = "moja-zahrada-white-bg-v1";
@@ -1346,6 +1347,9 @@ let autoCloudPushPending = false;
 let autoCloudPullPending = false;
 let autoCloudPullForcePending = false;
 let autoCloudLastPullStartedAt = 0;
+let autoCloudBackgroundPullInterval = null;
+let supabaseClientSingleton = null;
+let supabaseClientSingletonKey = "";
 
 const mainMenuEl = document.getElementById("main-menu");
 const catalogEl = document.getElementById("catalog");
@@ -3591,6 +3595,7 @@ installBootRefreshMask();
 render();
 syncResponsiveAppShellClass();
 scheduleAutoCloudWakeSync({ delay: 1400, forcePull: true });
+ensureAutoCloudBackgroundPullLoop();
 window.addEventListener("resize", () => {
   scheduleGlobalViewportMaintenance({ resize: true });
 }, { passive: true });
@@ -3610,10 +3615,11 @@ document.addEventListener("visibilitychange", () => {
     scheduleAutoCloudWakeSync({ delay: AUTO_CLOUD_PULL_DEBOUNCE_MS });
     return;
   }
-  if (hasPendingAutoCloudChanges(state)) {
-    scheduleAutoCloudPush({ delay: 250 });
-  }
+  flushAutoCloudOnAppHide();
 });
+window.addEventListener("pagehide", () => {
+  flushAutoCloudOnAppHide();
+}, { passive: true });
 syncDocumentVisibilityRuntimeState();
 scheduleImageBackgroundCleanup();
 
@@ -3840,7 +3846,13 @@ function renderJournalOverlayCard(entry, options = {}) {
   const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
   const images = journalImages(normalizedEntry);
   const video = journalVideo(normalizedEntry);
-  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, { compact: true, photoCount: images.length, photoEntryId: normalizedEntry.id });
+  const isWalkEntry = normalizedEntry.entryType === "walk" && Boolean(normalizedEntry.walk);
+  const walkMarkup = renderJournalWalkSummary(normalizedEntry.walk, {
+    compact: true,
+    photoCount: images.length,
+    photoEntryId: normalizedEntry.id,
+    spotlight: isWalkEntry
+  });
   const forceExpanded = Boolean(options?.forceExpanded);
   const safeText = String(normalizedEntry.text || "").trim();
   const titleInfo = journalPreviewTitleInfo(normalizedEntry, 72);
@@ -3858,6 +3870,35 @@ function renderJournalOverlayCard(entry, options = {}) {
   const headerWeatherWidgets = renderJournalWeatherWidgets(journalHeaderWeather(normalizedEntry), {
     singlePill: isMobileShell
   });
+  const galleryMarkup = images.length
+    ? (isWalkEntry
+      ? `
+        <section class="journal-overlay-card__walk-gallery" aria-label="Momentky z trasy">
+          <div class="journal-overlay-card__walk-gallery-head">
+            <strong class="journal-overlay-card__walk-gallery-title">Momentky z trasy</strong>
+            <span class="journal-overlay-card__walk-gallery-count">${escapeHtml(countedLabel(images.length, "fotka", "fotky", "fotiek"))}</span>
+          </div>
+          <div class="journal-overlay-card__gallery journal-overlay-card__gallery--walk ${images.length === 1 ? "journal-overlay-card__gallery--single" : ""}">
+            ${images.slice(0, 4).map((image, index) => `
+              <button class="journal-item__image journal-overlay-card__walk-image ${index === 0 ? "journal-overlay-card__walk-image--hero" : ""}" type="button" data-open-journal-image="${escapeAttribute(safeId)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(safeTitle)}">
+                ${renderJournalImageTag(image, safeTitle, { entryId: safeId, index })}
+              </button>
+            `).join("")}
+            ${images.length > 4 ? `<span class="journal-item__more journal-overlay-card__walk-more">+${images.length - 4}</span>` : ""}
+          </div>
+        </section>
+      `
+      : `
+        <div class="journal-overlay-card__gallery ${images.length === 1 ? "journal-overlay-card__gallery--single" : ""}">
+          ${images.slice(0, 4).map((image, index) => `
+            <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(safeId)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(safeTitle)}">
+              ${renderJournalImageTag(image, safeTitle, { entryId: safeId, index })}
+            </button>
+          `).join("")}
+          ${images.length > 4 ? `<span class="journal-item__more">+${images.length - 4}</span>` : ""}
+        </div>
+      `)
+    : "";
 
   if (isMobileShell && !forceExpanded) {
     const compactGalleryPreviewCount = 5;
@@ -3904,7 +3945,7 @@ function renderJournalOverlayCard(entry, options = {}) {
   }
 
   return `
-    <article class="journal-overlay-card ${images.length ? "journal-overlay-card--with-image" : ""} ${safeText || walkMarkup ? "" : "journal-overlay-card--compact"}" data-journal-entry-id="${escapeAttribute(safeId)}">
+    <article class="journal-overlay-card ${images.length ? "journal-overlay-card--with-image" : ""} ${safeText || walkMarkup ? "" : "journal-overlay-card--compact"} ${isWalkEntry ? "journal-overlay-card--walk-entry" : ""}" data-journal-entry-id="${escapeAttribute(safeId)}">
       <div class="journal-overlay-card__header">
         <div class="journal-overlay-card__meta">
           <div class="journal-overlay-card__topline">
@@ -3939,16 +3980,7 @@ function renderJournalOverlayCard(entry, options = {}) {
       ${showBodyText ? `<p class="journal-overlay-card__text">${escapeHtml(safeText)}</p>` : ""}
       ${walkMarkup}
       ${renderJournalVideoPlayer(video, `Video zápisu ${safeTitle}`, "journal-item__video")}
-      ${images.length ? `
-        <div class="journal-overlay-card__gallery ${images.length === 1 ? "journal-overlay-card__gallery--single" : ""}">
-          ${images.slice(0, 4).map((image, index) => `
-            <button class="journal-item__image" type="button" data-open-journal-image="${escapeAttribute(safeId)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(safeTitle)}">
-              ${renderJournalImageTag(image, safeTitle, { entryId: safeId, index })}
-            </button>
-          `).join("")}
-          ${images.length > 4 ? `<span class="journal-item__more">+${images.length - 4}</span>` : ""}
-        </div>
-      ` : ""}
+      ${galleryMarkup}
       ${footerChips.length ? `<div class="journal-overlay-card__footer"><div class="journal-item__chips journal-overlay-card__chips">${footerChips.map(renderJournalChip).join("")}</div></div>` : ""}
     </article>
   `;
@@ -11717,10 +11749,10 @@ function formatJournalWalkDuration(durationMinutes) {
   return `${hours} h ${minutes} min`;
 }
 
-function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0, photoEntryId = "" } = {}) {
+function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0, photoEntryId = "", spotlight = false } = {}) {
   const walk = normalizeJournalWalk({ walk: walkValue }) || null;
   if (!walk) return "";
-  const deferCompactMap = compact && Boolean(document.body?.classList.contains("app-mobile-shell"));
+  const deferCompactMap = compact && !spotlight && Boolean(document.body?.classList.contains("app-mobile-shell"));
 
   const startLabel = displayWalkPlaceLabel(walk.startPlace);
   const endLabel = displayWalkPlaceLabel(walk.endPlace);
@@ -11763,6 +11795,56 @@ function renderJournalWalkSummary(walkValue, { compact = false, photoCount = 0, 
   const extraPointCount = routePoints.length
     ? (compact && walk.routePoints.length > routePoints.length ? walk.routePoints.length - routePoints.length : 0)
     : (compact && gpsPoints.length > gpsPreviewPoints.length ? gpsPoints.length - gpsPreviewPoints.length : 0);
+
+  if (spotlight) {
+    const spotlightTitle = routeLabel || "Zaznamenaná trasa";
+    const spotlightSummary = [
+      timeRangeLabel,
+      walk.durationMinutes !== null ? formatJournalWalkDuration(walk.durationMinutes) : "",
+      walk.distanceKm !== null ? formatJournalWalkDistance(walk.distanceKm) : ""
+    ].filter(Boolean).join(" • ");
+    const spotlightBadge = photoCount
+      ? countedLabel(photoCount, "fotka", "fotky", "fotiek")
+      : (gpsPoints.length ? countedLabel(gpsPoints.length, "GPS bod", "GPS body", "GPS bodov") : "");
+    const weatherSummary = [
+      walk.temperature,
+      walk.conditions
+    ].filter(Boolean).join(" • ");
+    const spotlightStats = [
+      timeRangeLabel ? { icon: ICONS.walkDuration, label: "Čas", value: timeRangeLabel } : null,
+      walk.durationMinutes !== null ? { icon: ICONS.walkDuration, label: "Trvanie", value: formatJournalWalkDuration(walk.durationMinutes) } : null,
+      walk.distanceKm !== null ? { icon: "-", label: "Vzdialenosť", value: formatJournalWalkDistance(walk.distanceKm) } : null,
+      gpsPoints.length ? { icon: ICONS.walkGps, label: "GPS body", value: countedLabel(gpsPoints.length, "bod", "body", "bodov") } : null,
+      weatherSummary ? { icon: weatherIconSymbol({ condition: walk.conditions }), label: "Počasie", value: weatherSummary } : null
+    ].filter(Boolean);
+
+    return `
+      <section class="journal-walk journal-walk--compact journal-walk--spotlight">
+        <div class="journal-walk__spotlight-head">
+          <div class="journal-walk__spotlight-copy">
+            <span class="journal-walk__spotlight-eyebrow">Záznam trasy</span>
+            <strong class="journal-walk__spotlight-title">${escapeHtml(spotlightTitle)}</strong>
+            ${spotlightSummary ? `<span class="journal-walk__spotlight-summary">${escapeHtml(spotlightSummary)}</span>` : ""}
+          </div>
+          ${spotlightBadge ? `<span class="journal-walk__spotlight-badge">${escapeHtml(spotlightBadge)}</span>` : ""}
+        </div>
+        ${spotlightStats.length ? `
+          <div class="journal-walk__stat-grid">
+            ${spotlightStats.map((item) => `
+              <div class="journal-walk__stat-card">
+                <span class="journal-walk__stat-icon" aria-hidden="true">${item.icon}</span>
+                <span class="journal-walk__stat-copy">
+                  <span class="journal-walk__stat-label">${escapeHtml(item.label)}</span>
+                  <strong class="journal-walk__stat-value">${escapeHtml(item.value)}</strong>
+                </span>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+        ${renderWalkMapMarkup(walk, { compact, photoCount, photoEntryId, deferred: deferCompactMap })}
+      </section>
+    `;
+  }
 
   return `
     <section class="journal-walk ${compact ? "journal-walk--compact" : ""}">
@@ -18290,6 +18372,26 @@ function clearAutoCloudSyncSchedules() {
   syncToolbarSyncStatusChip();
 }
 
+function ensureAutoCloudBackgroundPullLoop() {
+  if (autoCloudBackgroundPullInterval || typeof window === "undefined") return;
+  autoCloudBackgroundPullInterval = window.setInterval(() => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    if (!hasConfiguredAutoCloudSync()) return;
+    if (autoCloudSyncInFlight || autoCloudPushPending || autoCloudPullPending) return;
+    if (hasPendingAutoCloudChanges(state)) {
+      scheduleAutoCloudPush({ delay: Math.min(400, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
+      return;
+    }
+    scheduleAutoCloudPull({ delay: 0, force: true });
+  }, AUTO_CLOUD_BACKGROUND_PULL_MS);
+}
+
+function flushAutoCloudOnAppHide() {
+  if (!hasPendingAutoCloudChanges(state)) return;
+  scheduleAutoCloudPush({ delay: 0 });
+  void flushAutoCloudSyncQueue();
+}
+
 function hasPendingAutoCloudChanges(value = state) {
   return countDirtySyncRecords(value) > 0 || countPendingMediaForState(value) > 0;
 }
@@ -18338,6 +18440,8 @@ async function flushAutoCloudSyncQueue() {
         if (hasPendingAutoCloudChanges(state) && await ensureAutoCloudSession()) {
           try {
             await syncStateToSupabase();
+            autoCloudPullPending = true;
+            autoCloudPullForcePending = true;
           } catch (error) {
             // Auto-sync ostáva tichý, detail chyby už je uložený v sync meta.
           }
@@ -20872,6 +20976,18 @@ function isProcessableImageDataUrl(value) {
     && !value.startsWith("data:image/svg+xml");
 }
 
+function imageMimeTypeFromDataUrl(value = "") {
+  const match = String(value || "").match(/^data:(image\/[a-z0-9.+-]+);/i);
+  return match ? String(match[1] || "").trim().toLowerCase() : "";
+}
+
+function shouldApplyWhiteEdgeCleanupForMime(mimeType = "") {
+  const normalized = String(mimeType || "").trim().toLowerCase();
+  // Agresívne vybielenie okrajov robilo mapy na fotkách v protisvetle,
+  // preto ho nechávame len pre PNG vstupy, kde ešte môže pomôcť s bielym pozadím.
+  return normalized === "image/png";
+}
+
 function shouldDerivePreviewImageSource(source = "") {
   const normalized = String(source || "").trim();
   return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
@@ -21265,6 +21381,11 @@ function normalizeImageBackgroundDataUrl(dataUrl) {
       resolve(dataUrl);
       return;
     }
+    const sourceMimeType = imageMimeTypeFromDataUrl(dataUrl);
+    if (!shouldApplyWhiteEdgeCleanupForMime(sourceMimeType)) {
+      resolve(dataUrl);
+      return;
+    }
 
     const image = new Image();
     image.onload = () => {
@@ -21296,6 +21417,7 @@ function fileToOptimizedDataUrl(file, maxDimension = 1200, quality = 0.92) {
     reader.onload = () => {
       const image = new Image();
       image.onload = () => {
+        const sourceMimeType = String(file?.type || "").trim().toLowerCase() || imageMimeTypeFromDataUrl(String(reader.result || ""));
         const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
         const width = Math.max(1, Math.round(image.width * scale));
         const height = Math.max(1, Math.round(image.height * scale));
@@ -21312,7 +21434,9 @@ function fileToOptimizedDataUrl(file, maxDimension = 1200, quality = 0.92) {
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = "high";
         context.drawImage(image, 0, 0, width, height);
-        whitenEdgeBackgroundOnCanvas(canvas);
+        if (shouldApplyWhiteEdgeCleanupForMime(sourceMimeType)) {
+          whitenEdgeBackgroundOnCanvas(canvas);
+        }
         resolve(canvas.toDataURL("image/jpeg", quality));
       };
       image.onerror = () => resolve(reader.result);
@@ -21686,13 +21810,29 @@ function loadSupabaseBootstrapPreferences() {
   return normalizeSupabasePreferences(rawConfig);
 }
 
+function isSupabaseBootstrapManaged(preferences = loadSupabaseBootstrapPreferences()) {
+  return Boolean(preferences?.enabled && preferences?.url && preferences?.anonKey);
+}
+
 function loadSupabasePreferences() {
+  const bootstrapPreferences = loadSupabaseBootstrapPreferences();
   try {
     const raw = localStorage.getItem(SUPABASE_PREFERENCES_KEY);
-    if (!raw) return loadSupabaseBootstrapPreferences();
-    return normalizeSupabasePreferences(JSON.parse(raw));
+    const storedPreferences = raw
+      ? normalizeSupabasePreferences(JSON.parse(raw))
+      : normalizeSupabasePreferences();
+    if (isSupabaseBootstrapManaged(bootstrapPreferences)) {
+      return normalizeSupabasePreferences({
+        ...storedPreferences,
+        enabled: true,
+        url: bootstrapPreferences.url,
+        anonKey: bootstrapPreferences.anonKey,
+        configuredAt: bootstrapPreferences.configuredAt || storedPreferences.configuredAt || ""
+      });
+    }
+    return raw ? storedPreferences : bootstrapPreferences;
   } catch (error) {
-    return loadSupabaseBootstrapPreferences();
+    return bootstrapPreferences;
   }
 }
 
@@ -21705,7 +21845,16 @@ function clearLocalAuthProfile() {
 }
 
 function saveSupabasePreferences(value = {}) {
-  const normalized = normalizeSupabasePreferences(value);
+  const bootstrapPreferences = loadSupabaseBootstrapPreferences();
+  const normalized = isSupabaseBootstrapManaged(bootstrapPreferences)
+    ? normalizeSupabasePreferences({
+      ...value,
+      enabled: true,
+      url: bootstrapPreferences.url,
+      anonKey: bootstrapPreferences.anonKey,
+      configuredAt: bootstrapPreferences.configuredAt || value?.configuredAt || ""
+    })
+    : normalizeSupabasePreferences(value);
   try {
     localStorage.setItem(SUPABASE_PREFERENCES_KEY, JSON.stringify(normalized));
     syncToolbarSyncStatusChip();
@@ -21843,12 +21992,42 @@ function configuredSupabaseClient() {
   if (!library) {
     throw new Error("Supabase knižnica sa zatiaľ nenačítala. Obnov appku a skús to znova.");
   }
-  return library.createClient(preferences.url, preferences.anonKey, {
+  const clientKey = `${preferences.url}::${preferences.anonKey}`;
+  if (supabaseClientSingleton && supabaseClientSingletonKey === clientKey) {
+    return supabaseClientSingleton;
+  }
+  supabaseClientSingleton = library.createClient(preferences.url, preferences.anonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true
     }
   });
+  supabaseClientSingletonKey = clientKey;
+  if (typeof supabaseClientSingleton?.auth?.onAuthStateChange === "function") {
+    supabaseClientSingleton.auth.onAuthStateChange((event, session) => {
+      const sessionUser = session?.user || null;
+      if (sessionUser?.id) {
+        saveSupabaseAuthMirror({
+          userId: sessionUser.id,
+          email: sessionUser.email || "",
+          signedInAt: session?.created_at || new Date().toISOString(),
+          provider: "email"
+        });
+        const normalizedEvent = String(event || "").trim().toUpperCase();
+        if (normalizedEvent === "INITIAL_SESSION" || normalizedEvent === "SIGNED_IN" || normalizedEvent === "TOKEN_REFRESHED" || normalizedEvent === "USER_UPDATED") {
+          scheduleAutoCloudWakeSync({
+            delay: normalizedEvent === "INITIAL_SESSION" ? 250 : 120,
+            forcePull: true
+          });
+        }
+        return;
+      }
+      clearSupabaseAuthMirror();
+      clearAutoCloudSyncSchedules();
+      autoCloudLastPullStartedAt = 0;
+    });
+  }
+  return supabaseClientSingleton;
 }
 
 async function testSupabaseConnection() {
@@ -22781,7 +22960,7 @@ async function importStateFromSupabase() {
   }
 
   const client = configuredSupabaseClient();
-  await requireSupabaseSessionUser(client);
+  const user = await requireSupabaseSessionUser(client);
 
   try {
     const [
@@ -22790,10 +22969,10 @@ async function importStateFromSupabase() {
       tasksResult,
       journalResult
     ] = await Promise.all([
-      client.from("categories").select("*").order("order_index", { ascending: true }),
-      client.from("cards").select("*").order("created_at", { ascending: true }),
-      client.from("tasks").select("*").order("due_on", { ascending: true }),
-      client.from("journal_entries").select("*").order("entry_at", { ascending: false })
+      client.from("categories").select("*").eq("user_id", user.id).order("order_index", { ascending: true }),
+      client.from("cards").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
+      client.from("tasks").select("*").eq("user_id", user.id).order("due_on", { ascending: true }),
+      client.from("journal_entries").select("*").eq("user_id", user.id).order("entry_at", { ascending: false })
     ]);
 
     if (categoriesResult.error) throw new Error(categoriesResult.error.message || "Kategórie sa z cloudu nepodarilo načítať.");
@@ -23018,13 +23197,15 @@ async function fetchSupabaseStateSummary() {
   const countTable = async (tableName) => {
     const activeQuery = await client
       .from(tableName)
-      .select("client_id, deleted_at");
+      .select("client_id, deleted_at")
+      .eq("user_id", user.id);
     if (!activeQuery.error) {
       return (Array.isArray(activeQuery.data) ? activeQuery.data : []).filter((row) => !row?.deleted_at).length;
     }
     const fallbackQuery = await client
       .from(tableName)
-      .select("client_id");
+      .select("client_id")
+      .eq("user_id", user.id);
     if (fallbackQuery.error) {
       throw new Error(fallbackQuery.error.message || `Tabuľku ${tableName} sa nepodarilo porovnať.`);
     }
@@ -23035,6 +23216,7 @@ async function fetchSupabaseStateSummary() {
     const { data, error } = await client
       .from(tableName)
       .select("updated_at")
+      .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(1);
     if (error) {

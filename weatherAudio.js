@@ -1411,14 +1411,15 @@
 
     async handleUserActivation() {
       if (!this.enabled || !this.supported) return;
-      this.activated = true;
       if (this.preferDirectAudio) {
+        this.activated = true;
         if (this.lastInput) {
           this.apply(this.lastInput);
           this.primeActiveLoopPlayback(this.lastActiveMix);
         } else {
           this.startMixLoop();
         }
+        this.notifyStateChange("activated");
         return;
       }
       this.initAudioEngine();
@@ -1429,12 +1430,19 @@
           // Ignore autoplay-related failures; the next gesture can retry.
         }
       }
+      if (this.audioContext && this.audioContext.state === "suspended") {
+        this.activated = false;
+        this.notifyStateChange("activation-pending");
+        return;
+      }
+      this.activated = true;
       if (this.lastInput) {
         this.apply(this.lastInput);
         this.primeActiveLoopPlayback(this.lastActiveMix);
       } else {
         this.startMixLoop();
       }
+      this.notifyStateChange("activated");
     }
 
     initAudioEngine() {
