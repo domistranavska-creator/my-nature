@@ -41163,6 +41163,256 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
   line-height: 1.04 !important;
 }
 
+/* Walk detail uplift:
+   jemne profesionálnejší detail pre záznam prechádzky bez zásahu do logiky mapy. */
+.journal-overlay-card--walk-entry {
+  gap: 16px;
+}
+
+.journal-walk--spotlight {
+  gap: 14px;
+  padding: 16px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(217, 236, 192, 0.46), transparent 32%),
+    linear-gradient(180deg, rgba(252, 248, 238, 0.99), rgba(243, 236, 221, 0.97));
+  border-color: rgba(126, 137, 86, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 14px 30px rgba(56, 46, 28, 0.06);
+}
+
+.journal-walk__spotlight-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.journal-walk__spotlight-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.journal-walk__spotlight-eyebrow {
+  color: rgba(82, 102, 60, 0.88);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.journal-walk__spotlight-title {
+  color: #25341d;
+  font-size: 1.08rem;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.journal-walk__spotlight-summary {
+  color: rgba(74, 89, 58, 0.88);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.journal-walk__spotlight-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 252, 245, 0.94);
+  border: 1px solid rgba(122, 103, 74, 0.14);
+  color: #495d34;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 8px 16px rgba(57, 46, 27, 0.04);
+}
+
+.journal-walk__stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 10px;
+}
+
+.journal-walk__stat-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 62px;
+  padding: 12px 13px;
+  border-radius: 18px;
+  background: rgba(255, 252, 246, 0.82);
+  border: 1px solid rgba(132, 118, 91, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 16px rgba(62, 50, 29, 0.04);
+}
+
+.journal-walk__stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(228, 239, 209, 0.88);
+  color: #58713a;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.journal-walk__stat-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.journal-walk__stat-label {
+  color: rgba(83, 94, 68, 0.9);
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.journal-walk__stat-value {
+  color: #23311c;
+  font-size: 0.95rem;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.journal-walk--spotlight .journal-walk__map-shell {
+  gap: 0;
+}
+
+.journal-walk--spotlight .journal-walk__map-shell:not(.is-expanded):not(.is-fullscreen) .journal-walk__map.journal-walk__map--compact {
+  min-height: clamp(220px, 31vh, 320px);
+  border-radius: 24px;
+  box-shadow:
+    0 16px 30px rgba(49, 39, 21, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+.journal-overlay-card__walk-gallery {
+  display: grid;
+  gap: 12px;
+}
+
+.journal-overlay-card__walk-gallery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.journal-overlay-card__walk-gallery-title {
+  color: #22311b;
+  font-size: 0.96rem;
+  line-height: 1.15;
+}
+
+.journal-overlay-card__walk-gallery-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 252, 245, 0.9);
+  border: 1px solid rgba(132, 118, 91, 0.12);
+  color: #5a6d43;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.journal-overlay-card__gallery--walk {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.journal-overlay-card__gallery--walk .journal-item__image {
+  width: 100%;
+  height: auto;
+  min-height: 96px;
+  aspect-ratio: 1 / 1;
+  border-radius: 20px;
+}
+
+.journal-overlay-card__gallery--walk .journal-overlay-card__walk-image--hero {
+  grid-column: 1 / -1;
+  min-height: 180px;
+  aspect-ratio: 16 / 10;
+  border-radius: 22px;
+}
+
+.journal-overlay-card__gallery--walk .journal-item__more {
+  min-width: 0;
+  width: 100%;
+  height: auto;
+  min-height: 96px;
+  border-radius: 20px;
+}
+
+body.app-mobile-shell .journal-overlay-card--walk-entry {
+  gap: 14px !important;
+}
+
+body.app-mobile-shell .journal-walk--spotlight {
+  padding: 14px !important;
+  border-radius: 22px !important;
+}
+
+body.app-mobile-shell .journal-walk__spotlight-head {
+  grid-template-columns: 1fr !important;
+}
+
+body.app-mobile-shell .journal-walk__spotlight-badge {
+  justify-self: start !important;
+}
+
+body.app-mobile-shell .journal-walk__stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .journal-walk__stat-card {
+  min-height: 58px !important;
+  padding: 10px 11px !important;
+  border-radius: 16px !important;
+}
+
+body.app-mobile-shell .journal-walk--spotlight .journal-walk__map-shell:not(.is-expanded):not(.is-fullscreen) .journal-walk__map.journal-walk__map--compact {
+  min-height: 200px !important;
+  border-radius: 22px !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__walk-gallery-head {
+  align-items: flex-start !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__gallery--walk {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__gallery--walk .journal-item__image {
+  width: 100% !important;
+  min-height: 88px !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__gallery--walk .journal-overlay-card__walk-image--hero {
+  grid-column: 1 / -1 !important;
+  min-height: 164px !important;
+}
+
 body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__head--category > .catalog-card__title.catalog-card__title--body {
   font-size: 0.82rem !important;
   line-height: 1.02 !important;
@@ -44897,6 +45147,7 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
 }
 
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-sky-weather-pill {
+  display: block !important;
   position: fixed !important;
   top: var(--mobile-floating-weather-top) !important;
   right: var(--mobile-floating-weather-right) !important;
@@ -44905,6 +45156,23 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-sky-wea
   width: min(34vw, 132px) !important;
   max-width: min(34vw, 132px) !important;
   pointer-events: auto !important;
+}
+
+body.app-mobile-shell .mobile-sky-weather-pill > #hero-weather-mini,
+body.app-mobile-shell .mobile-sky-weather-pill > #hero-weather-mini.main-menu-weather-mini--hero {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+}
+
+body.app-mobile-shell .mobile-sky-weather-pill > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
 }
 
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home,

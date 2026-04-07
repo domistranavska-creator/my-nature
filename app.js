@@ -11168,12 +11168,8 @@ function applyMobileWeatherTheme(snapshot = null) {
 
   window.weatherBackgroundEngine?.apply?.(weatherBackgroundInput);
   window.weatherAudioEngine?.setEnabled?.(mobileWeatherSoundEnabled);
-  if (mobileWeatherSoundEnabled) {
-    window.weatherAudioEngine?.apply?.(weatherBackgroundInput);
-    window.weatherAudioEngine?.setMasterVolume?.(mobileWeatherSoundVolume);
-  } else {
-    window.weatherAudioEngine?.clear?.();
-  }
+  window.weatherAudioEngine?.apply?.(weatherBackgroundInput);
+  window.weatherAudioEngine?.setMasterVolume?.(mobileWeatherSoundVolume);
   syncMobileWeatherSoundButton();
   syncMainMenuWeatherAudioControls();
   scheduleEmbeddedMobilePreviewMetricsPush();
@@ -21993,6 +21989,20 @@ function configuredSupabaseClient() {
     throw new Error("Supabase knižnica sa zatiaľ nenačítala. Obnov appku a skús to znova.");
   }
   const clientKey = `${preferences.url}::${preferences.anonKey}`;
+  const bootstrapPreferences = loadSupabaseBootstrapPreferences();
+  if (isSupabaseBootstrapManaged(bootstrapPreferences) && (
+    preferences.url !== bootstrapPreferences.url
+    || preferences.anonKey !== bootstrapPreferences.anonKey
+    || preferences.enabled !== true
+  )) {
+    saveSupabasePreferences({
+      ...preferences,
+      enabled: true,
+      url: bootstrapPreferences.url,
+      anonKey: bootstrapPreferences.anonKey,
+      configuredAt: bootstrapPreferences.configuredAt || preferences.configuredAt || ""
+    });
+  }
   if (supabaseClientSingleton && supabaseClientSingletonKey === clientKey) {
     return supabaseClientSingleton;
   }
