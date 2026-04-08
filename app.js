@@ -554,12 +554,16 @@ function countPendingMediaForState(value = state) {
 }
 
 function countDirtySyncRecords(value = state) {
-  return [
-    ...(Array.isArray(value?.categories) ? value.categories : []),
-    ...(Array.isArray(value?.varieties) ? value.varieties : []),
-    ...(Array.isArray(value?.customTasks) ? value.customTasks : []),
-    ...(Array.isArray(value?.journal) ? value.journal : [])
-  ].filter((item) => Boolean(item?.dirty)).length;
+  const categories = (Array.isArray(value?.categories) ? value.categories : []).map(normalizeCategoryRecord);
+  const cards = (Array.isArray(value?.varieties) ? value.varieties : []).map(normalizeVarietyRecord);
+  const tasks = (Array.isArray(value?.customTasks) ? value.customTasks : []).map((task) => normalizeTaskRecord(task, cards));
+  const journal = (Array.isArray(value?.journal) ? value.journal : []).map((entry) => normalizeJournalEntry(entry, cards));
+  return (
+    syncRecordsPendingPush(categories).length
+    + syncRecordsPendingPush(cards).length
+    + syncRecordsPendingPush(tasks).length
+    + syncRecordsPendingPush(journal).length
+  );
 }
 
 function softDeleteStateRecord(collectionKey = "", recordId = "", entityType = "", options = {}) {

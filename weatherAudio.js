@@ -1476,9 +1476,7 @@
 
     preloadAudioAssets(layerKeys = []) {
       if (!this.activated) return;
-      const keys = this.lowPerformanceMobile
-        ? asArray(layerKeys).slice(0, 2)
-        : asArray(layerKeys);
+      const keys = asArray(layerKeys);
       keys.forEach((layerKey) => {
         this.ensureLoopLayer(layerKey);
       });
@@ -1875,12 +1873,12 @@
         blockedSet.add("mosquito_pass");
       }
 
-      const allowedDetails = (this.lowPerformanceMobile ? [] : asArray(preset.allowDetails)).filter((detailKey) => {
+      const allowedDetails = asArray(preset.allowDetails).filter((detailKey) => {
         if (blockedSet.has(detailKey)) return false;
         return this.isDetailEligible(detailKey, nextState, { ignoreCooldown: true });
       });
 
-      if (this.lowPerformanceMobile) {
+      if (false && this.lowPerformanceMobile) {
         mutedDueToPriority.push("Na reálnom mobile sú detailné zvuky utlmené, aby appka menej sekala.");
       }
 
@@ -1920,16 +1918,11 @@
     computeActiveLayers(nextState, evaluation) {
       const preset = evaluation.preset;
       const activeLayers = {};
-      const activeLayerKeys = this.lowPerformanceMobile
-        ? uniq([
-          ...asArray(preset.timeLayers).slice(0, 1),
-          ...asArray(preset.weatherLayers).slice(0, 1)
-        ])
-        : uniq([
-          ...asArray(preset.timeLayers),
-          ...asArray(preset.weatherLayers),
-          ...asArray(preset.textureLayers)
-        ]);
+      const activeLayerKeys = uniq([
+        ...asArray(preset.timeLayers),
+        ...asArray(preset.weatherLayers),
+        ...asArray(preset.textureLayers)
+      ]);
 
       activeLayerKeys.forEach((layerKey) => {
         const config = this.getLoopConfig(layerKey);
