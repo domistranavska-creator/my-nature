@@ -1353,6 +1353,7 @@ let autoCloudSyncInFlight = false;
 let autoCloudPushPending = false;
 let autoCloudPullPending = false;
 let autoCloudPullForcePending = false;
+let autoCloudPullPreferPending = false;
 let autoCloudLastPullStartedAt = 0;
 let autoCloudBackgroundPullInterval = null;
 let supabaseClientSingleton = null;
@@ -18464,6 +18465,7 @@ function clearAutoCloudSyncSchedules() {
   autoCloudPushPending = false;
   autoCloudPullPending = false;
   autoCloudPullForcePending = false;
+  autoCloudPullPreferPending = false;
   syncToolbarSyncStatusChip();
 }
 
@@ -18553,10 +18555,12 @@ async function flushAutoCloudSyncQueue() {
 
       if (!autoCloudPullPending) continue;
       const force = autoCloudPullForcePending;
+      const preferPull = autoCloudPullPreferPending;
       autoCloudPullPending = false;
       autoCloudPullForcePending = false;
+      autoCloudPullPreferPending = false;
 
-      if (hasBlockingAutoCloudPushChanges(state)) {
+      if (!preferPull && hasBlockingAutoCloudPushChanges(state)) {
         scheduleAutoCloudPush({ delay: AUTO_CLOUD_PUSH_DEBOUNCE_MS });
         continue;
       }
@@ -18570,6 +18574,9 @@ async function flushAutoCloudSyncQueue() {
         autoCloudLastPullStartedAt = Date.now();
         try {
           await importStateFromSupabase();
+          if (hasPendingAutoCloudChanges(state)) {
+            autoCloudPushPending = true;
+          }
         } catch (error) {
           // Auto-sync ostáva tichý, detail chyby už je uložený v sync meta.
         }
@@ -18603,13 +18610,15 @@ function scheduleAutoCloudPull(options = {}) {
   const delayCandidate = Number(options.delay);
   const delay = Number.isFinite(delayCandidate) ? Math.max(0, delayCandidate) : AUTO_CLOUD_PULL_DEBOUNCE_MS;
   const force = Boolean(options.force);
+  const preferPull = Boolean(options.preferPull);
   if (!hasConfiguredAutoCloudSync()) return;
-  if (hasBlockingAutoCloudPushChanges(state)) {
+  if (!preferPull && hasBlockingAutoCloudPushChanges(state)) {
     scheduleAutoCloudPush({ delay: Math.min(delay, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
     return;
   }
   autoCloudPullPending = true;
   autoCloudPullForcePending = autoCloudPullForcePending || force;
+  autoCloudPullPreferPending = autoCloudPullPreferPending || preferPull;
   syncToolbarSyncStatusChip();
   if (autoCloudPullTimer) {
     clearTimeout(autoCloudPullTimer);
@@ -18624,11 +18633,12 @@ function scheduleAutoCloudWakeSync(options = {}) {
   const delayCandidate = Number(options.delay);
   const delay = Number.isFinite(delayCandidate) ? Math.max(0, delayCandidate) : AUTO_CLOUD_PULL_DEBOUNCE_MS;
   const forcePull = Boolean(options.forcePull);
+  const preferPull = Boolean(options.preferPull);
   if (hasPendingAutoCloudChanges(state)) {
     scheduleAutoCloudPush({ delay: Math.min(delay, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
-    if (hasBlockingAutoCloudPushChanges(state)) return;
+    if (!preferPull && hasBlockingAutoCloudPushChanges(state)) return;
   }
-  scheduleAutoCloudPull({ delay, force: forcePull });
+  scheduleAutoCloudPull({ delay, force: forcePull, preferPull });
 }
 
 function persist(options = {}) {
@@ -22134,7 +22144,8 @@ function configuredSupabaseClient() {
         if (normalizedEvent === "INITIAL_SESSION" || normalizedEvent === "SIGNED_IN" || normalizedEvent === "TOKEN_REFRESHED" || normalizedEvent === "USER_UPDATED") {
           scheduleAutoCloudWakeSync({
             delay: normalizedEvent === "INITIAL_SESSION" ? 250 : 120,
-            forcePull: true
+            forcePull: true,
+            preferPull: normalizedEvent === "INITIAL_SESSION" || normalizedEvent === "SIGNED_IN"
           });
         }
         return;
@@ -22169,7 +22180,7 @@ async function testSupabaseConnection() {
     lastCheckedAt: new Date().toISOString()
   });
   if (data?.session?.user?.id) {
-    scheduleAutoCloudWakeSync({ delay: 500, forcePull: true });
+    scheduleAutoCloudWakeSync({ delay: 500, forcePull: true, preferPull: true });
   }
   return {
     hasSession: Boolean(data?.session)
@@ -22194,7 +22205,7 @@ async function supabaseSignUpEmail(email = "", password = "") {
       provider: "email"
     });
     if (data?.session?.user?.id) {
-      scheduleAutoCloudWakeSync({ delay: 400, forcePull: true });
+      scheduleAutoCloudWakeSync({ delay: 400, forcePull: true, preferPull: true });
     }
   }
   return {
@@ -22219,7 +22230,7 @@ async function supabaseSignInEmail(email = "", password = "") {
     signedInAt: data?.session?.created_at || new Date().toISOString(),
     provider: "email"
   });
-  scheduleAutoCloudWakeSync({ delay: 300, forcePull: true });
+  scheduleAutoCloudWakeSync({ delay: 300, forcePull: true, preferPull: true });
   return {
     userEmail
   };
