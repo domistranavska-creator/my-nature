@@ -920,19 +920,13 @@ function journalHeaderWeather(entry = {}) {
 }
 
 function markAppBootReady() {
-  if (typeof document === "undefined") return;
-  document.documentElement.classList.remove("app-booting");
-  document.documentElement.classList.add("app-ready");
+  return;
 }
 
 function installBootRefreshMask() {
-  if (typeof window === "undefined" || typeof document === "undefined") return;
+  if (typeof window === "undefined") return;
   if (window.__mojaZahradaBootRefreshMaskInstalled) return;
   window.__mojaZahradaBootRefreshMaskInstalled = true;
-  window.addEventListener("beforeunload", () => {
-    document.documentElement.classList.add("app-booting");
-    document.documentElement.classList.remove("app-ready");
-  });
 }
 
 function ensureLeafletLoaded() {
@@ -1357,7 +1351,9 @@ let autoCloudPullPending = false;
 let autoCloudPullForcePending = false;
 let autoCloudPullPreferPending = false;
 let autoCloudLastPullStartedAt = 0;
+let autoCloudInitialSyncPending = true;
 let autoCloudBackgroundPullInterval = null;
+let autoCloudSilentPullInFlight = false;
 let supabaseClientSingleton = null;
 let supabaseClientSingletonKey = "";
 let categoryStorageHydrationPromise = null;
@@ -3640,8 +3636,7 @@ wireStaticEvents();
 installBootRefreshMask();
 render();
 syncResponsiveAppShellClass();
-scheduleAutoCloudWakeSync({ delay: 1400, forcePull: true });
-ensureAutoCloudBackgroundPullLoop();
+scheduleAutoCloudWakeSync({ delay: 1400, forcePull: true, preferPull: true });
 window.addEventListener("resize", () => {
   scheduleGlobalViewportMaintenance({ resize: true });
 }, { passive: true });
@@ -3649,16 +3644,23 @@ window.addEventListener("scroll", () => {
 scheduleGlobalViewportMaintenance({ scroll: true });
 }, { passive: true });
 window.addEventListener("focus", () => {
-  scheduleAutoCloudWakeSync({ delay: AUTO_CLOUD_PULL_DEBOUNCE_MS });
+  if (!autoCloudInitialSyncPending) return;
+  scheduleAutoCloudWakeSync({ delay: AUTO_CLOUD_PULL_DEBOUNCE_MS, forcePull: true, preferPull: true });
 });
 window.addEventListener("online", () => {
-  scheduleAutoCloudWakeSync({ delay: 800, forcePull: true });
+  if (hasPendingAutoCloudChanges(state)) {
+    scheduleAutoCloudWakeSync({ delay: 800, forcePull: true });
+    return;
+  }
+  if (!autoCloudInitialSyncPending) return;
+  scheduleAutoCloudWakeSync({ delay: 800, forcePull: true, preferPull: true });
 }, { passive: true });
 document.addEventListener("visibilitychange", () => {
   syncDocumentVisibilityRuntimeState();
   syncWeatherBackgroundLoopVisibility();
   if (document.visibilityState === "visible") {
-    scheduleAutoCloudWakeSync({ delay: AUTO_CLOUD_PULL_DEBOUNCE_MS });
+    if (!autoCloudInitialSyncPending) return;
+    scheduleAutoCloudWakeSync({ delay: AUTO_CLOUD_PULL_DEBOUNCE_MS, forcePull: true, preferPull: true });
     return;
   }
   flushAutoCloudOnAppHide();
@@ -4086,7 +4088,11 @@ function renderJournalOverlayCardsSafe(entries) {
 function renderJournalOverlayEmergencyList(entries = []) {
   const safeEntries = Array.isArray(entries) ? entries : [];
   if (!safeEntries.length) {
-    return '<div class="empty-state empty-state--compact">Denník je pripravený. Pridaj prvý zápis a začne žiť.</div>';
+    return renderWarmEmptyState({
+      title: "Zatiaľ je tu priestor pre tvoje prvé chvíle",
+      text: "Pridaj prvý moment, fotku alebo poznámku.",
+      compact: true
+    });
   }
   return `
     <div class="journal-overlay-stack">
@@ -4201,13 +4207,21 @@ function openJournalOverlayList(initialTagKey = "", options = {}) {
               ${renderJournalTagFilterPanel(entries, activeTagKey, filteredEntries.length)}
               ${filteredEntries.length
                 ? renderJournalOverlayTimeline(filteredEntries)
-                : '<div class="empty-state empty-state--compact">K tomuto tagu zatiaľ nemáš žiadny zápis.</div>'}
+                : renderWarmEmptyState({
+                  title: "K tomuto tagu je zatiaľ ticho",
+                  text: "Prvý postreh s týmto tagom sa objaví práve tu.",
+                  compact: true
+                })}
             </div>
           `
           : `
             <div class="journal-overlay-stack">
               ${journalQuickActionsInline}
-              <div class="empty-state empty-state--compact">Denník je pripravený. Pridaj prvý zápis a začne žiť.</div>
+              ${renderWarmEmptyState({
+                title: "Zatiaľ je tu priestor pre tvoje prvé chvíle",
+                text: "Pridaj prvý moment, fotku alebo poznámku.",
+                compact: true
+              })}
             </div>
           `,
         overlayFrameActions,
@@ -6798,9 +6812,12 @@ function render() {
     }
   };
 
+  const shouldKeepToolbarAddMenuOpen = Boolean(toolbarAddMenuEl?.open);
   ensureActiveCategory();
   syncMobilePreviewClass();
-  closeToolbarAddMenu();
+  if (!shouldKeepToolbarAddMenuOpen) {
+    closeToolbarAddMenu();
+  }
   refreshAutoTasks();
   updateUndoButton();
   updateRestoreResetButton();
@@ -6825,6 +6842,11 @@ function render() {
   syncAuthGate();
   reconcileBodyScrollState();
   syncMainMenuTouchScrollState();
+  if (shouldKeepToolbarAddMenuOpen && toolbarAddMenuEl) {
+    toolbarAddMenuEl.open = true;
+    syncToolbarAddMenuOverlayState();
+    positionToolbarAddMenuOverlay();
+  }
   scheduleEmbeddedMobilePreviewMetricsPush();
   if (typeof window !== "undefined" && window.history && "scrollRestoration" in window.history) {
     window.history.scrollRestoration = "manual";
@@ -7871,8 +7893,8 @@ function ensureBottomNavMediaInput() {
   }
 
   input.accept = `${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`;
-  input.removeAttribute("capture");
-  input.setAttribute("multiple", "");
+  input.setAttribute("capture", "environment");
+  input.removeAttribute("multiple");
   return input;
 }
 
@@ -8809,6 +8831,29 @@ function syncMobileTopStripVisibility() {
   }
 }
 
+function renderWarmEmptyState({
+  title = "",
+  text = "",
+  compact = false,
+  actionLabel = "",
+  actionAttr = "",
+  actionClass = "button button--ghost"
+} = {}) {
+  const classes = compact ? "empty-state empty-state--compact" : "empty-state";
+  const safeTitle = String(title || "").trim();
+  const safeText = String(text || "").trim();
+  const safeActionLabel = String(actionLabel || "").trim();
+  const safeActionAttr = String(actionAttr || "").trim();
+  const safeActionClass = String(actionClass || "button button--ghost").trim();
+  return `
+    <div class="${classes}">
+      ${safeTitle ? `<p class="empty-state__title">${escapeHtml(safeTitle)}</p>` : ""}
+      ${safeText ? `<p class="empty-state__text">${escapeHtml(safeText)}</p>` : ""}
+      ${safeActionLabel && safeActionAttr ? `<div class="empty-state__actions"><button class="${escapeAttribute(safeActionClass)}" type="button" ${safeActionAttr}>${escapeHtml(safeActionLabel)}</button></div>` : ""}
+    </div>
+  `;
+}
+
 function renderProgressOverview() {
   if (!progressOverviewEl) return;
   if (sowingTipInterval) {
@@ -8825,9 +8870,17 @@ function renderProgressOverview() {
   const undatedTasks = sortTasks(openTaskItems.filter((task) => !task.date));
   const upcomingTasks = sortTasks(openTaskItems.filter((task) => task.date && task.date > todayISO()));
   const taskPreview = [...dueNowTasks, ...undatedTasks, ...upcomingTasks].slice(0, 3);
-  const taskPreviewEmptyText = openTasks
-    ? "Zatiaľ tu nemáš žiadne úlohy na dnes ani po termíne."
-    : "Zatiaľ tu nemáš žiadne úlohy.";
+  const taskPreviewEmptyMarkup = openTasks
+    ? renderWarmEmptyState({
+      title: "Dnes si môžeš vydýchnuť",
+      text: "Na dnes ani po termíne tu nič nečaká.",
+      compact: true
+    })
+    : renderWarmEmptyState({
+      title: "Plán je zatiaľ voľný",
+      text: "Prvú malú úlohu si môžeš pridať kedykoľvek.",
+      compact: true
+    });
   const taskPercent = percent(completedTasks, tasks.length || 0);
   const stressPercent = percent(overdueTasks, openTasks || 0);
   const taskExtraHtml = `
@@ -8842,7 +8895,7 @@ function renderProgressOverview() {
     <div class="progress-card__task-stack">
       ${taskPreview.length
         ? taskPreview.map(renderTaskSidebarCard).join("")
-        : `<div class="empty-state empty-state--compact">${escapeHtml(taskPreviewEmptyText)}</div>`}
+        : taskPreviewEmptyMarkup}
       ${openTasks ? `<button class="button button--ghost mini-list__more" type="button" id="open-all-tasks">Zobraziť všetky úlohy (${openTasks})</button>` : ""}
     </div>
   `;
@@ -8894,7 +8947,14 @@ function renderCatalog() {
 
   const category = currentCategory();
   if (!category) {
-    catalogEl.innerHTML = '<div class="empty-state">Najprv si vytvor kategóriu.</div>';
+    catalogEl.innerHTML = renderWarmEmptyState({
+      title: "Začni niečím malým",
+      text: "Vytvor prvú kategóriu a potom do nej môžeš ukladať karty, poznámky aj odrody.",
+      actionLabel: "Pridať prvú kategóriu",
+      actionAttr: 'id="open-first-category"',
+      actionClass: "button"
+    });
+    document.getElementById("open-first-category")?.addEventListener("click", () => openCategoryManager());
     return;
   }
 
@@ -9105,7 +9165,7 @@ function renderCatalog() {
       openVarietyOverviewModal({
         title: `Vysiate v kategórii ${category.name}`,
         items: scopedPlantVarieties.filter((item) => item.sowedAt),
-        emptyMessage: "V tejto kategórii zatiaľ nemáš nič vysiate.",
+        emptyMessage: "Prvé výsevy v tejto kategórii si sem nájdu miesto, keď pribudnú.",
         detailBuilder: (item) => formatDate(item.sowedAt)
       });
     });
@@ -9117,7 +9177,7 @@ function renderCatalog() {
       openVarietyOverviewModal({
         title: `Top odrody v kategórii ${category.name}`,
         items: scopedPlantVarieties.filter((item) => item.top),
-        emptyMessage: "V tejto kategórii zatiaľ nemáš žiadne top odrody.",
+        emptyMessage: "Top odrody si v tejto kategórii ešte len hľadajú miesto.",
         detailBuilder: (item) => `${categoryName(item.categoryId)}${inferBreedingType(item) === "hybrid" ? " • F1" : ""}`
       });
     });
@@ -9129,7 +9189,7 @@ function renderCatalog() {
       openVarietyOverviewModal({
         title: `Neodporúčam v kategórii ${category.name}`,
         items: scopedPlantVarieties.filter((item) => item.avoidNextYear),
-        emptyMessage: "V tejto kategórii zatiaľ nemáš nič označené ako neodporúčam.",
+        emptyMessage: "Tu sa časom ukáže, čo si chceš nechať bokom.",
         detailBuilder: (item) => `${categoryName(item.categoryId)}${inferBreedingType(item) === "hybrid" ? " • F1" : ""}`
       });
     });
@@ -9141,7 +9201,7 @@ function renderCatalog() {
       openVarietyOverviewModal({
         title: `Ešte som nepestovala v kategórii ${category.name}`,
         items: scopedPlantVarieties.filter((item) => item.neverGrown),
-        emptyMessage: "V tejto kategórii zatiaľ nemáš nič označené ako ešte som nepestovala.",
+        emptyMessage: "Tu uvidíš, čo ťa v tejto kategórii ešte len čaká.",
         detailBuilder: (item) => `${categoryName(item.categoryId)}${inferBreedingType(item) === "hybrid" ? " • F1" : ""}`
       });
     });
@@ -9153,7 +9213,7 @@ function renderCatalog() {
       openVarietyOverviewModal({
         title: `Nehybridné v kategórii ${category.name}`,
         items: scopedPlantVarieties.filter((item) => inferBreedingType(item) === "open"),
-        emptyMessage: "V tejto kategórii zatiaľ nemáš nič označené ako nehybridné.",
+        emptyMessage: "Nehybridné odrody sa tu ukážu, keď ich pridáš.",
         detailBuilder: (item) => categoryName(item.categoryId)
       });
     });
@@ -9165,7 +9225,7 @@ function renderCatalog() {
       openVarietyOverviewModal({
         title: `Hybridné F1 v kategórii ${category.name}`,
         items: scopedPlantVarieties.filter((item) => inferBreedingType(item) === "hybrid"),
-        emptyMessage: "V tejto kategórii zatiaľ nemáš nič označené ako hybridnú F1.",
+        emptyMessage: "Hybridné F1 odrody sa tu objavia, keď ich pridáš.",
         detailBuilder: (item) => categoryName(item.categoryId)
       });
     });
@@ -9194,18 +9254,27 @@ function renderHomeDashboard() {
   const weatherCardPlace = String(weatherSnapshot?.placeLabel || weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).split(",")[0].trim() || "Záhrada";
   const weatherCardTitle = `${weatherCardPlace} dnes`;
   const latestPhotoImages = latestPhotos.map((item) => item.image);
+  const isFirstOpenHome = !entries.length && !latestPhotos.length && !anniversaryMoments.length && !thingRecords.length;
+  const homeHeroTitle = isFirstOpenHome
+    ? "Tvoje miesto pre momenty z prírody"
+    : "Môj pokojný priestor pre záhradu, prírodu a spomienky";
+  const homeHeroText = isFirstOpenHome
+    ? "Začni prvým zápisom, fotkou alebo objavom. Postupne si tu vytvoríš svoj vlastný prírodný svet."
+    : `Aktívna je sezóna ${escapeHtml(String(activeSeasonYearValue))}. Staršie roky ostávajú v histórii a domov ukazuje najmä to, čo sa deje teraz.`;
+  const homePrimaryActionLabel = isFirstOpenHome ? "Pridať prvý moment" : "Pridať zápis";
+  const homeSecondaryActionLabel = isFirstOpenHome ? "Začať v denníku" : "Otvoriť denník";
 
   catalogEl.innerHTML = `
     <div class="home-board">
       <section class="home-hero">
         <div class="home-hero__copy">
           <p class="eyebrow">Sezóna ${escapeHtml(String(activeSeasonYearValue))}</p>
-          <h2>Môj pokojný priestor pre záhradu, prírodu a spomienky</h2>
-          <p>Aktívna je sezóna ${escapeHtml(String(activeSeasonYearValue))}. Staršie roky ostávajú v histórii a domov ukazuje najmä to, čo sa deje teraz.</p>
+          <h2>${homeHeroTitle}</h2>
+          <p>${homeHeroText}</p>
         </div>
         <div class="home-hero__actions">
-          <button class="button" type="button" data-open-home-add>Pridať zápis</button>
-          <button class="button button--ghost" type="button" data-open-home-journal>Otvoriť denník</button>
+          <button class="button" type="button" data-open-home-add>${homePrimaryActionLabel}</button>
+          <button class="button button--ghost" type="button" data-open-home-journal>${homeSecondaryActionLabel}</button>
         </div>
       </section>
 
@@ -9214,7 +9283,7 @@ function renderHomeDashboard() {
           <div class="home-card__head">
             <div>
               <p class="eyebrow">Posledný zápis</p>
-              <h3>${escapeHtml(latestEntry?.title || "Zatiaľ bez zápisu")}</h3>
+              <h3>${escapeHtml(latestEntry?.title || "Prvý moment ešte len čaká")}</h3>
             </div>
           </div>
           <p class="home-card__meta">${latestEntry ? escapeHtml(formatRelativeTime(latestEntry.date)) : "Pridaj prvý zápis a začneme si pamätať príbeh sezóny."}</p>
@@ -9265,7 +9334,7 @@ function renderHomeDashboard() {
           <div class="home-stack">
             ${problemEntries.length
               ? problemEntries.map((entry) => `<div class="home-line"><strong>${escapeHtml(entry.title)}</strong><span>${escapeHtml(formatRelativeTime(entry.date))}</span></div>`).join("")
-              : '<p class="home-card__text">Škodcovia, plesne, poškodenia a iné problémy budú mať svoje miesto bez toho, aby rozhádzali zvyšok appky.</p>'}
+              : '<p class="home-card__text">Aj menej príjemné chvíle si tu nájdu svoje miesto, keď ich budeš potrebovať mať poruke.</p>'}
           </div>
         </article>
       </section>
@@ -9289,7 +9358,10 @@ function renderHomeDashboard() {
                   </span>
                 </button>
               `).join("")
-            : '<div class="empty-state">Galéria bude žiť z denníkových fotiek, nie ako samostatný hlúpy album.</div>'}
+            : renderWarmEmptyState({
+              title: "Fotky si sem nájdu cestu postupne",
+              text: "Prvý zachytený moment z denníka sem prinesie život."
+            })}
         </div>
       </section>
 
@@ -9310,7 +9382,10 @@ function renderHomeDashboard() {
                 <span>${escapeHtml(item.summary)}</span>
               </button>
             `).join("")
-            : '<div class="empty-state">Témy sa budú skladať z kategórií, odrôd, miest, tagov a prepojených zápisov.</div>'}
+            : renderWarmEmptyState({
+              title: "Sem sa budú prepájať tvoje objavy",
+              text: "Keď pribudnú karty a zápisy, začnú si tu vytvárať prirodzené súvislosti."
+            })}
         </div>
       </section>
     </div>
@@ -9322,8 +9397,8 @@ function renderHomeDashboard() {
 
 function bindHomeDashboard({ latestPhotoImages, latestPhotos }) {
   bindWeatherOverviewTriggers(catalogEl);
-  catalogEl.querySelector("[data-open-home-add]")?.addEventListener("click", openJournalComposer);
-  catalogEl.querySelector("[data-open-home-journal]")?.addEventListener("click", forceOpenJournalManager);
+  catalogEl.querySelector("[data-open-home-add]")?.addEventListener("click", () => openJournalComposer());
+  catalogEl.querySelector("[data-open-home-journal]")?.addEventListener("click", () => forceOpenJournalManager());
   catalogEl.querySelectorAll("[data-open-home-anniversary-entry]").forEach((button) => {
     button.addEventListener("click", () => {
       const entryId = String(button.getAttribute("data-open-home-anniversary-entry") || "").trim();
@@ -12802,7 +12877,10 @@ function renderOverview() {
         ${topVarieties.map((item) => miniItem(item.name, categoryName(item.categoryId), item.id, { badge: "TOP" })).join("")}
         ${allTopVarieties.length > topVarieties.length ? `<button class="button button--ghost mini-list__more" type="button" id="open-favorite-overview">Zobraziť všetky top odrody (${allTopVarieties.length})</button>` : ""}
       `
-      : '<div class="empty-state">Tu budú tvoje najlepšie odrody s top hodnotením.</div>';
+      : renderWarmEmptyState({
+        title: "Tu si odložíš svoje obľúbené odrody",
+        text: "Keď niektorú označíš ako top, objaví sa práve tu."
+      });
 
     const openFavoriteOverviewButton = document.getElementById("open-favorite-overview");
     if (openFavoriteOverviewButton) {
@@ -12817,7 +12895,10 @@ function renderOverview() {
         ${avoidPreview.map((item) => miniItem(item.name, categoryName(item.categoryId), item.id, { badge: "NOPE" })).join("")}
         ${avoidVarieties.length > avoidPreview.length ? `<button class="button button--ghost mini-list__more" type="button" id="open-avoid-overview">Zobraziť všetky označené (${avoidVarieties.length})</button>` : ""}
       `
-      : '<div class="empty-state">Keď niečo označíš ako neodporúčané, ukáže sa to tu.</div>';
+      : renderWarmEmptyState({
+        title: "Aj menej vydarené pokusy majú svoje miesto",
+        text: "Keď si niečo odložíš bokom, budeš to mať poruke."
+      });
 
     const openAvoidOverviewButton = document.getElementById("open-avoid-overview");
     if (openAvoidOverviewButton) {
@@ -12851,26 +12932,47 @@ function renderTasks() {
         </div>
       </section>
       `
-    : '<div class="empty-state">Sem si môžeš pridávať vlastné úlohy.</div>';
+    : renderWarmEmptyState({
+      title: "Miesto pre malé kroky",
+      text: "Sem si môžeš uložiť, čo chceš stihnúť dnes alebo neskôr."
+    });
   bindTaskActions(customTaskListEl);
   bindThingLinks(customTaskListEl);
 }
 
 function renderJournal() {
   const journalEntries = normalizedJournalList();
+  const journalEmptyMarkup = renderWarmEmptyState({
+    title: "Sem sa budú zbierať tvoje zápisy a spomienky",
+    text: "Ulož si prvý postreh, fotku alebo krátku poznámku z dneška.",
+    actionLabel: "Vytvoriť prvý zápis",
+    actionAttr: 'data-open-empty-journal-add',
+    actionClass: "button"
+  });
+  const journalSidebarEmptyMarkup = renderWarmEmptyState({
+    title: "Zatiaľ je tu ticho",
+    text: "Keď začneš zapisovať, rýchly prehľad sa objaví aj tu.",
+    compact: true,
+    actionLabel: "Začať v denníku",
+    actionAttr: 'data-open-empty-journal-sidebar',
+    actionClass: "button button--ghost"
+  });
 
   if (journalListEl) {
     try {
       journalListEl.innerHTML = journalEntries.length
         ? journalEntries.map((entry) => renderJournalOverlayCard(entry)).join("")
-        : '<div class="empty-state">Tvoje záznamy zo záhrady budú tu.</div>';
+        : journalEmptyMarkup;
     } catch (error) {
       console.error("Zlyhal hlavný prehľad denníka", error);
       journalListEl.innerHTML = journalEntries.length
         ? journalEntries.map((entry) => renderJournalManagerCard(entry, "data-delete-journal")).join("")
-        : '<div class="empty-state">Denník sa nepodarilo načítať.</div>';
+        : journalEmptyMarkup;
     }
     syncDeferredJournalImages(journalListEl, { eagerCount: 2 });
+    journalListEl.querySelectorAll("[data-open-empty-journal-add]").forEach((button) => {
+      button.addEventListener("click", () => openJournalComposer());
+    });
   }
 
   if (journalSidebarEl) {
@@ -12881,7 +12983,7 @@ function renderJournal() {
           ${latestEntries.map((entry) => renderJournalSidebarCard(entry)).join("")}
           ${journalEntries.length > latestEntries.length ? `<button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Zobraziť všetky zápisy (${journalEntries.length})</button>` : ""}
         `
-        : '<div class="empty-state">Keď pridáš prvý zápis, ukáže sa aj tu.</div>';
+        : journalSidebarEmptyMarkup;
     } catch (error) {
       console.error("Zlyhal bočný prehľad denníka", error);
       journalSidebarEl.innerHTML = latestEntries.length
@@ -12896,9 +12998,12 @@ function renderJournal() {
           `).join("")}
           <button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Otvoriť denník</button>
         `
-        : '<div class="empty-state">Keď pridáš prvý zápis, ukáže sa aj tu.</div>';
+        : journalSidebarEmptyMarkup;
     }
     syncDeferredJournalImages(journalSidebarEl, { eagerCount: 3 });
+    journalSidebarEl.querySelectorAll("[data-open-empty-journal-sidebar]").forEach((button) => {
+      button.addEventListener("click", () => forceOpenJournalManager());
+    });
   }
 
   if (journalListEl) {
@@ -13098,7 +13203,11 @@ function renderMemories() {
         </div>
       </div>
     `
-    : '<div class="empty-state empty-state--compact">Keď pridáš fotky do denníka, ukážu sa aj tu.</div>';
+    : renderWarmEmptyState({
+      title: "Tu sa budú usádzať tvoje spomienky",
+      text: "Pridaj prvý zápis s fotkou a tento priestor ožije.",
+      compact: true
+    });
 
   const memoryHero = memoryStripEl.querySelector(".memory-strip__hero");
   const memoryHeroImage = memoryHero?.querySelector("img");
@@ -13743,7 +13852,11 @@ function renderInsights() {
         </div>
       ` : ""}
     `
-    : '<div class="empty-state empty-state--compact">Tipy sa objavia podľa počasia a týždenného vývoja.</div>';
+    : renderWarmEmptyState({
+      title: "Tipy prídu s rytmom počasia",
+      text: "Keď sa počasie rozhýbe, objavia sa tu jemné upozornenia a nápady.",
+      compact: true
+    });
 }
 
 function syncOverviewHighlights() {
@@ -13784,7 +13897,11 @@ function renderTaskManagerList(taskList, taskCount, rerender) {
 
   taskList.innerHTML = tasks.length
     ? tasks.map(renderTaskItem).join("")
-    : '<div class="empty-state empty-state--compact">Sem si môžeš pridávať vlastné úlohy.</div>';
+    : renderWarmEmptyState({
+      title: "Miesto pre malé kroky",
+      text: "Sem si môžeš uložiť, čo chceš stihnúť dnes alebo neskôr.",
+      compact: true
+    });
   bindThingLinks(taskList);
 
   taskList.querySelectorAll("[data-toggle-task]").forEach((checkbox) => {
@@ -13821,16 +13938,21 @@ function renderTaskManagerList(taskList, taskCount, rerender) {
 function renderJournalManagerList(journalList, journalCount, rerender) {
   const journalEntries = normalizedJournalList();
   if (journalCount) journalCount.textContent = countedLabel(journalEntries.length, "zápis", "zápisy", "zápisov");
+  const journalManagerEmptyMarkup = renderWarmEmptyState({
+    title: "Sem sa budú ukladať tvoje momenty z prírody",
+    text: "Keď začneš zapisovať, toto miesto ožije.",
+    compact: true
+  });
 
   try {
     journalList.innerHTML = journalEntries.length
       ? journalEntries.map((entry) => renderJournalManagerCard(entry)).join("")
-      : '<div class="empty-state empty-state--compact">Tvoje záznamy zo záhrady budú tu.</div>';
+      : journalManagerEmptyMarkup;
   } catch (error) {
     console.error("Zlyhal manažér denníka", error);
     journalList.innerHTML = journalEntries.length
       ? journalEntries.map((entry) => renderJournalManagerCard(entry)).join("")
-      : '<div class="empty-state empty-state--compact">Tvoje záznamy zo záhrady budú tu.</div>';
+      : journalManagerEmptyMarkup;
   }
 
   bindThingLinks(journalList);
@@ -14582,7 +14704,10 @@ function openThingOverview(thingKey) {
         <div class="home-stack">
           ${entries.length
             ? entries.map((entry) => renderJournalItem(entry, "", "")).join("")
-            : '<div class="empty-state">K tejto téme zatiaľ nie sú priradené žiadne zápisy.</div>'}
+            : renderWarmEmptyState({
+              title: "Táto téma si ešte pýta prvý zápis",
+              text: "Keď sa jej dotkneš v denníku, objaví sa tu."
+            })}
         </div>
         </section>
         ${photos.length ? `<button class="button" type="button" id="open-thing-photos">Otvoriť všetky fotky (${photos.length})</button>` : ""}
@@ -14635,7 +14760,7 @@ function openSownOverviewModal(items) {
   openVarietyOverviewModal({
     title: "Čo mám vysiate",
     items,
-    emptyMessage: "Zatiaľ tu nemáš nič vysiate.",
+    emptyMessage: "Prvé výsevy si sem nájdu miesto, keď pribudnú.",
     detailBuilder: (item) => formatDate(item.sowedAt)
   });
 }
@@ -14644,7 +14769,7 @@ function openFavoriteOverviewModal(items) {
   openVarietyOverviewModal({
     title: "Najobľúbenejšie odrody",
     items,
-    emptyMessage: "Zatiaľ tu nemáš žiadne top odrody.",
+    emptyMessage: "Keď si niečo obľúbiš, nájdeš to práve tu.",
     detailBuilder: (item) => `${categoryName(item.categoryId)}${inferBreedingType(item) === "hybrid" ? " • F1" : ""}`
   });
 }
@@ -14653,7 +14778,7 @@ function openAvoidOverviewModal(items) {
   openVarietyOverviewModal({
     title: "Už nepestovať",
     items,
-    emptyMessage: "Zatiaľ tu nemáš nič označené na vyradenie.",
+    emptyMessage: "Sem si môžeš odložiť odrody, ku ktorým sa nechceš vracať.",
     detailBuilder: (item) => `${categoryName(item.categoryId)}${inferBreedingType(item) === "hybrid" ? " • F1" : ""}`
   });
 }
@@ -15583,7 +15708,10 @@ function openBatchSowingManager(categoryId = activeCategoryId) {
             </span>
           </label>
         `).join("")
-      : '<div class="empty-state">V tomto filtri zatiaľ nie sú žiadne odrody.</div>';
+      : renderWarmEmptyState({
+        title: "V tomto výbere je zatiaľ ticho",
+        text: "Skús inú kombináciu alebo pridaj prvú kartu."
+      });
 
     list.querySelectorAll('input[name="varietyIds"]').forEach((checkbox) => {
       checkbox.addEventListener("change", () => {
@@ -18506,6 +18634,10 @@ function clearAutoCloudSyncSchedules() {
     clearTimeout(autoCloudPullTimer);
     autoCloudPullTimer = null;
   }
+  if (autoCloudBackgroundPullInterval) {
+    clearInterval(autoCloudBackgroundPullInterval);
+    autoCloudBackgroundPullInterval = null;
+  }
   autoCloudPushPending = false;
   autoCloudPullPending = false;
   autoCloudPullForcePending = false;
@@ -18514,17 +18646,13 @@ function clearAutoCloudSyncSchedules() {
 }
 
 function ensureAutoCloudBackgroundPullLoop() {
-  if (autoCloudBackgroundPullInterval || typeof window === "undefined") return;
-  autoCloudBackgroundPullInterval = window.setInterval(() => {
-    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-    if (!hasConfiguredAutoCloudSync()) return;
-    if (autoCloudSyncInFlight || autoCloudPushPending || autoCloudPullPending) return;
-    if (hasPendingAutoCloudChanges(state)) {
-      scheduleAutoCloudPush({ delay: Math.min(260, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
-      return;
-    }
-    scheduleAutoCloudPull({ delay: 0, force: true });
-  }, AUTO_CLOUD_BACKGROUND_PULL_MS);
+  if (!autoCloudBackgroundPullInterval) return;
+  clearInterval(autoCloudBackgroundPullInterval);
+  autoCloudBackgroundPullInterval = null;
+}
+
+async function runSilentAutoCloudBackgroundPull() {
+  return false;
 }
 
 function flushAutoCloudOnAppHide() {
@@ -18602,6 +18730,7 @@ async function flushAutoCloudSyncQueue() {
       }
 
       if (await ensureAutoCloudSession()) {
+        autoCloudInitialSyncPending = false;
         autoCloudLastPullStartedAt = Date.now();
         try {
           await importStateFromSupabase();
@@ -18627,8 +18756,6 @@ async function flushAutoCloudSyncQueue() {
         if (hasPendingAutoCloudChanges(state) && await ensureAutoCloudSession()) {
           try {
             await syncStateToSupabase();
-            autoCloudPullPending = true;
-            autoCloudPullForcePending = true;
           } catch (error) {
             // Auto-sync ostáva tichý, detail chyby už je uložený v sync meta.
           }
@@ -18651,6 +18778,10 @@ function scheduleAutoCloudPush(options = {}) {
   const delayCandidate = Number(options.delay);
   const delay = Number.isFinite(delayCandidate) ? Math.max(0, delayCandidate) : AUTO_CLOUD_PUSH_DEBOUNCE_MS;
   if (!hasConfiguredAutoCloudSync() || !hasPendingAutoCloudChanges(state)) return;
+  if (autoCloudInitialSyncPending) {
+    scheduleAutoCloudPull({ delay, force: true, preferPull: true });
+    return;
+  }
   autoCloudPushPending = true;
   syncToolbarSyncStatusChip();
   if (autoCloudPushTimer) {
@@ -18702,7 +18833,7 @@ function scheduleAutoCloudWakeSync(options = {}) {
   }
   if (hasPendingAutoCloudChanges(state)) {
     scheduleAutoCloudPush({ delay: Math.min(delay, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
-    if (!preferPull && hasBlockingAutoCloudPushChanges(state)) return;
+    if (!preferPull) return;
   }
   scheduleAutoCloudPull({ delay, force: forcePull, preferPull });
 }
@@ -20957,15 +21088,21 @@ function shouldDeferCategoryCardImageSource(source = "") {
 
 function renderCategoryCardImageTag(category, altText) {
   const source = categoryCardImage(category);
-  const needsResolvedSource = Boolean(extractSupabaseStoragePath(source)) || !isDirectRenderableImageSource(source);
-  if (!needsResolvedSource && !shouldDeferCategoryCardImageSource(source)) {
+  const hasDirectSource = isDirectRenderableImageSource(source);
+  const hasResolvableStoragePath = Boolean(extractSupabaseStoragePath(source));
+  const shouldDeferSource = shouldDeferCategoryCardImageSource(source);
+  const needsResolvedSource = !hasDirectSource;
+  if (!needsResolvedSource && !hasResolvableStoragePath && !shouldDeferSource) {
     return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
   const cachedPreviewSource = getCachedPreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
   if (!needsResolvedSource && cachedPreviewSource && cachedPreviewSource !== source) {
     return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
-  return `<img src="${escapeAttribute(categoryPlaceholderImage(category))}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+  const optimisticSource = hasDirectSource && !shouldDeferSource
+    ? source
+    : categoryPlaceholderImage(category);
+  return `<img src="${escapeAttribute(optimisticSource)}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
 }
 
 function resolveDeferredCategoryCardImageSource(categoryId = "") {
@@ -22289,6 +22426,9 @@ function configuredSupabaseClient() {
         });
         const normalizedEvent = String(event || "").trim().toUpperCase();
         if (normalizedEvent === "INITIAL_SESSION" || normalizedEvent === "SIGNED_IN" || normalizedEvent === "TOKEN_REFRESHED" || normalizedEvent === "USER_UPDATED") {
+          if (normalizedEvent === "INITIAL_SESSION" || normalizedEvent === "SIGNED_IN") {
+            autoCloudInitialSyncPending = true;
+          }
           scheduleAutoCloudWakeSync({
             delay: normalizedEvent === "INITIAL_SESSION" ? 250 : 120,
             forcePull: true,
@@ -22301,6 +22441,7 @@ function configuredSupabaseClient() {
       clearSupabaseAuthMirror();
       clearAutoCloudSyncSchedules();
       autoCloudLastPullStartedAt = 0;
+      autoCloudInitialSyncPending = false;
     });
   }
   return supabaseClientSingleton;
@@ -22328,6 +22469,7 @@ async function testSupabaseConnection() {
     lastCheckedAt: new Date().toISOString()
   });
   if (data?.session?.user?.id) {
+    autoCloudInitialSyncPending = true;
     scheduleAutoCloudWakeSync({ delay: 500, forcePull: true, preferPull: true });
     void repairMissingCategoryImagesFromSupabaseStorage(client, data.session.user);
   }
@@ -22354,6 +22496,7 @@ async function supabaseSignUpEmail(email = "", password = "") {
       provider: "email"
     });
     if (data?.session?.user?.id) {
+      autoCloudInitialSyncPending = true;
       scheduleAutoCloudWakeSync({ delay: 400, forcePull: true, preferPull: true });
       void repairMissingCategoryImagesFromSupabaseStorage(client, data.session.user);
     }
@@ -22380,6 +22523,7 @@ async function supabaseSignInEmail(email = "", password = "") {
     signedInAt: data?.session?.created_at || new Date().toISOString(),
     provider: "email"
   });
+  autoCloudInitialSyncPending = true;
   scheduleAutoCloudWakeSync({ delay: 300, forcePull: true, preferPull: true });
   if (data?.session?.user?.id) {
     void repairMissingCategoryImagesFromSupabaseStorage(client, data.session.user);
@@ -23423,6 +23567,7 @@ async function importStateFromSupabase() {
 
   const client = configuredSupabaseClient();
   const user = await requireSupabaseSessionUser(client);
+  autoCloudInitialSyncPending = false;
 
   try {
     const [
@@ -23603,24 +23748,31 @@ async function importStateFromSupabase() {
       syncedAt
     });
 
-    state = normalizePersistedState({
+    const nextMergedState = normalizePersistedState({
       categories: mergedCategories,
       varieties: mergedVarieties,
       customTasks: mergedTasks,
       journal: mergedJournal,
       autoTasks: Array.isArray(previousState.autoTasks) ? previousState.autoTasks : []
     });
-    invalidateDerivedDataCaches();
-    if (!activeSyncItems(state.categories).some((item) => item.id === activeCategoryId)) {
-      activeCategoryId = firstActiveCategoryId(state.categories);
-    }
+    const previousStateJson = JSON.stringify(previousState);
+    const nextMergedStateJson = JSON.stringify(nextMergedState);
+    const stateChanged = previousStateJson !== nextMergedStateJson;
 
-    if (!persist({ skipSyncPreparation: true, skipAutoSync: true })) {
-      state = normalizePersistedState(previousState);
+    if (stateChanged) {
+      state = nextMergedState;
       invalidateDerivedDataCaches();
-      activeCategoryId = previousActiveCategoryId;
-      persist({ skipSyncPreparation: true, skipAutoSync: true });
-      throw new Error("Cloud dáta sa načítali, ale nový lokálny merge stav sa nepodarilo bezpečne uložiť.");
+      if (!activeSyncItems(state.categories).some((item) => item.id === activeCategoryId)) {
+        activeCategoryId = firstActiveCategoryId(state.categories);
+      }
+
+      if (!persist({ skipSyncPreparation: true, skipAutoSync: true })) {
+        state = normalizePersistedState(previousState);
+        invalidateDerivedDataCaches();
+        activeCategoryId = previousActiveCategoryId;
+        persist({ skipSyncPreparation: true, skipAutoSync: true });
+        throw new Error("Cloud dáta sa načítali, ale nový lokálny merge stav sa nepodarilo bezpečne uložiť.");
+      }
     }
 
     const finishedAt = new Date().toISOString();
@@ -23637,7 +23789,9 @@ async function importStateFromSupabase() {
     });
 
     void repairMissingCategoryImagesFromSupabaseStorage(client, user);
-    render();
+    if (stateChanged) {
+      render();
+    }
     return {
       categories: cloudCategories.length,
       cards: cloudCards.length,
@@ -24616,7 +24770,11 @@ function renderWeatherOverviewWeekSwitcher(overview) {
   const weeks = weatherOverviewWeekCandidates(overview);
   const selectedWeek = resolveWeatherOverviewSelectedWeek(overview);
   if (!weeks.length || !selectedWeek) {
-    return '<div class="empty-state empty-state--compact">Týždenný prehľad zatiaľ nie je dostupný.</div>';
+    return renderWarmEmptyState({
+      title: "Týždeň sa ešte skladá",
+      text: "Hneď ako budeme mať čerstvý výhľad na ďalšie dni, objaví sa tu prehľad.",
+      compact: true
+    });
   }
 
   return `
@@ -25359,7 +25517,7 @@ async function refreshMainMenuWeatherMini() {
   const [snapshot, trend] = await Promise.all([loadHomeWeatherSnapshot(), loadHomeWeatherTrend()]);
   if (!snapshot) return;
   applyMobileWeatherTheme(snapshot);
-  document.querySelectorAll("#main-menu-weather-mini, #hero-weather-mini").forEach((mountEl) => {
+  document.querySelectorAll("#hero-weather-mini, #mobile-sky-weather-mini").forEach((mountEl) => {
     const isHeroMount = mountEl.id === "hero-weather-mini" || mountEl.classList.contains("main-menu-weather-mini--hero");
     const heroCompact = Boolean(document.body?.classList.contains("app-mobile-shell") && isHeroMount);
     const showTrend = !isHeroMount;
@@ -25375,7 +25533,7 @@ async function refreshMainMenuWeatherMini() {
   if (homeWeatherRefreshTimer) clearTimeout(homeWeatherRefreshTimer);
   homeWeatherRefreshTimer = window.setTimeout(() => {
     Promise.all([loadHomeWeatherSnapshot(true), loadHomeWeatherTrend(true), loadHomeWeatherOverview(true)]).then(() => {
-      if (document.getElementById("main-menu-weather-mini") || document.getElementById("hero-weather-mini")) {
+      if (document.getElementById("hero-weather-mini") || document.getElementById("mobile-sky-weather-mini")) {
         refreshMainMenuWeatherMini().catch(() => {});
       }
       if (document.getElementById("home-weather-card")) {

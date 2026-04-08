@@ -10191,16 +10191,42 @@ input::placeholder {
   border: 1px dashed rgba(77, 107, 47, 0.2);
 }
 
+.empty-state__title {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.empty-state__text {
+  margin: 8px auto 0;
+  max-width: 34ch;
+  line-height: 1.55;
+}
+
+.empty-state__actions {
+  margin-top: 14px;
+}
+
 .empty-state--compact {
   padding: 14px 16px;
   min-height: 0;
 }
 
+.empty-state--compact .empty-state__text {
+  margin-top: 6px;
+}
+
+.empty-state--compact .empty-state__actions {
+  margin-top: 12px;
+}
+
 .worklog-manager .empty-state--compact {
   min-height: 108px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   font-size: 1rem;
 }
 
@@ -17152,13 +17178,6 @@ body.app-mobile-shell .hero__text::after {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  gap: 8px !important;
-  align-items: start !important;
-}
-
 body.app-mobile-shell .hero__text {
   display: grid;
   gap: 4px;
@@ -17184,11 +17203,6 @@ body.app-mobile-shell .hero h1 {
   text-align: center;
   text-wrap: nowrap !important;
   text-shadow: 0 6px 18px rgba(18, 24, 14, 0.12);
-}
-
-body.app-mobile-shell .hero__weather {
-  width: 100%;
-  justify-content: stretch !important;
 }
 
 body.app-mobile-shell .main-menu-weather-mini--hero,
@@ -20351,10 +20365,6 @@ body.app-mobile-shell .hero {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  gap: 10px !important;
-}
-
 body.app-mobile-shell .hero__text {
   width: min(100%, 304px) !important;
   min-height: 74px !important;
@@ -23514,31 +23524,10 @@ body.app-mobile-shell .menu-toolbar {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  position: relative !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 6px !important;
-}
-
 body.app-mobile-shell .hero__text {
   width: min(100%, 304px) !important;
   margin: 0 auto !important;
   align-self: center !important;
-}
-
-body.app-mobile-shell .hero__weather {
-  position: relative !important;
-  top: auto !important;
-  right: auto !important;
-  width: min(44vw, 166px) !important;
-  max-width: min(44vw, 166px) !important;
-  margin: -2px 2px 0 auto !important;
-  display: flex !important;
-  justify-content: flex-end !important;
-  align-self: flex-end !important;
-  z-index: 5 !important;
 }
 
 body.app-mobile-shell #hero-weather-mini,
@@ -24447,25 +24436,6 @@ body.app-mobile-shell .hero__overlay {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  position: relative !important;
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  gap: 10px !important;
-  align-items: start !important;
-}
-
-body.app-mobile-shell .hero__weather {
-  position: relative !important;
-  top: auto !important;
-  right: auto !important;
-  width: 100% !important;
-  display: flex !important;
-  justify-content: flex-end !important;
-  margin-top: 4px !important;
-  z-index: 3 !important;
-}
-
 body.app-mobile-shell #hero-weather-mini {
   display: flex !important;
   justify-content: flex-end !important;
@@ -24501,23 +24471,9 @@ body.app-mobile-shell .home-section__header {
 
 /* Kompaktný hero weather widget:
    mini, vpravo, klikateľný, aby pozadie zostalo dominantné */
-body.app-mobile-shell .hero__content--with-weather {
-  position: relative !important;
-  display: block !important;
-}
-
 body.app-mobile-shell .hero__text {
   width: min(100%, 304px) !important;
   margin: 0 auto !important;
-}
-
-body.app-mobile-shell .hero__weather {
-  position: absolute !important;
-  top: 78px;
-  right: 2px;
-  width: auto !important;
-  justify-content: flex-end !important;
-  z-index: 2;
 }
 
 body.app-mobile-shell .main-menu-weather-mini--hero,
@@ -24845,29 +24801,8 @@ body.app-mobile-shell .utility-bar__settings {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  position: relative !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 6px !important;
-}
-
 body.app-mobile-shell .hero__text {
   align-self: center !important;
-}
-
-body.app-mobile-shell .hero__weather {
-  position: relative !important;
-  top: auto !important;
-  right: auto !important;
-  width: min(44vw, 166px) !important;
-  max-width: min(44vw, 166px) !important;
-  margin: -2px 2px 0 auto !important;
-  display: flex !important;
-  justify-content: flex-end !important;
-  align-self: flex-end !important;
-  z-index: 5 !important;
 }
 
 body.app-mobile-shell #hero-weather-mini,
@@ -24887,12 +24822,6 @@ body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__car
 
 /* Finálny mini widget len pre mobil:
    menší, pokojný, aby neprekrýval hlavičku ani Pridať. */
-body.app-mobile-shell .hero__weather {
-  width: min(34vw, 132px) !important;
-  max-width: min(34vw, 132px) !important;
-  margin: 0 2px 0 auto !important;
-}
-
 body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-compact {
   border-radius: 16px !important;
   background: linear-gradient(180deg, rgba(255, 252, 245, 0.74), rgba(255, 252, 245, 0.44)) !important;
@@ -25184,10 +25113,6 @@ body.app-mobile-shell .hero {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  gap: 4px !important;
-}
-
 body.app-mobile-shell .hero__overlay {
   background: none !important;
 }
@@ -25223,12 +25148,6 @@ body.app-mobile-shell .page-shell::before {
 
 /* Mobilný mini weather pill vpravo hore:
    len základné info, aby dominovalo pozadie. */
-body.app-mobile-shell .hero__weather {
-  width: min(38vw, 164px) !important;
-  max-width: min(38vw, 164px) !important;
-  margin: -2px 4px 0 auto !important;
-}
-
 body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
   width: 100% !important;
   min-height: 0 !important;
@@ -25441,22 +25360,8 @@ body.app-mobile-shell .hero {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  min-height: 178px !important;
-  justify-content: flex-start !important;
-  gap: 10px !important;
-}
-
 body.app-mobile-shell .hero__text {
   width: min(100%, 304px) !important;
-}
-
-body.app-mobile-shell .hero__weather {
-  width: min(31vw, 136px) !important;
-  max-width: min(31vw, 136px) !important;
-  margin: 6px 8px 0 auto !important;
-  align-self: flex-end !important;
-  z-index: 6 !important;
 }
 
 body.app-mobile-shell #hero-weather-mini,
@@ -25660,12 +25565,6 @@ body.app-mobile-preview.app-mobile-shell .detail-modal--settings .settings-sheet
 }
 
 /* Mobil: mini weather chip ešte kratší a úplne doprava. */
-body.app-mobile-shell .hero__weather {
-  width: min(24vw, 104px) !important;
-  max-width: min(24vw, 104px) !important;
-  margin: 6px 0 0 auto !important;
-}
-
 body.app-mobile-shell #hero-weather-mini,
 body.app-mobile-shell .main-menu-weather-mini--hero {
   justify-content: flex-end !important;
@@ -25709,81 +25608,6 @@ body.app-mobile-shell .main-menu-weather-mini__hero-pill .main-menu-weather-mini
 /* Mobil final:
    hero weather chip musi byt naozaj mini, prisadeny doprava
    a nesmie si ponechat starsiu plnosirkovu kartu. */
-body.app-mobile-shell .hero__content--with-weather {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-}
-
-body.app-mobile-shell .hero__text {
-  width: min(100%, 304px) !important;
-  margin: 0 auto !important;
-}
-
-body.app-mobile-shell .hero__weather {
-  position: relative !important;
-  top: auto !important;
-  right: auto !important;
-  width: 112px !important;
-  min-width: 112px !important;
-  max-width: 112px !important;
-  flex: 0 0 112px !important;
-  margin: 8px 0 0 auto !important;
-  align-self: flex-end !important;
-  justify-content: flex-end !important;
-  z-index: 6 !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero {
-  display: block !important;
-  width: 112px !important;
-  min-width: 112px !important;
-  max-width: 112px !important;
-  margin-left: auto !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
-  display: block !important;
-  width: 112px !important;
-  min-width: 112px !important;
-  max-width: 112px !important;
-  margin-left: auto !important;
-  border-radius: 14px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-pill {
-  grid-template-columns: 14px 1fr auto !important;
-  grid-template-areas:
-    "phase temp meta"
-    "condition condition condition" !important;
-  gap: 1px 4px !important;
-  padding: 5px 7px 5px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-phase {
-  min-width: 14px !important;
-  min-height: 14px !important;
-  font-size: 0.5rem !important;
-  padding: 0 2px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-temperature {
-  font-size: 0.88rem !important;
-  line-height: 1 !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-condition {
-  font-size: 0.56rem !important;
-  line-height: 1.02 !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-meta {
-  font-size: 0.46rem !important;
-  max-width: 34px !important;
-  text-align: right !important;
-  justify-self: end !important;
-}
-
 /* Mobilny reset pocasia:
    zatial iba cisty den a noc na jednej spolocnej vrstve.
    Vsetky stare weather vrstvy a efekty su vypnute. */
@@ -26029,79 +25853,6 @@ body.app-mobile-shell .hero__text {
 body.app-mobile-shell .hero {
   min-height: 0 !important;
   padding: calc(10px + env(safe-area-inset-top)) 12px 6px !important;
-}
-
-body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto !important;
-  align-items: center !important;
-  gap: 10px !important;
-  min-height: 0 !important;
-}
-
-body.app-mobile-shell .hero__text {
-  width: auto !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-}
-
-body.app-mobile-shell .hero h1 {
-  max-width: none !important;
-  margin: 0 !important;
-  font-size: 0.9rem !important;
-  line-height: 1.08 !important;
-  letter-spacing: 0.08em !important;
-  text-transform: uppercase !important;
-  white-space: nowrap !important;
-  text-align: left !important;
-  color: rgba(247, 251, 255, 0.96) !important;
-  text-shadow: 0 4px 12px rgba(9, 24, 46, 0.22) !important;
-}
-
-body.app-mobile-shell .hero__weather {
-  width: 102px !important;
-  min-width: 102px !important;
-  max-width: 102px !important;
-  flex: 0 0 102px !important;
-  margin: 0 0 0 auto !important;
-  align-self: center !important;
-  justify-content: flex-end !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero,
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
-  width: 102px !important;
-  min-width: 102px !important;
-  max-width: 102px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-pill {
-  grid-template-columns: 13px 1fr auto !important;
-  gap: 1px 4px !important;
-  padding: 5px 7px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-phase {
-  min-width: 13px !important;
-  min-height: 13px !important;
-  padding: 0 2px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-temperature {
-  font-size: 0.82rem !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-condition {
-  font-size: 0.53rem !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-meta {
-  font-size: 0.44rem !important;
-  max-width: 30px !important;
 }
 
 body.app-mobile-shell .content {
@@ -26369,24 +26120,6 @@ body.app-mobile-shell .hero h1 {
   letter-spacing: 0.07em !important;
 }
 
-body.app-mobile-shell .hero__weather {
-  width: 96px !important;
-  min-width: 96px !important;
-  max-width: 96px !important;
-  flex-basis: 96px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero,
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
-  width: 96px !important;
-  min-width: 96px !important;
-  max-width: 96px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-pill {
-  padding: 4px 6px !important;
-}
-
 body.app-mobile-shell .utility-bar,
 body.app-mobile-shell .utility-bar.is-collapsed,
 body.app-mobile-shell.app-main-menu-mode .utility-bar.is-collapsed {
@@ -26638,42 +26371,6 @@ body.app-mobile-shell .toolbar-add-submenu__panel {
 body.app-mobile-shell .hero {
   min-height: 0 !important;
   padding: calc(env(safe-area-inset-top) + 2px) 8px 2px !important;
-}
-
-body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  gap: 0 !important;
-  min-height: 0 !important;
-}
-
-body.app-mobile-shell .hero__text {
-  display: none !important;
-}
-
-body.app-mobile-shell .hero h1 {
-  display: none !important;
-}
-
-body.app-mobile-shell .hero__weather {
-  width: 94px !important;
-  min-width: 94px !important;
-  max-width: 94px !important;
-  flex: 0 0 94px !important;
-  margin: 0 0 0 auto !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero,
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
-  width: 94px !important;
-  min-width: 94px !important;
-  max-width: 94px !important;
-}
-
-body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-pill {
-  padding: 4px 6px !important;
 }
 
 body.app-mobile-shell .content {
@@ -30034,14 +29731,6 @@ body.app-mobile-shell .hero {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  display: none !important;
-  min-height: 0 !important;
-  height: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
 body.app-mobile-shell .mobile-toolbar-weather-slot,
 body.app-mobile-shell.app-main-menu-mode .mobile-toolbar-weather-slot,
 body.app-mobile-shell.app-focused-mode .mobile-toolbar-weather-slot {
@@ -38960,10 +38649,6 @@ body.app-mobile-shell .hero {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  gap: 6px !important;
-}
-
 body.app-mobile-shell .hero__text {
   width: min(100%, 272px) !important;
   min-height: 60px !important;
@@ -39647,10 +39332,6 @@ body.app-mobile-shell .hero {
 }
 
 body.app-mobile-shell .hero__content,
-body.app-mobile-shell .hero__content--with-weather {
-  gap: 4px !important;
-}
-
 body.app-mobile-shell .hero__text {
   width: min(100%, 240px) !important;
   min-height: 50px !important;
@@ -44421,7 +44102,7 @@ body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill {
   pointer-events: auto;
 }
 
-body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill #hero-weather-mini,
+body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill #mobile-sky-weather-mini,
 body.app-mobile-shell.app-main-menu-mode .mobile-sky-weather-pill .main-menu-weather-mini--hero {
   display: flex !important;
   justify-content: flex-end !important;
@@ -44809,7 +44490,7 @@ body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill {
   pointer-events: auto !important;
 }
 
-body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill #hero-weather-mini,
+body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill #mobile-sky-weather-mini,
 body.app-mobile-shell.app-focused-mode .mobile-sky-weather-pill .main-menu-weather-mini--hero {
   display: flex !important;
   justify-content: flex-end !important;
@@ -45206,8 +44887,8 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-sky-wea
   pointer-events: auto !important;
 }
 
-body.app-mobile-shell .mobile-sky-weather-pill > #hero-weather-mini,
-body.app-mobile-shell .mobile-sky-weather-pill > #hero-weather-mini.main-menu-weather-mini--hero {
+body.app-mobile-shell .mobile-sky-weather-pill > #mobile-sky-weather-mini,
+body.app-mobile-shell .mobile-sky-weather-pill > #mobile-sky-weather-mini.main-menu-weather-mini--hero {
   display: block !important;
   width: 100% !important;
   min-width: 0 !important;
@@ -45215,12 +44896,46 @@ body.app-mobile-shell .mobile-sky-weather-pill > #hero-weather-mini.main-menu-we
   margin-left: auto !important;
 }
 
-body.app-mobile-shell .mobile-sky-weather-pill > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
+body.app-mobile-shell .mobile-sky-weather-pill > #mobile-sky-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
   display: block !important;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
   margin-left: auto !important;
+}
+
+/* Final mobile hero weather widget:
+   one compact right-aligned hero pill, kept after older mobile blocks
+   so nothing later in the file redefines the real hero mount. */
+body.app-mobile-shell .hero__content--with-weather {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0 !important;
+  min-height: 0 !important;
+}
+
+body.app-mobile-shell .hero__weather {
+  width: 94px !important;
+  min-width: 94px !important;
+  max-width: 94px !important;
+  flex: 0 0 94px !important;
+  margin: 0 0 0 auto !important;
+  align-self: center !important;
+  justify-content: flex-end !important;
+}
+
+body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero,
+body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__card--hero-pill {
+  display: block !important;
+  width: 94px !important;
+  min-width: 94px !important;
+  max-width: 94px !important;
+  margin-left: auto !important;
+}
+
+body.app-mobile-shell .hero__weather > #hero-weather-mini.main-menu-weather-mini--hero .main-menu-weather-mini__hero-pill {
+  padding: 4px 6px !important;
 }
 
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home,

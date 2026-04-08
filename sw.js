@@ -1,15 +1,15 @@
-const MOJA_ZAHRADA_STATIC_CACHE = "moja-zahrada-static-v2026-04-08-0029";
-const MOJA_ZAHRADA_RUNTIME_CACHE = "moja-zahrada-runtime-v2026-04-08-0029";
+const MOJA_ZAHRADA_STATIC_CACHE = "moja-zahrada-static-v2026-04-08-0033";
+const MOJA_ZAHRADA_RUNTIME_CACHE = "moja-zahrada-runtime-v2026-04-08-0033";
 const MOJA_ZAHRADA_APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css?v=2026-04-08-0027",
   "./weatherBackground.css?v=2026-04-05-0129",
-  "./app.js?v=2026-04-08-0029",
+  "./app.js?v=2026-04-08-0033",
   "./weatherBackground.js?v=2026-04-05-0129",
-  "./weatherAudio.js?v=2026-04-08-0001",
+  "./weatherAudio.js?v=2026-04-08-0002",
   "./supabase-config.js?v=2026-03-29-0015",
-  "./pwa.js?v=2026-04-08-0029",
+  "./pwa.js?v=2026-04-08-0033",
   "./manifest.webmanifest?v=2026-04-04-0077",
   "./icon-192.png",
   "./icon-512.png",
