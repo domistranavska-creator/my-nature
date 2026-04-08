@@ -19,7 +19,7 @@
   });
 
   window.addEventListener("load", () => {
-    const serviceWorkerUrl = new URL("./sw.js?v=2026-04-08-0010", window.location.href);
+    const serviceWorkerUrl = new URL("./sw.js?v=2026-04-08-0011", window.location.href);
 
     navigator.serviceWorker.register(serviceWorkerUrl.href).then((registration) => {
       if (registration.waiting) {

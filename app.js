@@ -20490,7 +20490,8 @@ function shouldDeferVarietyCardImageSource(source = "") {
 
 function renderVarietyCardImageTag(item, altText) {
   const source = primaryVarietyImage(item);
-  if (!shouldDeferVarietyCardImageSource(source)) {
+  const requiresResolution = !isDirectRenderableImageSource(source);
+  if (!requiresResolution && !shouldDeferVarietyCardImageSource(source)) {
     return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
   return `<img src="${escapeAttribute(cardPlaceholderImage(cardType(item)))}" data-lazy-variety-image="${escapeAttribute(item.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
@@ -20512,9 +20513,11 @@ async function activateDeferredVarietyCardImage(img) {
     if (!varietyId) return;
     const source = resolveDeferredVarietyCardImageSource(varietyId);
     if (!source) return;
-    const previewSource = await resolvePreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+    const renderableSource = await resolveRenderableSupabaseImageSource(source);
+    if (!isDirectRenderableImageSource(renderableSource)) return;
+    const previewSource = await resolvePreviewImageSource(renderableSource, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
     if (!img.isConnected) return;
-    img.src = previewSource || source;
+    img.src = previewSource || renderableSource;
     img.removeAttribute("data-lazy-variety-image");
     if (deferredVarietyCardImageObserver) {
       try {
@@ -20922,9 +20925,10 @@ async function activateDeferredCategoryCardImage(img) {
     const source = resolveDeferredCategoryCardImageSource(categoryId);
     if (!source) return;
     const renderableSource = await resolveRenderableSupabaseImageSource(source);
+    if (!isDirectRenderableImageSource(renderableSource)) return;
     const previewSource = await resolvePreviewImageSource(renderableSource, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
     if (!img.isConnected) return;
-    img.src = previewSource || renderableSource || source;
+    img.src = previewSource || renderableSource;
     img.removeAttribute("data-lazy-category-image");
     if (deferredCategoryCardImageObserver) {
       try {
@@ -20990,9 +20994,10 @@ function renderJournalImageTag(source, altText, { entryId = "", index = 0, class
   const classAttribute = className ? ` class="${escapeAttribute(className)}"` : "";
   const styleAttribute = style ? ` style="${escapeAttribute(style)}"` : "";
   const previewVariantAttribute = previewVariant ? ` data-journal-preview-variant="${escapeAttribute(previewVariant)}"` : "";
+  const requiresResolution = !isDirectRenderableImageSource(normalizedSource);
   const shouldDefer = forceDeferred
     ? shouldUseMobileDeferredVarietyImages() && !isPlaceholderImage(normalizedSource)
-    : shouldDeferJournalImageSource(normalizedSource);
+    : (requiresResolution || shouldDeferJournalImageSource(normalizedSource));
   if (!shouldDefer) {
     return `<img src="${escapeAttribute(normalizedSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${previewVariantAttribute}${classAttribute}${styleAttribute}>`;
   }
@@ -21017,12 +21022,14 @@ async function activateDeferredJournalImage(img) {
   const imageIndex = Math.max(0, Number(img.getAttribute("data-lazy-journal-image-index") || 0) || 0);
   const source = resolveDeferredJournalImageSource(entryId, imageIndex);
   if (!source) return;
+  const renderableSource = await resolveRenderableSupabaseImageSource(source);
+  if (!isDirectRenderableImageSource(renderableSource)) return;
   const previewVariant = String(img.getAttribute("data-journal-preview-variant") || "").trim();
   const previewSource = previewVariant === "sidebar-media"
-    ? await resolveJournalSidebarPreviewImageSource(source, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION)
-    : await resolvePreviewImageSource(source, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+    ? await resolveJournalSidebarPreviewImageSource(renderableSource, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION)
+    : await resolvePreviewImageSource(renderableSource, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION);
   if (!img.isConnected) return;
-  img.src = previewSource || source;
+  img.src = previewSource || renderableSource;
   img.removeAttribute("data-lazy-journal-image-entry");
   img.removeAttribute("data-lazy-journal-image-index");
   if (deferredJournalImageObserver) {
