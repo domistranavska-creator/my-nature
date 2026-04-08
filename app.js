@@ -1358,6 +1358,8 @@ let autoCloudLastPullStartedAt = 0;
 let autoCloudBackgroundPullInterval = null;
 let supabaseClientSingleton = null;
 let supabaseClientSingletonKey = "";
+let categoryStorageHydrationPromise = null;
+let categoryStorageHydrationUserId = "";
 
 const mainMenuEl = document.getElementById("main-menu");
 const catalogEl = document.getElementById("catalog");
@@ -22156,6 +22158,7 @@ function configuredSupabaseClient() {
             forcePull: true,
             preferPull: normalizedEvent === "INITIAL_SESSION" || normalizedEvent === "SIGNED_IN"
           });
+          void repairMissingCategoryImagesFromSupabaseStorage(supabaseClientSingleton, sessionUser);
         }
         return;
       }
@@ -22190,6 +22193,7 @@ async function testSupabaseConnection() {
   });
   if (data?.session?.user?.id) {
     scheduleAutoCloudWakeSync({ delay: 500, forcePull: true, preferPull: true });
+    void repairMissingCategoryImagesFromSupabaseStorage(client, data.session.user);
   }
   return {
     hasSession: Boolean(data?.session)
@@ -22215,6 +22219,7 @@ async function supabaseSignUpEmail(email = "", password = "") {
     });
     if (data?.session?.user?.id) {
       scheduleAutoCloudWakeSync({ delay: 400, forcePull: true, preferPull: true });
+      void repairMissingCategoryImagesFromSupabaseStorage(client, data.session.user);
     }
   }
   return {
@@ -22240,6 +22245,9 @@ async function supabaseSignInEmail(email = "", password = "") {
     provider: "email"
   });
   scheduleAutoCloudWakeSync({ delay: 300, forcePull: true, preferPull: true });
+  if (data?.session?.user?.id) {
+    void repairMissingCategoryImagesFromSupabaseStorage(client, data.session.user);
+  }
   return {
     userEmail
   };
@@ -22524,6 +22532,78 @@ async function resolveRenderableSupabaseImageSource(source = "") {
   } catch (error) {
     return normalized;
   }
+}
+
+async function repairMissingCategoryImagesFromSupabaseStorage(client, user) {
+  const userId = String(user?.id || "").trim();
+  if (!userId || !client?.storage?.from) return 0;
+
+  if (categoryStorageHydrationPromise && categoryStorageHydrationUserId === userId) {
+    return categoryStorageHydrationPromise;
+  }
+
+  const run = (async () => {
+    const categories = (Array.isArray(state?.categories) ? state.categories : []).map(normalizeCategoryRecord);
+    const candidates = categories.filter((category) => !category.deleted && !String(category?.image || "").trim());
+    if (!candidates.length) return 0;
+
+    let storageFiles = [];
+    try {
+      storageFiles = await listSupabaseStorageFiles(client, `${userId}/categories`);
+    } catch (error) {
+      return 0;
+    }
+
+    const fileByCategoryId = new Map();
+    storageFiles.forEach((path) => {
+      const normalizedPath = String(path || "").trim();
+      if (!normalizedPath) return;
+      const segments = normalizedPath.split("/").filter(Boolean);
+      if (segments.length < 4) return;
+      if (segments[0] !== userId || segments[1] !== "categories") return;
+      const categoryId = String(segments[2] || "").trim();
+      if (!categoryId || fileByCategoryId.has(categoryId)) return;
+      fileByCategoryId.set(categoryId, normalizedPath);
+    });
+
+    const repairedMap = new Map();
+    for (const category of candidates) {
+      const fallbackPath = fileByCategoryId.get(String(category?.id || "").trim());
+      if (!fallbackPath) continue;
+      const resolved = await resolveSupabaseStorageImage(client, fallbackPath);
+      repairedMap.set(String(category.id || "").trim(), resolved || fallbackPath);
+    }
+
+    if (!repairedMap.size) return 0;
+
+    const previousCategories = clone(state.categories);
+    state.categories = (Array.isArray(state.categories) ? state.categories : []).map((item) => {
+      const categoryId = String(item?.id || "").trim();
+      const repairedImage = repairedMap.get(categoryId);
+      if (!repairedImage) return item;
+      return normalizeCategoryRecord({
+        ...item,
+        image: repairedImage
+      });
+    });
+
+    if (!persist()) {
+      state.categories = previousCategories;
+      return 0;
+    }
+
+    render();
+    return repairedMap.size;
+  })();
+
+  categoryStorageHydrationPromise = run.finally(() => {
+    if (categoryStorageHydrationPromise === run || categoryStorageHydrationUserId === userId) {
+      categoryStorageHydrationPromise = null;
+      categoryStorageHydrationUserId = "";
+    }
+  });
+  categoryStorageHydrationUserId = userId;
+  return categoryStorageHydrationPromise;
 }
 
 async function resolveSupabaseStorageImages(client, values = []) {
@@ -23348,6 +23428,7 @@ async function importStateFromSupabase() {
       journal: activeSyncCount(state.journal)
     });
 
+    void repairMissingCategoryImagesFromSupabaseStorage(client, user);
     render();
     return {
       categories: cloudCategories.length,
