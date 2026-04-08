@@ -1142,8 +1142,11 @@ function hydrateWalkMaps(root = document) {
       const point = markerEntry?.point || null;
       const photoIndex = Math.max(0, Number(markerEntry?.photoIndex) || 0);
       const photoSource = String(markerEntry?.photoSource || "").trim();
+      const duplicateIndex = Math.max(0, Number(markerEntry?.duplicateIndex) || 0);
+      const duplicateCount = Math.max(1, Number(markerEntry?.duplicateCount) || 1);
       if (!point) return;
-      const marker = window.L.marker([Number(point.latitude), Number(point.longitude)], {
+      const markerPoint = offsetWalkPhotoMarkerPoint(point, duplicateIndex, duplicateCount);
+      const marker = window.L.marker([Number(markerPoint.latitude), Number(markerPoint.longitude)], {
         keyboard: false,
         zIndexOffset: 600,
         icon: window.L.divIcon({
@@ -2903,20 +2906,47 @@ function walkMapPhotoMarkerPoints(points = [], photoImages = [], photoCount = 0)
     }
   }
 
-  const usedPointIndexes = new Set();
-  return markerIndexes
+  const plannedMarkers = markerIndexes
     .map((pointIndex, photoIndex) => ({ pointIndex, photoIndex }))
-    .filter(({ pointIndex }) => {
-      if (usedPointIndexes.has(pointIndex)) return false;
-      usedPointIndexes.add(pointIndex);
-      return true;
+    .filter(({ pointIndex }) => Number.isFinite(Number(pointIndex)) && normalizedPoints[pointIndex]);
+  const markerCountByPoint = new Map();
+  plannedMarkers.forEach(({ pointIndex }) => {
+    markerCountByPoint.set(pointIndex, (markerCountByPoint.get(pointIndex) || 0) + 1);
+  });
+  const markerSeenByPoint = new Map();
+  return plannedMarkers
+    .map(({ pointIndex, photoIndex }) => {
+      const duplicateIndex = markerSeenByPoint.get(pointIndex) || 0;
+      markerSeenByPoint.set(pointIndex, duplicateIndex + 1);
+      return {
+        point: normalizedPoints[pointIndex],
+        pointIndex,
+        photoIndex,
+        photoSource: normalizedPhotos[photoIndex] || "",
+        duplicateIndex,
+        duplicateCount: markerCountByPoint.get(pointIndex) || 1
+      };
     })
-    .map(({ pointIndex, photoIndex }) => ({
-      point: normalizedPoints[pointIndex],
-      photoIndex,
-      photoSource: normalizedPhotos[photoIndex] || ""
-    }))
     .filter((item) => Number.isFinite(Number(item?.point?.latitude)) && Number.isFinite(Number(item?.point?.longitude)));
+}
+
+function offsetWalkPhotoMarkerPoint(point, duplicateIndex = 0, duplicateCount = 1) {
+  if (!point || duplicateCount <= 1) return point;
+  const latitude = Number(point.latitude);
+  const longitude = Number(point.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return point;
+
+  const orbitMeters = Math.min(14, 6 + Math.max(0, duplicateCount - 2) * 2);
+  const angle = ((Math.PI * 2) / Math.max(duplicateCount, 1)) * duplicateIndex;
+  const latOffset = (Math.cos(angle) * orbitMeters) / 111320;
+  const lngDivisor = 111320 * Math.max(Math.cos((latitude * Math.PI) / 180), 0.2);
+  const lngOffset = (Math.sin(angle) * orbitMeters) / lngDivisor;
+
+  return {
+    ...point,
+    latitude: latitude + latOffset,
+    longitude: longitude + lngOffset
+  };
 }
 
 function constrainWalkMapBounds(bounds, { compact = false } = {}) {
@@ -5051,12 +5081,15 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   };
 
   const WALK_GPS_MAX_ACCEPTED_ACCURACY_METERS = 45;
+  const WALK_GPS_RELAXED_MAX_ACCEPTED_ACCURACY_METERS = 120;
   const WALK_GPS_MIN_CLEARANCE_METERS = 12;
+  const WALK_GPS_RELAXED_MIN_DISTANCE_METERS = 4;
+  const WALK_GPS_RELAXED_MIN_SECONDS = 12;
   const WALK_GPS_MAX_WALKING_SPEED_KMH = 12;
 
   const shouldAppendWalkGpsPoint = (nextPoint) => {
     const accuracyMeters = Number(nextPoint?.accuracyMeters);
-    if (Number.isFinite(accuracyMeters) && accuracyMeters > WALK_GPS_MAX_ACCEPTED_ACCURACY_METERS) {
+    if (Number.isFinite(accuracyMeters) && accuracyMeters > WALK_GPS_RELAXED_MAX_ACCEPTED_ACCURACY_METERS) {
       return false;
     }
     const previousPoint = walkGpsPoints[walkGpsPoints.length - 1] || null;
@@ -5071,18 +5104,33 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     const previousAccuracyMeters = Number(previousPoint?.accuracyMeters);
     const combinedAccuracyMeters = (Number.isFinite(previousAccuracyMeters) ? previousAccuracyMeters : 0)
       + (Number.isFinite(accuracyMeters) ? accuracyMeters : 0);
-    const minimumClearanceMeters = Math.max(
-      WALK_GPS_MIN_CLEARANCE_METERS,
-      combinedAccuracyMeters * 0.9
-    );
+    const relaxedIndoorCandidate = Math.max(
+      Number.isFinite(previousAccuracyMeters) ? previousAccuracyMeters : 0,
+      Number.isFinite(accuracyMeters) ? accuracyMeters : 0
+    ) > WALK_GPS_MAX_ACCEPTED_ACCURACY_METERS;
+    const minimumClearanceMeters = relaxedIndoorCandidate
+      ? WALK_GPS_RELAXED_MIN_DISTANCE_METERS
+      : Math.max(
+        WALK_GPS_MIN_CLEARANCE_METERS,
+        combinedAccuracyMeters * 0.9
+      );
     if (distanceMeters <= minimumClearanceMeters) {
-      return false;
+      const relaxedIndoorMove = relaxedIndoorCandidate
+        && Number.isFinite(secondsDiff)
+        && secondsDiff >= WALK_GPS_RELAXED_MIN_SECONDS
+        && distanceMeters >= WALK_GPS_RELAXED_MIN_DISTANCE_METERS;
+      if (!relaxedIndoorMove) {
+        return false;
+      }
     }
     if (Number.isFinite(secondsDiff) && secondsDiff > 0) {
       const speedKmh = distanceKm / (secondsDiff / 3600);
       if (speedKmh > WALK_GPS_MAX_WALKING_SPEED_KMH) {
         return false;
       }
+    }
+    if (relaxedIndoorCandidate) {
+      return distanceMeters >= WALK_GPS_RELAXED_MIN_DISTANCE_METERS || secondsDiff >= WALK_GPS_RELAXED_MIN_SECONDS;
     }
     return distanceKm >= 0.008 || secondsDiff >= 20;
   };
@@ -16867,8 +16915,15 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
       const latestCloudLabel = summary.latestUpdatedAt
         ? formatDate(summary.latestUpdatedAt)
         : "zatiaľ bez dátumu";
+      const journalPreviewLabel = Array.isArray(summary.journalPreview) && summary.journalPreview.length
+        ? ` Posledné cloud zápisy: ${summary.journalPreview.map((item) => {
+          const title = String(item?.title || "Zápis").trim() || "Zápis";
+          const entryAt = String(item?.entryAt || "").trim();
+          return entryAt ? `${title} (${formatRelativeTime(entryAt)})` : title;
+        }).join(", ")}.`
+        : " Cloud denník je zatiaľ prázdny.";
       openSettingsManager(
-        `${countsMatch ? "Lokálne dáta a cloud sa momentálne zhodujú v počtoch." : "Lokálne dáta a cloud sa momentálne nezhodujú v počtoch."} Lokálne: ${localSummary.categories}/${localSummary.cards}/${localSummary.tasks}/${localSummary.journal}. Cloud: ${summary.categories}/${summary.cards}/${summary.tasks}/${summary.journal}. Obrázky v cloude: ${summary.imageFiles}. Posledná zmena v cloude: ${latestCloudLabel}.`,
+        `${countsMatch ? "Lokálne dáta a cloud sa momentálne zhodujú v počtoch." : "Lokálne dáta a cloud sa momentálne nezhodujú v počtoch."} Cloud účet: ${summary.accountEmail || "neznámy"}. Lokálne: ${localSummary.categories}/${localSummary.cards}/${localSummary.tasks}/${localSummary.journal}. Cloud: ${summary.categories}/${summary.cards}/${summary.tasks}/${summary.journal}. Obrázky v cloude: ${summary.imageFiles}. Posledná zmena v cloude: ${latestCloudLabel}.${journalPreviewLabel}`,
         countsMatch ? "success" : "",
         "cloud-sync"
       );
@@ -23239,6 +23294,24 @@ async function fetchSupabaseStateSummary() {
     return String(data?.[0]?.updated_at || "").trim();
   };
 
+  const latestJournalEntries = async () => {
+    const { data, error } = await client
+      .from("journal_entries")
+      .select("title, entry_at, updated_at, deleted_at")
+      .eq("user_id", user.id)
+      .order("entry_at", { ascending: false })
+      .limit(3);
+    if (error) {
+      throw new Error(error.message || "Cloud denník sa nepodarilo skontrolovať.");
+    }
+    return (Array.isArray(data) ? data : [])
+      .filter((row) => !row?.deleted_at)
+      .map((row) => ({
+        title: String(row?.title || "Zápis").trim() || "Zápis",
+        entryAt: String(row?.entry_at || row?.updated_at || "").trim()
+      }));
+  };
+
   const [
     categories,
     cards,
@@ -23247,7 +23320,8 @@ async function fetchSupabaseStateSummary() {
     latestCategoryUpdate,
     latestCardUpdate,
     latestTaskUpdate,
-    latestJournalUpdate
+    latestJournalUpdate,
+    journalPreview
   ] = await Promise.all([
     countTable("categories"),
     countTable("cards"),
@@ -23256,7 +23330,8 @@ async function fetchSupabaseStateSummary() {
     latestUpdatedAtForTable("categories"),
     latestUpdatedAtForTable("cards"),
     latestUpdatedAtForTable("tasks"),
-    latestUpdatedAtForTable("journal_entries")
+    latestUpdatedAtForTable("journal_entries"),
+    latestJournalEntries()
   ]);
 
   const latestUpdatedAt = [
@@ -23274,7 +23349,9 @@ async function fetchSupabaseStateSummary() {
     tasks,
     journal,
     latestUpdatedAt,
-    imageFiles
+    imageFiles,
+    accountEmail: String(user?.email || "").trim().toLowerCase(),
+    journalPreview
   };
 }
 
