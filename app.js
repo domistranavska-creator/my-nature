@@ -47,10 +47,10 @@ const LEAFLET_CSS_INTEGRITY = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BM
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const LEAFLET_JS_INTEGRITY = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
 const SUPABASE_SIGNED_IMAGE_CACHE_MS = 1000 * 60 * 30;
-const AUTO_CLOUD_PUSH_DEBOUNCE_MS = 700;
-const AUTO_CLOUD_PULL_DEBOUNCE_MS = 1200;
+const AUTO_CLOUD_PUSH_DEBOUNCE_MS = 450;
+const AUTO_CLOUD_PULL_DEBOUNCE_MS = 900;
 const AUTO_CLOUD_PULL_THROTTLE_MS = 15000;
-const AUTO_CLOUD_BACKGROUND_PULL_MS = 1000 * 8;
+const AUTO_CLOUD_BACKGROUND_PULL_MS = 1000 * 4;
 const UNDO_KEY = "moja-zahrada-undo-v1";
 const RESET_BACKUP_KEY = "moja-zahrada-reset-backup-v1";
 const IMAGE_BACKGROUND_MIGRATION_KEY = "moja-zahrada-white-bg-v1";
@@ -3230,6 +3230,13 @@ function inferVisibleOverlayHistoryKind() {
   return "";
 }
 
+function isJournalOverlayHistoryKind(kind = "") {
+  const normalizedKind = String(kind || "").trim();
+  return normalizedKind === "journal"
+    || normalizedKind === "journal-entry"
+    || normalizedKind === "journal-compose";
+}
+
 function buildAppNavigationHistoryState(baseState = {}) {
   const nextState = baseState && typeof baseState === "object" ? { ...baseState } : {};
   nextState.__mzView = isFocusedView ? "category" : "menu";
@@ -3812,13 +3819,19 @@ function handleJournalOverlayEscape(event) {
 function closeJournalOverlay(options = {}) {
   const { fromHistory = false } = options;
   const root = journalOverlayRoot();
+  const rootView = String(root?.dataset.journalOverlayView || "").trim();
+  const historyKind = isJournalOverlayHistoryKind(activeOverlayHistoryKind)
+    ? activeOverlayHistoryKind
+    : (rootView === "compose"
+      ? "journal-compose"
+      : (rootView === "entry" ? "journal-entry" : "journal"));
   if (root) root.remove();
   unlockBodyScroll("journal");
   journalOverlayPreviousOverflow = null;
   document.removeEventListener("keydown", handleJournalOverlayEscape);
   if (!fromHistory) {
-    clearOverlayHistory("journal");
-  } else if (activeOverlayHistoryKind === "journal") {
+    clearOverlayHistory(historyKind);
+  } else if (isJournalOverlayHistoryKind(historyKind)) {
     activeOverlayHistoryKind = "";
   }
   syncWeatherBackgroundLoopVisibility();
@@ -3914,7 +3927,7 @@ function renderJournalOverlayCard(entry, options = {}) {
           </div>
           <div class="journal-overlay-card__gallery journal-overlay-card__gallery--walk ${images.length === 1 ? "journal-overlay-card__gallery--single" : ""}">
             ${images.slice(0, 4).map((image, index) => `
-              <button class="journal-item__image journal-overlay-card__walk-image ${index === 0 ? "journal-overlay-card__walk-image--hero" : ""}" type="button" data-open-journal-image="${escapeAttribute(safeId)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(safeTitle)}">
+              <button class="journal-item__image journal-overlay-card__walk-image" type="button" data-open-journal-image="${escapeAttribute(safeId)}" data-journal-image-index="${index}" aria-label="Otvoriť fotku zápisu ${escapeAttribute(safeTitle)}">
                 ${renderJournalImageTag(image, safeTitle, { entryId: safeId, index })}
               </button>
             `).join("")}
@@ -4207,6 +4220,7 @@ function openJournalOverlayList(initialTagKey = "", options = {}) {
     root.dataset.journalReturnTagKey = "";
     root.dataset.journalReturnEntryId = "";
     root.dataset.journalEntryId = "";
+    root.dataset.journalCloseOnBack = "";
 
     root.querySelector("#journal-overlay-close")?.addEventListener("click", closeJournalOverlay);
     root.querySelector("#journal-overlay-back")?.addEventListener("click", closeJournalOverlay);
@@ -4317,6 +4331,7 @@ function openJournalOverlayEntry(entryId = "", returnTagKey = "", options = {}) 
   root.dataset.journalReturnTagKey = normalizedReturnTagKey;
   root.dataset.journalReturnEntryId = normalizedEntryId;
   root.dataset.journalEntryId = normalizedEntryId;
+  root.dataset.journalCloseOnBack = "";
   root.querySelector("#journal-overlay-close")?.addEventListener("click", closeJournalOverlay);
   root.querySelector("#journal-overlay-back")?.addEventListener("click", () => {
     if (activeOverlayHistoryKind === "journal-entry" && typeof window !== "undefined" && window.history?.back) {
@@ -4458,9 +4473,14 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const fallbackReturnTagKey = String(journalOverlayRoot()?.dataset.journalActiveTagKey || "").trim();
   const returnToTagKey = String(composerOptions.returnToTagKey || fallbackReturnTagKey).trim();
   const historyMode = String(composerOptions.historyMode || "").trim() || "auto";
+  const closeOnBack = Boolean(composerOptions.closeOnBack) && !returnToEntryId;
   const openJournalReturnView = () => {
     if (activeOverlayHistoryKind === "journal-compose" && typeof window !== "undefined" && window.history?.back) {
       window.history.back();
+      return;
+    }
+    if (closeOnBack) {
+      closeJournalOverlay();
       return;
     }
     if (returnToEntryId) {
@@ -4487,6 +4507,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   root.dataset.journalReturnTagKey = returnToTagKey;
   root.dataset.journalReturnEntryId = returnToEntryId;
   root.dataset.journalEntryId = editingEntry?.id || "";
+  root.dataset.journalCloseOnBack = closeOnBack ? "true" : "";
   if (isMobileJournalShell && historyMode !== "preserve") {
     pushOverlayHistory("journal-compose");
   }
@@ -6343,7 +6364,10 @@ function wireStaticEvents() {
   if (addEntryQuickEl) {
     addEntryQuickEl.addEventListener("click", () => {
       closeToolbarAddMenu();
-      openJournalComposer();
+      openJournalComposer("", "note", {
+        historyMode: "preserve",
+        closeOnBack: true
+      });
     });
   }
 
@@ -6484,6 +6508,14 @@ function wireStaticEvents() {
       const root = journalOverlayRoot();
       const returnEntryId = String(root?.dataset.journalReturnEntryId || "").trim();
       const returnTagKey = String(root?.dataset.journalReturnTagKey || "").trim();
+      const closeOnBack = String(root?.dataset.journalCloseOnBack || "").trim() === "true";
+      if (closeOnBack && !returnEntryId) {
+        closeJournalOverlay({ fromHistory: true });
+        window.setTimeout(() => {
+          overlayHistoryNavigating = false;
+        }, 0);
+        return;
+      }
       if (returnEntryId) {
         activeOverlayHistoryKind = "journal-entry";
         openJournalOverlayEntry(returnEntryId, returnTagKey, { historyMode: "preserve" });
@@ -7815,6 +7847,14 @@ function ensureBottomNavMediaInput() {
 }
 
 function openBottomNavMediaChooser() {
+  if (shouldUseDirectBottomNavMediaChooser()) {
+    const input = ensureBottomNavMediaInput();
+    if (input instanceof HTMLInputElement) {
+      input.value = "";
+      openNativeFilePicker(input);
+      return;
+    }
+  }
   openMobileCameraPicker();
 }
 
@@ -18434,7 +18474,7 @@ function ensureAutoCloudBackgroundPullLoop() {
     if (!hasConfiguredAutoCloudSync()) return;
     if (autoCloudSyncInFlight || autoCloudPushPending || autoCloudPullPending) return;
     if (hasPendingAutoCloudChanges(state)) {
-      scheduleAutoCloudPush({ delay: Math.min(400, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
+      scheduleAutoCloudPush({ delay: Math.min(260, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
       return;
     }
     scheduleAutoCloudPull({ delay: 0, force: true });
@@ -18447,8 +18487,16 @@ function flushAutoCloudOnAppHide() {
   void flushAutoCloudSyncQueue();
 }
 
+function hasBlockingAutoCloudPushChanges(value = state) {
+  return countDirtySyncRecords(value) > 0;
+}
+
+function hasAutoCloudMediaBacklog(value = state) {
+  return countPendingMediaForState(value) > 0;
+}
+
 function hasPendingAutoCloudChanges(value = state) {
-  return countDirtySyncRecords(value) > 0 || countPendingMediaForState(value) > 0;
+  return hasBlockingAutoCloudPushChanges(value) || hasAutoCloudMediaBacklog(value);
 }
 
 function hasConfiguredAutoCloudSync() {
@@ -18508,7 +18556,7 @@ async function flushAutoCloudSyncQueue() {
       autoCloudPullPending = false;
       autoCloudPullForcePending = false;
 
-      if (hasPendingAutoCloudChanges(state)) {
+      if (hasBlockingAutoCloudPushChanges(state)) {
         scheduleAutoCloudPush({ delay: AUTO_CLOUD_PUSH_DEBOUNCE_MS });
         continue;
       }
@@ -18556,7 +18604,7 @@ function scheduleAutoCloudPull(options = {}) {
   const delay = Number.isFinite(delayCandidate) ? Math.max(0, delayCandidate) : AUTO_CLOUD_PULL_DEBOUNCE_MS;
   const force = Boolean(options.force);
   if (!hasConfiguredAutoCloudSync()) return;
-  if (hasPendingAutoCloudChanges(state)) {
+  if (hasBlockingAutoCloudPushChanges(state)) {
     scheduleAutoCloudPush({ delay: Math.min(delay, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
     return;
   }
@@ -18578,7 +18626,7 @@ function scheduleAutoCloudWakeSync(options = {}) {
   const forcePull = Boolean(options.forcePull);
   if (hasPendingAutoCloudChanges(state)) {
     scheduleAutoCloudPush({ delay: Math.min(delay, AUTO_CLOUD_PUSH_DEBOUNCE_MS) });
-    return;
+    if (hasBlockingAutoCloudPushChanges(state)) return;
   }
   scheduleAutoCloudPull({ delay, force: forcePull });
 }
@@ -20822,8 +20870,8 @@ function categoryCardImage(category) {
 function shouldDeferCategoryCardImageSource(source = "") {
   const normalized = String(source || "").trim();
   if (!shouldUseMobileDeferredVarietyImages() || !normalized || isPlaceholderImage(normalized)) return false;
-  if (isRealMobileRuntimeMode()) return true;
-  return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
+  // Kategórií je málo, preto je dôležitejšie ukázať obrázok hneď než ho deferovať.
+  return false;
 }
 
 function renderCategoryCardImageTag(category, altText) {

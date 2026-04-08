@@ -34911,6 +34911,26 @@ body.app-mobile-shell #mobile-camera-picker-host[hidden] {
   display: none !important;
 }
 
+body.app-mobile-shell .mobile-camera-picker__native-input,
+body.app-mobile-shell #mobile-bottom-nav-media-input,
+body.app-mobile-shell .detail-modal input[type="file"][hidden],
+body.app-mobile-shell .journal-overlay-root input[type="file"][hidden] {
+  position: fixed !important;
+  left: -9999px !important;
+  top: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+  z-index: -1 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+}
+
 body.app-mobile-shell .mobile-camera-picker__scrim {
   position: absolute !important;
   inset: 0 !important;
@@ -41335,6 +41355,8 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
 .journal-overlay-card__gallery--walk {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-items: stretch;
+  align-items: stretch;
   gap: 12px;
 }
 
@@ -41344,13 +41366,6 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
   min-height: 96px;
   aspect-ratio: 1 / 1;
   border-radius: 20px;
-}
-
-.journal-overlay-card__gallery--walk .journal-overlay-card__walk-image--hero {
-  grid-column: 1 / -1;
-  min-height: 180px;
-  aspect-ratio: 16 / 10;
-  border-radius: 22px;
 }
 
 .journal-overlay-card__gallery--walk .journal-item__more {
@@ -41405,12 +41420,9 @@ body.app-mobile-shell .journal-overlay-card__gallery--walk {
 
 body.app-mobile-shell .journal-overlay-card__gallery--walk .journal-item__image {
   width: 100% !important;
+  height: auto !important;
   min-height: 88px !important;
-}
-
-body.app-mobile-shell .journal-overlay-card__gallery--walk .journal-overlay-card__walk-image--hero {
-  grid-column: 1 / -1 !important;
-  min-height: 164px !important;
+  aspect-ratio: 1 / 1 !important;
 }
 
 body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__head--category > .catalog-card__title.catalog-card__title--body {
@@ -41685,6 +41697,24 @@ body.app-mobile-shell .journal-overlay-card__gallery .journal-item__image {
   width: 68px !important;
   height: 68px !important;
   border-radius: 12px !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__gallery--walk .journal-item__image {
+  width: 100% !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 88px !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 18px !important;
+}
+
+body.app-mobile-shell .journal-overlay-card__gallery--walk .journal-item__more {
+  min-width: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 88px !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 18px !important;
 }
 
 body.app-mobile-shell .journal-item__gallery--manager-compact .journal-item__image,
@@ -42536,6 +42566,16 @@ body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item_
   min-height: 40px !important;
   border-radius: 14px !important;
   padding: 0 !important;
+  background: var(--mobile-modal-surface-muted) !important;
+  color: #4c5c70 !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__actions--mobile .journal-item__action svg {
+  width: 18px !important;
+  height: 18px !important;
+  stroke-width: 2.1 !important;
 }
 
 body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__row--meta {
@@ -42571,6 +42611,14 @@ body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item_
 }
 
 body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .journal-item__action--danger {
+  background: #fef3f2 !important;
+  border-color: rgba(240, 86, 86, 0.16) !important;
+  color: #b42318 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .journal-item__action--danger:hover,
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .journal-item__action--danger:focus-visible {
   background: #fef3f2 !important;
   border-color: rgba(240, 86, 86, 0.16) !important;
   color: #b42318 !important;
