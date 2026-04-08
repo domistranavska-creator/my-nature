@@ -20880,8 +20880,8 @@ function categoryCardImage(category) {
 function shouldDeferCategoryCardImageSource(source = "") {
   const normalized = String(source || "").trim();
   if (!shouldUseMobileDeferredVarietyImages() || !normalized || isPlaceholderImage(normalized)) return false;
-  // Kategórií je málo, preto je dôležitejšie ukázať obrázok hneď než ho deferovať.
-  return false;
+  if (isRealMobileRuntimeMode()) return true;
+  return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
 }
 
 function renderCategoryCardImageTag(category, altText) {
@@ -20890,7 +20890,7 @@ function renderCategoryCardImageTag(category, altText) {
     return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
   const cachedPreviewSource = getCachedPreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
-  if (cachedPreviewSource) {
+  if (cachedPreviewSource && cachedPreviewSource !== source) {
     return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
   return `<img src="${escapeAttribute(categoryPlaceholderImage(category))}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
@@ -22928,6 +22928,28 @@ function normalizeCloudMergeRecord(record = {}, entityType = "", options = {}) {
   });
 }
 
+function shouldPreferCloudMediaMerge(localItem = {}, cloudItem = {}, entityType = "") {
+  if (Boolean(localItem?.dirty)) return false;
+  const localSources = entityMediaSources(localItem, entityType)
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const cloudSources = entityMediaSources(cloudItem, entityType)
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  if (!cloudSources.length) return false;
+  if (!localSources.length) return true;
+
+  const localComparable = localSources.map((value) => extractSupabaseStoragePath(value) || value);
+  const cloudComparable = cloudSources.map((value) => extractSupabaseStoragePath(value) || value);
+
+  if (localComparable.length !== cloudComparable.length) return true;
+  if (cloudComparable.some((value, index) => value !== localComparable[index])) return true;
+
+  // Rovnaký storage path, ale iný podpísaný URL alebo čerstvejšia cloud hodnota.
+  return cloudSources.some((value, index) => value !== localSources[index]);
+}
+
 function mergeSupabaseCollection(localItems = [], cloudRecords = [], { entityType = "", normalizeLocal = (value) => value, syncedAt = "" } = {}) {
   const normalizedLocalItems = (Array.isArray(localItems) ? localItems : []).map((item) => normalizeLocal(item));
   const localById = new Map(normalizedLocalItems.map((item) => [String(item?.id || "").trim(), item]).filter(([id]) => id));
@@ -22977,7 +22999,7 @@ function mergeSupabaseCollection(localItems = [], cloudRecords = [], { entityTyp
       || (!Boolean(localItem.dirty) && Boolean(localTimestamp) && !cloudTimestamp)
       || (!Boolean(localItem.dirty) && Boolean(localTimestamp) && Boolean(cloudTimestamp) && localTimestamp > cloudTimestamp);
 
-    if (localWins) {
+    if (localWins && !shouldPreferCloudMediaMerge(localItem, normalizedCloudItem, entityType)) {
       merged.push(normalizeLocal(localItem));
       return;
     }
