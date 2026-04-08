@@ -4083,6 +4083,18 @@ function renderJournalOverlayCardsSafe(entries) {
   }).join("");
 }
 
+function renderJournalOverlayEmergencyList(entries = []) {
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  if (!safeEntries.length) {
+    return '<div class="empty-state empty-state--compact">Denník je pripravený. Pridaj prvý zápis a začne žiť.</div>';
+  }
+  return `
+    <div class="journal-overlay-stack">
+      ${safeEntries.map((entry) => renderJournalItemEmergency(entry, "data-delete-journal-overlay", "data-edit-journal-overlay")).join("")}
+    </div>
+  `;
+}
+
 function bindJournalOverlayCardActions(container) {
   if (!container) return;
 
@@ -4205,11 +4217,7 @@ function openJournalOverlayList(initialTagKey = "", options = {}) {
       console.error("Denníkový overlay sa nepodarilo vykresliť", error);
       root.innerHTML = journalOverlayFrame(
         overlayFrameTitle,
-        `
-          <div class="empty-state empty-state--compact">
-            Denník sa teraz nepodarilo celé vykresliť, ale jadro appky ostalo v poriadku.
-          </div>
-        `,
+        renderJournalOverlayEmergencyList(entries),
         overlayFrameActions,
         journalQuickActionsTopbar
       );
@@ -4253,8 +4261,25 @@ function openJournalOverlayList(initialTagKey = "", options = {}) {
       });
     });
     bindJournalOverlayCardActions(root);
-    hydrateWalkMaps(root);
-    syncMobileOverlayBottomNavPlacement();
+    try {
+      hydrateWalkMaps(root);
+      syncMobileOverlayBottomNavPlacement();
+    } catch (error) {
+      console.error("Denníkový overlay prešiel do núdzového režimu", error);
+      root.innerHTML = journalOverlayFrame(
+        overlayFrameTitle,
+        renderJournalOverlayEmergencyList(filteredEntries.length ? filteredEntries : entries),
+        overlayFrameActions,
+        journalQuickActionsTopbar
+      );
+      root.querySelector("#journal-overlay-close")?.addEventListener("click", closeJournalOverlay);
+      root.querySelector("#journal-overlay-back")?.addEventListener("click", closeJournalOverlay);
+      root.querySelector("#journal-overlay-add")?.addEventListener("click", () => {
+        openJournalComposer("", "", { returnToTagKey: activeTagKey });
+      });
+      bindJournalOverlayCardActions(root);
+      syncMobileOverlayBottomNavPlacement();
+    }
   };
 
   renderOverlay();
@@ -13020,16 +13045,13 @@ function renderTaskSidebarCard(task) {
 
 function latestJournalImages() {
   const mapEntriesToImages = (entries = []) => entries.flatMap((entry) => {
-    const images = Array.isArray(entry.images) && entry.images.length
-      ? entry.images
-      : entry.image
-        ? [entry.image]
-        : [];
+    const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
+    const images = journalImages(normalizedEntry);
     return images.map((image, index) => ({
-      entryId: entry.id,
-      entryTitle: entry.title || "Záhradný zápis",
-      entryDate: entry.date,
-      entryText: String(entry.text || "").trim(),
+      entryId: normalizedEntry.id,
+      entryTitle: journalDisplayTitle(normalizedEntry) || "Záhradný zápis",
+      entryDate: normalizedEntry.date,
+      entryText: String(normalizedEntry.text || "").trim(),
       image,
       index
     }));
@@ -13059,9 +13081,17 @@ function renderMemories() {
           tabindex="0"
           data-open-memory-entry="${escapeAttribute(memoryItems[memoryCarouselIndex].entryId)}"
         >
-          <span class="memory-strip__backdrop" style="background-image:url('${escapeAttribute(memoryItems[memoryCarouselIndex].image)}')"></span>
+          <span class="memory-strip__backdrop"></span>
           <span class="memory-strip__subtitle">${escapeHtml(formatRelativeTime(memoryItems[memoryCarouselIndex].entryDate))}</span>
-          <img src="${escapeAttribute(memoryItems[memoryCarouselIndex].image)}" alt="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}" loading="lazy" decoding="async" fetchpriority="low">
+          ${renderJournalImageTag(
+            memoryItems[memoryCarouselIndex].image,
+            memoryItems[memoryCarouselIndex].entryTitle,
+            {
+              entryId: memoryItems[memoryCarouselIndex].entryId,
+              index: memoryItems[memoryCarouselIndex].index,
+              forceDeferred: true
+            }
+          )}
           ${memoryItems[memoryCarouselIndex].entryText
             ? `<span class="memory-strip__note">${escapeHtml(trimText(memoryItems[memoryCarouselIndex].entryText, 160))}</span>`
             : ""}
@@ -13072,6 +13102,7 @@ function renderMemories() {
 
   const memoryHero = memoryStripEl.querySelector(".memory-strip__hero");
   const memoryHeroImage = memoryHero?.querySelector("img");
+  syncDeferredJournalImages(memoryStripEl, { eagerCount: 1 });
   if (memoryHero && memoryHeroImage) {
     const openLinkedJournalEntry = () => {
       const entryId = String(memoryHero.getAttribute("data-open-memory-entry") || "").trim();
