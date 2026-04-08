@@ -20886,11 +20886,12 @@ function shouldDeferCategoryCardImageSource(source = "") {
 
 function renderCategoryCardImageTag(category, altText) {
   const source = categoryCardImage(category);
-  if (!shouldDeferCategoryCardImageSource(source)) {
+  const needsResolvedSource = !isDirectRenderableImageSource(source);
+  if (!needsResolvedSource && !shouldDeferCategoryCardImageSource(source)) {
     return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
   const cachedPreviewSource = getCachedPreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
-  if (cachedPreviewSource && cachedPreviewSource !== source) {
+  if (!needsResolvedSource && cachedPreviewSource && cachedPreviewSource !== source) {
     return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
   return `<img src="${escapeAttribute(categoryPlaceholderImage(category))}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
@@ -20920,9 +20921,10 @@ async function activateDeferredCategoryCardImage(img) {
     if (!categoryId) return;
     const source = resolveDeferredCategoryCardImageSource(categoryId);
     if (!source) return;
-    const previewSource = await resolvePreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+    const renderableSource = await resolveRenderableSupabaseImageSource(source);
+    const previewSource = await resolvePreviewImageSource(renderableSource, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
     if (!img.isConnected) return;
-    img.src = previewSource || source;
+    img.src = previewSource || renderableSource || source;
     img.removeAttribute("data-lazy-category-image");
     if (deferredCategoryCardImageObserver) {
       try {
@@ -20938,7 +20940,7 @@ async function activateDeferredCategoryCardImage(img) {
 }
 
 function syncDeferredCategoryCardImages(root = document) {
-  if (!shouldUseMobileDeferredVarietyImages()) return;
+  if (typeof window === "undefined") return;
   const pendingImages = [...root.querySelectorAll("img[data-lazy-category-image]")];
   if (!pendingImages.length) return;
 
@@ -22500,6 +22502,21 @@ async function resolveSupabaseStorageImage(client, source = "") {
     }
   }
   return resolvedUrl;
+}
+
+async function resolveRenderableSupabaseImageSource(source = "") {
+  const normalized = String(source || "").trim();
+  if (!normalized) return "";
+  const storagePath = extractSupabaseStoragePath(normalized)
+    || (!isDirectRenderableImageSource(normalized) ? normalized : "");
+  if (!storagePath) return normalized;
+  if (!hasConfiguredAutoCloudSync()) return normalized;
+  try {
+    const resolved = await resolveSupabaseStorageImage(configuredSupabaseClient(), storagePath);
+    return resolved || normalized;
+  } catch (error) {
+    return normalized;
+  }
 }
 
 async function resolveSupabaseStorageImages(client, values = []) {
