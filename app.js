@@ -4887,19 +4887,18 @@ function cardTypeStrip(root = document) {
   return horizontalTypeStrips(root).find((strip) => strip instanceof HTMLElement && strip.querySelector("[data-card-type]")) || null;
 }
 
-function visibleCardTypeButtons(root = document) {
+function cardTypeButtons(root = document) {
   const strip = cardTypeStrip(root);
   if (!(strip instanceof HTMLElement)) return [];
   return [...strip.querySelectorAll("[data-card-type]")].filter((button) => (
     button instanceof HTMLButtonElement
     && !button.disabled
-    && button.getClientRects().length
   ));
 }
 
 function adjacentCardTypeButton(root = document, step = 1) {
   const strip = cardTypeStrip(root);
-  const buttons = visibleCardTypeButtons(root);
+  const buttons = cardTypeButtons(root);
   if (!(strip instanceof HTMLElement) || buttons.length < 2) return null;
   const activeItem = activeHorizontalTypeStripItem(strip);
   const activeIndex = buttons.findIndex((button) => button === activeItem);
@@ -4920,10 +4919,17 @@ function attachCardTypePreviewSwipe(preview, root = document) {
   let direction = null;
   let suppressClickUntil = 0;
   let resetTransitionTimer = 0;
+  let switchTransitionTimer = 0;
   const swipeThreshold = 48;
   const directionThreshold = 8;
-  const dragVisualLimit = 18;
-  const dragVisualFactor = 0.16;
+  const dragVisualLimit = 16;
+  const dragVisualFactor = 0.12;
+
+  const clearSwitchTransitionTimer = () => {
+    if (!switchTransitionTimer) return;
+    window.clearTimeout(switchTransitionTimer);
+    switchTransitionTimer = 0;
+  };
 
   const clearResetTransitionTimer = () => {
     if (!resetTransitionTimer) return;
@@ -4931,16 +4937,36 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     resetTransitionTimer = 0;
   };
 
+  const resetPreviewStyles = () => {
+    if (!preview.isConnected) return;
+    preview.style.transition = "";
+    preview.style.transform = "";
+    preview.style.opacity = "";
+    preview.style.willChange = "";
+  };
+
   const animatePreviewBack = () => {
     clearResetTransitionTimer();
+    clearSwitchTransitionTimer();
     preview.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
     preview.style.transform = "translate3d(0, 0, 0)";
+    preview.style.opacity = "";
     resetTransitionTimer = window.setTimeout(() => {
       resetTransitionTimer = 0;
-      if (!preview.isConnected) return;
-      preview.style.transition = "";
-      preview.style.willChange = "";
+      resetPreviewStyles();
     }, 240);
+  };
+
+  const animatePreviewSwitchOut = (step, onComplete) => {
+    clearResetTransitionTimer();
+    clearSwitchTransitionTimer();
+    preview.style.transition = "transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease";
+    preview.style.transform = `translate3d(${step > 0 ? -14 : 14}px, 0, 0)`;
+    preview.style.opacity = "0.92";
+    switchTransitionTimer = window.setTimeout(() => {
+      switchTransitionTimer = 0;
+      onComplete?.();
+    }, 120);
   };
 
   const reset = () => {
@@ -4950,15 +4976,17 @@ function attachCardTypePreviewSwipe(preview, root = document) {
 
   preview.addEventListener("touchstart", (event) => {
     if (event.touches.length !== 1) return;
-    if (visibleCardTypeButtons(root).length < 2) return;
+    if (cardTypeButtons(root).length < 2) return;
     const touch = event.touches[0];
     startX = touch.clientX;
     startY = touch.clientY;
     tracking = true;
     direction = null;
     clearResetTransitionTimer();
+    clearSwitchTransitionTimer();
     preview.style.transition = "";
     preview.style.willChange = "transform";
+    preview.style.opacity = "";
   }, { passive: true });
 
   preview.addEventListener("touchmove", (event) => {
@@ -5001,12 +5029,13 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     }
     const step = deltaX < 0 ? 1 : -1;
     const targetButton = adjacentCardTypeButton(root, step);
-    animatePreviewBack();
     if (targetButton) {
       suppressClickUntil = Date.now() + 320;
-      window.requestAnimationFrame(() => {
+      animatePreviewSwitchOut(step, () => {
         targetButton.click();
       });
+    } else {
+      animatePreviewBack();
     }
     reset();
   }, { passive: true });
@@ -5021,6 +5050,7 @@ function attachCardTypePreviewSwipe(preview, root = document) {
 
 const SWIPE_ROW_ACTION_BUTTON_WIDTH = 68;
 let activeSwipeRow = null;
+let activeSwipeDeleteConfirm = null;
 
 function swipeRowsEnabled() {
   return typeof document !== "undefined"
@@ -5041,6 +5071,12 @@ function swipeRowContentEl(rowEl) {
   return rowEl instanceof HTMLElement
     ? rowEl.querySelector(":scope > .swipe-row__content")
     : null;
+}
+
+function swipeRowOpenWidth(rowEl) {
+  if (!(rowEl instanceof HTMLElement)) return SWIPE_ROW_ACTION_BUTTON_WIDTH * 2;
+  const actionCount = Math.max(1, Number(rowEl.dataset.swipeActionsCount || 0) || 0);
+  return actionCount * SWIPE_ROW_ACTION_BUTTON_WIDTH;
 }
 
 function closeSwipeRow(rowEl) {
@@ -5068,8 +5104,7 @@ function openSwipeRow(rowEl) {
   if (activeSwipeRow && activeSwipeRow !== rowEl) {
     closeSwipeRow(activeSwipeRow);
   }
-  const actionCount = Math.max(1, Number(rowEl.dataset.swipeActionsCount || 0) || 0);
-  rowEl.style.setProperty("--swipe-row-open-width", `${actionCount * SWIPE_ROW_ACTION_BUTTON_WIDTH}px`);
+  rowEl.style.setProperty("--swipe-row-open-width", `${swipeRowOpenWidth(rowEl)}px`);
   rowEl.classList.add("swipe-row--open");
   content.style.transition = "";
   content.style.transform = "";
@@ -5103,6 +5138,7 @@ function ensureSwipeRowStructure(contentElement, kind, itemId) {
   }
   rowEl.dataset.swipeKind = String(kind || "").trim();
   rowEl.dataset.swipeId = String(itemId || "").trim();
+  rowEl.classList.toggle("swipe-row--catalog-card", Boolean(contentElement.classList.contains("catalog-card") || contentElement.closest(".catalog-card")));
   return rowEl;
 }
 
@@ -5131,8 +5167,7 @@ function getSwipeActionsForItem(kind, item) {
 
   if (kind === "card") {
     return [
-      { key: "edit", label: "✏️", action: "edit", title: "Upraviť" },
-      { key: "top", label: item?.top ? "⭐" : "☆", action: "toggle-top", title: item?.top ? "Zrušiť top" : "Označiť ako top" }
+      { key: "edit", label: "✏️", action: "edit", title: "Upraviť" }
     ];
   }
 
@@ -5154,10 +5189,16 @@ function renderSwipeActions(rowEl, kind, item, handlers) {
   rowEl._swipeItem = item;
   rowEl._swipeHandlers = handlers || null;
   rowEl.dataset.swipeActionsCount = String(actions.length || 0);
-  rowEl.style.setProperty("--swipe-row-open-width", `${Math.max(1, actions.length) * SWIPE_ROW_ACTION_BUTTON_WIDTH}px`);
+  rowEl.style.setProperty("--swipe-row-open-width", `${Math.max(0, actions.length) * SWIPE_ROW_ACTION_BUTTON_WIDTH}px`);
   rowEl.classList.toggle("swipe-row--single", actions.length === 1);
   rowEl.classList.toggle("swipe-row--double", actions.length === 2);
   rowEl.classList.toggle("swipe-row--triple", actions.length >= 3);
+
+  if (!actions.length) {
+    actionsEl.innerHTML = "";
+    closeSwipeRow(rowEl);
+    return;
+  }
 
   actionsEl.innerHTML = actions.map((action) => `
     <button
@@ -5191,12 +5232,97 @@ function swipeRowDeleteConfirmMessage(rowEl) {
   return "Naozaj chceš odstrániť túto položku?";
 }
 
-function triggerSwipeRowDeleteConfirm(rowEl) {
+function dismissSwipeDeleteConfirm(result = false) {
+  const active = activeSwipeDeleteConfirm;
+  if (!active) return;
+  activeSwipeDeleteConfirm = null;
+
+  const cleanup = () => {
+    active.keydownCleanup?.();
+    if (active.backdrop?.isConnected) {
+      active.backdrop.remove();
+    }
+    active.resolve(Boolean(result));
+  };
+
+  active.backdrop?.classList.remove("is-visible");
+  active.sheet?.classList.remove("is-visible");
+  if (typeof window === "undefined") {
+    cleanup();
+    return;
+  }
+  window.setTimeout(cleanup, 180);
+}
+
+function showSwipeDeleteConfirm(message = "") {
+  const safeMessage = String(message || "").trim();
+  if (!safeMessage) return Promise.resolve(false);
+  dismissSwipeDeleteConfirm(false);
+
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "swipe-delete-confirm";
+    backdrop.innerHTML = `
+      <div class="swipe-delete-confirm__sheet" role="dialog" aria-modal="true" aria-label="Potvrdenie odstránenia">
+        <p class="swipe-delete-confirm__title">Odstrániť položku?</p>
+        <p class="swipe-delete-confirm__text">${escapeHtml(safeMessage)}</p>
+        <div class="swipe-delete-confirm__actions">
+          <button type="button" class="swipe-delete-confirm__button swipe-delete-confirm__button--soft" data-swipe-delete-cancel>Zrušiť</button>
+          <button type="button" class="swipe-delete-confirm__button swipe-delete-confirm__button--danger" data-swipe-delete-confirm>Odstrániť</button>
+        </div>
+      </div>
+    `;
+
+    const sheet = backdrop.querySelector(".swipe-delete-confirm__sheet");
+    const cancelButton = backdrop.querySelector("[data-swipe-delete-cancel]");
+    const confirmButton = backdrop.querySelector("[data-swipe-delete-confirm]");
+
+    const handleKeydown = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      dismissSwipeDeleteConfirm(false);
+    };
+
+    document.body?.appendChild(backdrop);
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        backdrop.classList.add("is-visible");
+        sheet?.classList.add("is-visible");
+      });
+      window.addEventListener("keydown", handleKeydown);
+    }
+
+    backdrop.addEventListener("click", (event) => {
+      if (event.target !== backdrop) return;
+      dismissSwipeDeleteConfirm(false);
+    });
+    cancelButton?.addEventListener("click", () => dismissSwipeDeleteConfirm(false));
+    confirmButton?.addEventListener("click", () => dismissSwipeDeleteConfirm(true));
+
+    activeSwipeDeleteConfirm = {
+      backdrop,
+      sheet,
+      resolve,
+      keydownCleanup: () => {
+        if (typeof window !== "undefined") {
+          window.removeEventListener("keydown", handleKeydown);
+        }
+      }
+    };
+
+    if (confirmButton instanceof HTMLButtonElement) {
+      window.setTimeout(() => confirmButton.focus(), 20);
+    }
+  });
+}
+
+async function triggerSwipeRowDeleteConfirm(rowEl) {
   if (!(rowEl instanceof HTMLElement)) return false;
   const handlers = rowEl._swipeHandlers;
   const item = rowEl._swipeItem;
   if (typeof handlers?.delete !== "function") return false;
-  if (!window.confirm(swipeRowDeleteConfirmMessage(rowEl))) return false;
+  const confirmed = await showSwipeDeleteConfirm(swipeRowDeleteConfirmMessage(rowEl));
+  if (!confirmed) return false;
   handlers.delete(item, rowEl);
   closeSwipeRow(rowEl);
   return true;
@@ -5219,6 +5345,7 @@ function attachSwipeRow(rowEl) {
   let startTime = 0;
   let pressTimer = 0;
   let suppressClickUntil = 0;
+  let startOffset = 0;
 
   const resetTracking = () => {
     tracking = false;
@@ -5249,20 +5376,21 @@ function attachSwipeRow(rowEl) {
     if (event.touches.length !== 1) return;
     const target = event.target;
     if (shouldIgnoreSwipeRowGestureTarget(target)) return;
-    if (rowEl.classList.contains("swipe-row--open")) return;
-    if (activeSwipeRow && activeSwipeRow !== rowEl) {
+    const rowAlreadyOpen = rowEl.classList.contains("swipe-row--open");
+    if (!rowAlreadyOpen && activeSwipeRow && activeSwipeRow !== rowEl) {
       closeSwipeRow(activeSwipeRow);
     }
     const touch = event.touches[0];
     startX = touch.clientX;
     startY = touch.clientY;
     currentX = touch.clientX;
+    startOffset = rowAlreadyOpen ? -swipeRowOpenWidth(rowEl) : 0;
     tracking = true;
     direction = "";
     startTime = Date.now();
     content.style.transition = "none";
     clearLongPressTimer();
-    if (typeof rowEl._swipeHandlers?.delete === "function") {
+    if (!rowAlreadyOpen && typeof rowEl._swipeHandlers?.delete === "function") {
       pressTimer = window.setTimeout(() => {
         clearLongPressTimer();
         tracking = false;
@@ -5271,7 +5399,7 @@ function attachSwipeRow(rowEl) {
         if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
           navigator.vibrate(10);
         }
-        triggerSwipeRowDeleteConfirm(rowEl);
+        void triggerSwipeRowDeleteConfirm(rowEl);
       }, 500);
     }
   }, { passive: true });
@@ -5293,11 +5421,9 @@ function attachSwipeRow(rowEl) {
     }
 
     if (direction !== "x") return;
-    if (dx > 0) return;
-
-    const maxOffset = Number(rowEl.dataset.swipeActionsCount || 0) * SWIPE_ROW_ACTION_BUTTON_WIDTH || (2 * SWIPE_ROW_ACTION_BUTTON_WIDTH);
-    const limitedDx = Math.max(dx, -maxOffset);
-    content.style.transform = `translateX(${limitedDx}px)`;
+    const maxOffset = swipeRowOpenWidth(rowEl);
+    const translatedOffset = Math.max(-maxOffset, Math.min(0, startOffset + dx));
+    content.style.transform = `translateX(${translatedOffset}px)`;
   }, { passive: true });
 
   content.addEventListener("touchend", () => {
@@ -5307,11 +5433,28 @@ function attachSwipeRow(rowEl) {
     const dx = currentX - startX;
     const duration = Date.now() - startTime;
     content.style.transition = "";
+    const rowAlreadyOpen = rowEl.classList.contains("swipe-row--open");
 
-    if (direction === "x" && dx < -70 && duration < 1200) {
-      openSwipeRow(rowEl);
+    if (direction === "x" && duration < 1200) {
+      if (rowAlreadyOpen) {
+        if (dx > 36) {
+          suppressClickUntil = Date.now() + 180;
+          closeSwipeRow(rowEl);
+        } else {
+          openSwipeRow(rowEl);
+        }
+      } else if (dx < -70) {
+        suppressClickUntil = Date.now() + 180;
+        openSwipeRow(rowEl);
+      } else {
+        closeSwipeRow(rowEl);
+      }
     } else {
-      closeSwipeRow(rowEl);
+      if (rowAlreadyOpen) {
+        openSwipeRow(rowEl);
+      } else {
+        closeSwipeRow(rowEl);
+      }
     }
 
     resetTracking();
@@ -5406,6 +5549,7 @@ function bindJournalSwipeRows(root = document) {
     if (!item) return;
     const rowEl = ensureSwipeRowStructure(itemEl, "journal", itemId);
     if (!(rowEl instanceof HTMLElement)) return;
+    rowEl.classList.add("swipe-row--journal-card");
     renderSwipeActions(rowEl, "journal", item, {
       edit: () => {
         if (itemEl.classList.contains("journal-item--manager-compact") || rowEl.closest(".worklog-manager")) {
@@ -5491,9 +5635,6 @@ function bindCardSwipeRows(root = document) {
     renderSwipeActions(rowEl, "card", item, {
       edit: () => {
         openStoredCardEditor(item.id);
-      },
-      "toggle-top": () => {
-        toggleCardTopFromSwipe(item);
       },
       delete: () => {
         deleteCardFromSwipe(item);
@@ -15499,6 +15640,70 @@ function createMemoryPhotoElement(item, { active = false } = {}) {
   return img;
 }
 
+function waitForMemoryPhotoReady(imageEl) {
+  return new Promise((resolve) => {
+    if (!(imageEl instanceof HTMLImageElement)) {
+      resolve();
+      return;
+    }
+
+    let settled = false;
+    let readyTimer = 0;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      imageEl.removeEventListener("load", finish);
+      imageEl.removeEventListener("error", finish);
+      if (readyTimer) {
+        window.clearTimeout(readyTimer);
+        readyTimer = 0;
+      }
+      resolve();
+    };
+
+    readyTimer = window.setTimeout(finish, 900);
+
+    if (imageEl.complete && (imageEl.currentSrc || imageEl.src)) {
+      if (typeof imageEl.decode === "function") {
+        imageEl.decode().catch(() => {}).finally(finish);
+        return;
+      }
+      finish();
+      return;
+    }
+
+    imageEl.addEventListener("load", finish, { once: true });
+    imageEl.addEventListener("error", finish, { once: true });
+  });
+}
+
+async function prepareMemoryPhotoElementForSwap(imageEl) {
+  if (!(imageEl instanceof HTMLImageElement)) return null;
+
+  const entryId = String(imageEl.getAttribute("data-lazy-journal-image-entry") || "").trim();
+  if (entryId) {
+    const imageIndex = Math.max(0, Number(imageEl.getAttribute("data-lazy-journal-image-index") || 0) || 0);
+    const source = resolveDeferredJournalImageSource(entryId, imageIndex);
+    if (source) {
+      try {
+        const renderableSource = await resolveRenderableSupabaseImageSource(source);
+        if (isDirectRenderableImageSource(renderableSource)) {
+          const previewSource = await resolvePreviewImageSource(renderableSource, JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+          imageEl.src = previewSource || renderableSource;
+          imageEl.removeAttribute("data-lazy-journal-image-entry");
+          imageEl.removeAttribute("data-lazy-journal-image-index");
+        }
+      } catch (error) {
+        // Pri memory prechode radšej ticho padneme späť na existujúci placeholder, než aby sa rozbil slider.
+      }
+    }
+  }
+
+  await waitForMemoryPhotoReady(imageEl);
+  return imageEl;
+}
+
 function syncMemoryHeroOrientation(memoryHero, imageEl) {
   if (!(memoryHero instanceof HTMLElement) || !(imageEl instanceof HTMLImageElement)) return;
 
@@ -15607,27 +15812,36 @@ function swapMemoryPhoto(memoryHero, item) {
 
   const next = createMemoryPhotoElement(item);
   if (!(next instanceof HTMLImageElement)) return;
+  frame._memorySwapRequestId = (Number(frame._memorySwapRequestId || 0) || 0) + 1;
+  const swapRequestId = frame._memorySwapRequestId;
 
-  frame.dataset.memoryDirection = memoryCarouselTransitionDirection === "prev" ? "prev" : "next";
-  frame.appendChild(next);
-  syncDeferredJournalImages(frame, { eagerCount: 2 });
-  syncMemoryHeroOrientation(memoryHero, next);
+  (async () => {
+    const preparedNext = await prepareMemoryPhotoElementForSwap(next);
+    if (!(preparedNext instanceof HTMLImageElement)) return;
+    if (!frame.isConnected || frame._memorySwapRequestId !== swapRequestId) return;
 
-  window.requestAnimationFrame(() => {
-    next.classList.add("active");
-    if (current instanceof HTMLElement) {
-      current.classList.remove("active");
-      current.classList.add("exit");
-    }
-  });
+    frame.dataset.memoryDirection = memoryCarouselTransitionDirection === "prev" ? "prev" : "next";
+    frame.appendChild(preparedNext);
+    syncMemoryHeroOrientation(memoryHero, preparedNext);
 
-  frame._memoryPhotoCleanupTimer = window.setTimeout(() => {
-    if (current?.isConnected) current.remove();
-    frame.querySelectorAll(".memory-photo").forEach((photo) => {
-      if (photo !== next) photo.remove();
+    window.requestAnimationFrame(() => {
+      if (!frame.isConnected || frame._memorySwapRequestId !== swapRequestId) return;
+      preparedNext.classList.add("active");
+      if (current instanceof HTMLElement) {
+        current.classList.remove("active");
+        current.classList.add("exit");
+      }
     });
-    frame.removeAttribute("data-memory-direction");
-  }, MEMORY_PHOTO_TRANSITION_MS + 40);
+
+    frame._memoryPhotoCleanupTimer = window.setTimeout(() => {
+      if (!frame.isConnected || frame._memorySwapRequestId !== swapRequestId) return;
+      if (current?.isConnected) current.remove();
+      frame.querySelectorAll(".memory-photo").forEach((photo) => {
+        if (photo !== preparedNext) photo.remove();
+      });
+      frame.removeAttribute("data-memory-direction");
+    }, MEMORY_PHOTO_TRANSITION_MS + 40);
+  })();
 }
 
 function renderMemoryHeroMarkup(item) {
@@ -17798,7 +18012,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
             <span>${currentEntryKind === "detail" ? "Poznámky a postrehy" : "Poznámka"}</span>
             <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="${currentEntryKind === "detail" ? "Poznámky: chuť, rodivosť, čo jej sadlo, či ju chceš znova..." : currentEntryKind === "quick" ? "Krátky popis, kde rastie alebo čo si chceš zapamätať..." : "Voliteľný popis galérie..."}">${escapeHtml(existing?.notes || "")}</textarea>
           </label>
-          ${renderEditorImageUploadField({ multiple: true })}
+          ${renderEditorImageUploadField({ multiple: true, visual: false })}
           <div class="editor-gallery" id="variety-gallery-editor"></div>
           ${existing ? `
             <div class="danger-zone">
@@ -17851,9 +18065,12 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   };
 
   const syncPreview = () => {
+    const hasImages = draftImages.length > 0;
     if (previewPickerLabel) {
-      previewPickerLabel.textContent = draftImages.length ? "Pridať ďalšie fotky" : "Pridať prvú fotku";
+      previewPickerLabel.textContent = hasImages ? "Pridať ďalšie fotky" : "Pridať prvú fotku";
     }
+    previewPickerButton?.classList.toggle("detail-image__upload-cta--icon-only", hasImages);
+    previewPickerButton?.setAttribute("aria-label", hasImages ? "Pridať ďalšie fotky" : "Pridať prvú fotku");
     if (!draftImages.length) {
       activeImageIndex = 0;
       preview.src = cardPlaceholderImage("variety");
@@ -17967,6 +18184,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   };
 
   renderVarietyGalleryEditor();
+  scheduleThumbSaveBarSync();
   if (currentEntryKind === "detail") {
     syncStatusDateField();
     syncRatingPicker();
@@ -18873,7 +19091,14 @@ function renderMediaUploadField({
   `;
 }
 
-function renderEditorImageUploadField({ multiple = true } = {}) {
+function renderEditorImageUploadField({ multiple = true, visual = true } = {}) {
+  if (!visual) {
+    return `
+      <div class="upload-field upload-field--editor-media upload-field--input-only" hidden>
+        <input name="imageFile" type="file" accept="${escapeAttribute(IMAGE_FILE_ACCEPT)}" ${multiple ? "multiple" : ""}>
+      </div>
+    `;
+  }
   return renderMediaUploadField({
     multiple,
     inputName: "imageFile",
@@ -20118,7 +20343,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               <span>Poznámka</span>
               <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="Krátka poznámka, čo si chceš zapamätať...">${escapeHtml(existing?.notes || "")}</textarea>
             </label>
-            ${renderEditorImageUploadField({ multiple: true })}
+            ${renderEditorImageUploadField({ multiple: true, visual: false })}
             <div class="editor-gallery" id="variety-gallery-editor"></div>
             ${existing ? `
               <div class="danger-zone">
@@ -20147,9 +20372,12 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     syncHorizontalTypeStrips(detailContent);
 
     const syncPreview = () => {
+      const hasImages = draftImages.length > 0;
       if (previewPickerLabel) {
-        previewPickerLabel.textContent = draftImages.length ? "Pridať ďalšie fotky" : "Pridať prvú fotku";
+        previewPickerLabel.textContent = hasImages ? "Pridať ďalšie fotky" : "Pridať prvú fotku";
       }
+      previewPickerButton?.classList.toggle("detail-image__upload-cta--icon-only", hasImages);
+      previewPickerButton?.setAttribute("aria-label", hasImages ? "Pridať ďalšie fotky" : "Pridať prvú fotku");
       if (!draftImages.length) {
         activeImageIndex = 0;
         preview.src = cardPlaceholderImage(selectedType);
@@ -21234,6 +21462,7 @@ function openStoredCardView(varietyId, options = {}) {
     : cardTypeLabel(resolvedType);
   const headerMetaMarkup = cardViewHeaderMetaMarkup(existing);
   const headerRatingMarkup = cardViewHeaderRatingMarkup(existing);
+  const sectionsMarkup = cardViewSectionsMarkup(existing);
   const summaryMetaMarkup = resolvedType === "variety" && entryKind(existing) === "detail"
     ? cardViewSummaryTextMarkup(existing)
     : (() => {
@@ -21297,14 +21526,12 @@ function openStoredCardView(varietyId, options = {}) {
               <h3>${escapeHtml(entryDisplayName(existing))}</h3>
               ${titleBadgeMarkup}
             </div>
-          </div>
-          ${headerMetaMarkup}
-          ${headerRatingMarkup}
-          ${summaryMetaMarkup}
         </div>
-        <div class="card-view-sections">
-          ${cardViewSectionsMarkup(existing)}
-        </div>
+        ${headerMetaMarkup}
+        ${headerRatingMarkup}
+        ${summaryMetaMarkup}
+      </div>
+        ${sectionsMarkup ? `<div class="card-view-sections">${sectionsMarkup}</div>` : ""}
       </div>
     </div>
   `;

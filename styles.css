@@ -151,6 +151,10 @@ body.app-mobile-shell .swipe-row__actions {
   z-index: 1;
 }
 
+body.app-mobile-shell .swipe-row__actions:empty {
+  display: none !important;
+}
+
 body.app-mobile-shell .swipe-row__action {
   min-width: 68px;
   border: none;
@@ -188,6 +192,180 @@ body.app-mobile-shell .swipe-row__action:focus-visible {
 
 body.app-mobile-shell .swipe-row--open .swipe-row__content {
   transform: translateX(calc(-1 * var(--swipe-row-open-width, 136px)));
+}
+
+body.app-mobile-shell .swipe-row--journal-card {
+  overflow: visible;
+}
+
+body.app-mobile-shell .swipe-row--journal-card > .swipe-row__content {
+  background: transparent;
+}
+
+body.app-mobile-shell .swipe-row--journal-card > .swipe-row__actions {
+  top: auto;
+  right: 10px;
+  bottom: 10px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  z-index: 4;
+  pointer-events: none;
+}
+
+body.app-mobile-shell .swipe-row--journal-card > .swipe-row__actions .swipe-row__action {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  box-shadow:
+    0 12px 24px rgba(28, 37, 20, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  opacity: 0;
+  transform: translate3d(8px, 0, 0) scale(0.96);
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: auto;
+}
+
+body.app-mobile-shell .swipe-row--journal-card.swipe-row--open > .swipe-row__actions {
+  pointer-events: auto;
+}
+
+body.app-mobile-shell .swipe-row--journal-card.swipe-row--open > .swipe-row__actions .swipe-row__action {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+body.app-mobile-shell .swipe-row--journal-card.swipe-row--open > .swipe-row__content {
+  transform: translateX(-52px) !important;
+}
+
+body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card {
+  min-width: 0;
+  overflow: visible;
+}
+
+body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card > .swipe-row__content,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__content {
+  background: transparent;
+  border-radius: inherit;
+}
+
+body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card > .swipe-row__actions,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__actions {
+  top: auto;
+  right: 10px;
+  bottom: 10px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  z-index: 4;
+  pointer-events: none;
+}
+
+body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card > .swipe-row__actions .swipe-row__action,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__actions .swipe-row__action {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  box-shadow:
+    0 12px 24px rgba(28, 37, 20, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  opacity: 0;
+  transform: translate3d(8px, 0, 0) scale(0.96);
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: auto;
+}
+
+body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card.swipe-row--open > .swipe-row__actions,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card.swipe-row--open > .swipe-row__actions {
+  pointer-events: auto;
+}
+
+body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card.swipe-row--open > .swipe-row__actions .swipe-row__action,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card.swipe-row--open > .swipe-row__actions .swipe-row__action {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card.swipe-row--open > .swipe-row__content,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card.swipe-row--open > .swipe-row__content {
+  transform: translateX(-52px) !important;
+}
+
+.swipe-delete-confirm {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: rgba(15, 20, 27, 0.36);
+  opacity: 0;
+  transition: opacity 180ms ease;
+  z-index: 2600;
+}
+
+.swipe-delete-confirm.is-visible {
+  opacity: 1;
+}
+
+.swipe-delete-confirm__sheet {
+  width: min(100%, 460px);
+  border-radius: 24px;
+  padding: 20px 18px 18px;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(246, 239, 226, 0.98));
+  box-shadow:
+    0 20px 40px rgba(15, 19, 26, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(16px);
+  opacity: 0;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.swipe-delete-confirm__sheet.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.swipe-delete-confirm__title {
+  margin: 0 0 6px;
+  color: #25311b;
+  font-size: 1.04rem;
+  font-weight: 800;
+}
+
+.swipe-delete-confirm__text {
+  margin: 0;
+  color: #5a6650;
+  line-height: 1.5;
+}
+
+.swipe-delete-confirm__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.swipe-delete-confirm__button {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 128, 88, 0.18);
+  background: rgba(255, 255, 255, 0.74);
+  color: #334226;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.swipe-delete-confirm__button--danger {
+  background: rgba(146, 72, 63, 0.12);
+  border-color: rgba(146, 72, 63, 0.18);
+  color: #8c4139;
 }
 
 button,
@@ -2123,31 +2301,33 @@ select {
   width: 100%;
   height: 100%;
   opacity: 0;
-  transform: translateX(10%) scale(1.01);
+  transform: translate3d(6%, 0, 0) scale(1.01);
   transition:
     transform 500ms cubic-bezier(0.22, 1, 0.36, 1),
     opacity 400ms ease;
   will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform-origin: center center;
 }
 
 .memory-frame[data-memory-direction="prev"] .memory-photo {
-  transform: translateX(-10%) scale(1.01);
+  transform: translate3d(-6%, 0, 0) scale(1.01);
 }
 
 .memory-photo.active {
   opacity: 1;
-  transform: translateX(0%) scale(1);
+  transform: translate3d(0, 0, 0) scale(1);
   z-index: 2;
 }
 
 .memory-photo.exit {
   opacity: 0;
-  transform: translateX(-10%) scale(1.01);
+  transform: translate3d(-6%, 0, 0) scale(1.01);
   z-index: 1;
 }
 
 .memory-frame[data-memory-direction="prev"] .memory-photo.exit {
-  transform: translateX(10%) scale(1.01);
+  transform: translate3d(6%, 0, 0) scale(1.01);
 }
 
 .memory-strip__subtitle {
@@ -10289,6 +10469,12 @@ input::placeholder {
 }
 
 .editor-gallery[hidden] {
+  display: none !important;
+}
+
+.editor-gallery:empty,
+.card-view-chip-list:empty,
+.detail-image__upload-cta-shell:empty {
   display: none !important;
 }
 
@@ -41324,6 +41510,20 @@ body.app-mobile-shell .detail-modal--editor .editor-gallery__remove {
   font-size: 0.98rem;
 }
 
+.detail-image__upload-cta--icon-only {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+}
+
+.detail-image__upload-cta--icon-only [data-editor-image-picker-label] {
+  display: none;
+}
+
 body.app-mobile-shell .upload-field--hero {
   padding: 16px !important;
   border-radius: 24px !important;
@@ -41369,6 +41569,14 @@ body.app-mobile-shell .detail-image__upload-cta {
   min-height: 44px !important;
   padding: 10px 14px !important;
   font-size: 0.92rem !important;
+}
+
+body.app-mobile-shell .detail-image__upload-cta--icon-only {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 !important;
 }
 
 /* Walk detail uplift:
@@ -43258,6 +43466,10 @@ body.app-mobile-shell.app-focused-mode .toolbar-search__field:focus-within {
 .card-view-sections {
   display: grid;
   gap: 14px;
+}
+
+.card-view-sections:empty {
+  display: none !important;
 }
 
 .card-view-panel {
@@ -45747,11 +45959,17 @@ body.app-mobile-shell .memory-strip__hero,
 body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
   overflow: hidden !important;
   background: #111923 !important;
+  border: 0 !important;
 }
 
 body.app-mobile-shell .memory-strip__backdrop,
 body.app-mobile-shell .workspace-layout--menu .memory-strip__backdrop {
   display: none !important;
+}
+
+body.app-mobile-shell .memory-frame,
+body.app-mobile-shell .workspace-layout--menu .memory-frame {
+  inset: -1px !important;
 }
 
 body.app-mobile-shell .memory-strip__hero img,
