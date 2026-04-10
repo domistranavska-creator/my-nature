@@ -1792,6 +1792,7 @@ let imageBackgroundCleanupScheduled = false;
 let sowingTipInterval = null;
 let overviewHighlightsInterval = null;
 let memoryCarouselIndex = 0;
+let memoryCarouselTransitionDirection = "next";
 let insightTipIndex = 0;
 let overviewHighlightsStep = 0;
 let homeWeatherSnapshot = null;
@@ -3965,11 +3966,13 @@ function ensureThumbSaveBar(formElement) {
     return null;
   }
 
-  document.querySelectorAll(".thumb-save-bar").forEach((element) => {
-    if (!formElement.contains(element)) {
-      element.remove();
-    }
-  });
+  let bar = document.body?.querySelector(":scope > .thumb-save-bar");
+  if (!(bar instanceof HTMLElement)) {
+    bar = document.createElement("div");
+    bar.className = "thumb-save-bar";
+    bar.innerHTML = `<button class="thumb-save-btn" type="button">Uložiť</button>`;
+    document.body?.appendChild(bar);
+  }
   document.querySelectorAll(".has-thumb-save-bar").forEach((element) => {
     if (element !== formElement) {
       element.classList.remove("has-thumb-save-bar");
@@ -3977,14 +3980,6 @@ function ensureThumbSaveBar(formElement) {
   });
 
   formElement.classList.add("has-thumb-save-bar");
-  let bar = formElement.querySelector(".thumb-save-bar");
-  if (!(bar instanceof HTMLElement)) {
-    bar = document.createElement("div");
-    bar.className = "thumb-save-bar";
-    bar.innerHTML = `<button class="thumb-save-btn" type="button">Uložiť</button>`;
-    formElement.appendChild(bar);
-  }
-
   const stickyButton = bar.querySelector(".thumb-save-btn");
   if (!(stickyButton instanceof HTMLButtonElement)) return bar;
   const nextLabel = String(submitButton.textContent || "").trim() || "Uložiť";
@@ -4266,6 +4261,7 @@ function openDetailModalDialog() {
   detailModal.scrollTop = 0;
   if (detailContent) detailContent.scrollTop = 0;
   refreshWalkMaps(detailContent || detailModal);
+  bindSwipeRows(detailContent || detailModal);
   scheduleThumbSaveBarSync();
 }
 const imageLightboxImageEl = document.getElementById("image-lightbox-image");
@@ -4923,8 +4919,29 @@ function attachCardTypePreviewSwipe(preview, root = document) {
   let tracking = false;
   let direction = null;
   let suppressClickUntil = 0;
-  const swipeThreshold = 56;
+  let resetTransitionTimer = 0;
+  const swipeThreshold = 48;
   const directionThreshold = 8;
+  const dragVisualLimit = 18;
+  const dragVisualFactor = 0.16;
+
+  const clearResetTransitionTimer = () => {
+    if (!resetTransitionTimer) return;
+    window.clearTimeout(resetTransitionTimer);
+    resetTransitionTimer = 0;
+  };
+
+  const animatePreviewBack = () => {
+    clearResetTransitionTimer();
+    preview.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
+    preview.style.transform = "translate3d(0, 0, 0)";
+    resetTransitionTimer = window.setTimeout(() => {
+      resetTransitionTimer = 0;
+      if (!preview.isConnected) return;
+      preview.style.transition = "";
+      preview.style.willChange = "";
+    }, 240);
+  };
 
   const reset = () => {
     tracking = false;
@@ -4939,6 +4956,9 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     startY = touch.clientY;
     tracking = true;
     direction = null;
+    clearResetTransitionTimer();
+    preview.style.transition = "";
+    preview.style.willChange = "transform";
   }, { passive: true });
 
   preview.addEventListener("touchmove", (event) => {
@@ -4949,15 +4969,21 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     if (!direction && (Math.abs(deltaX) > directionThreshold || Math.abs(deltaY) > directionThreshold)) {
       direction = Math.abs(deltaX) > Math.abs(deltaY) ? "x" : "y";
     }
+    if (direction === "x") {
+      const limitedOffset = Math.max(-dragVisualLimit, Math.min(dragVisualLimit, deltaX * dragVisualFactor));
+      preview.style.transform = `translate3d(${limitedOffset}px, 0, 0)`;
+    }
   }, { passive: true });
 
   preview.addEventListener("touchend", (event) => {
     if (!tracking) {
+      animatePreviewBack();
       reset();
       return;
     }
     const touch = event.changedTouches?.[0];
     if (!touch) {
+      animatePreviewBack();
       reset();
       return;
     }
@@ -4968,21 +4994,558 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     if (!direction && (absX > directionThreshold || absY > directionThreshold)) {
       direction = absX > absY ? "x" : "y";
     }
-    if (direction !== "x" || deltaX >= 0 || absX < swipeThreshold || absX <= absY) {
+    if (direction !== "x" || absX < swipeThreshold || absX <= absY) {
+      animatePreviewBack();
       reset();
       return;
     }
-    const nextButton = adjacentCardTypeButton(root, 1);
-    if (nextButton) {
+    const step = deltaX < 0 ? 1 : -1;
+    const targetButton = adjacentCardTypeButton(root, step);
+    animatePreviewBack();
+    if (targetButton) {
       suppressClickUntil = Date.now() + 320;
-      nextButton.click();
+      window.requestAnimationFrame(() => {
+        targetButton.click();
+      });
     }
     reset();
   }, { passive: true });
 
-  preview.addEventListener("touchcancel", reset, { passive: true });
+  preview.addEventListener("touchcancel", () => {
+    animatePreviewBack();
+    reset();
+  }, { passive: true });
 
   return () => Date.now() < suppressClickUntil;
+}
+
+const SWIPE_ROW_ACTION_BUTTON_WIDTH = 68;
+let activeSwipeRow = null;
+
+function swipeRowsEnabled() {
+  return typeof document !== "undefined"
+    && typeof window !== "undefined"
+    && document.body?.classList.contains("app-mobile-shell");
+}
+
+function escapeSwipeSelectorValue(value = "") {
+  const normalizedValue = String(value || "").trim();
+  if (!normalizedValue) return "";
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(normalizedValue);
+  }
+  return normalizedValue.replace(/["\\]/g, "\\$&");
+}
+
+function swipeRowContentEl(rowEl) {
+  return rowEl instanceof HTMLElement
+    ? rowEl.querySelector(":scope > .swipe-row__content")
+    : null;
+}
+
+function closeSwipeRow(rowEl) {
+  if (!(rowEl instanceof HTMLElement)) return;
+  const content = swipeRowContentEl(rowEl);
+  rowEl.classList.remove("swipe-row--open");
+  if (content instanceof HTMLElement) {
+    content.style.transition = "";
+    content.style.transform = "";
+  }
+  if (activeSwipeRow === rowEl) {
+    activeSwipeRow = null;
+  }
+}
+
+function closeActiveSwipeRow() {
+  if (!(activeSwipeRow instanceof HTMLElement)) return;
+  closeSwipeRow(activeSwipeRow);
+}
+
+function openSwipeRow(rowEl) {
+  if (!(rowEl instanceof HTMLElement)) return;
+  const content = swipeRowContentEl(rowEl);
+  if (!(content instanceof HTMLElement)) return;
+  if (activeSwipeRow && activeSwipeRow !== rowEl) {
+    closeSwipeRow(activeSwipeRow);
+  }
+  const actionCount = Math.max(1, Number(rowEl.dataset.swipeActionsCount || 0) || 0);
+  rowEl.style.setProperty("--swipe-row-open-width", `${actionCount * SWIPE_ROW_ACTION_BUTTON_WIDTH}px`);
+  rowEl.classList.add("swipe-row--open");
+  content.style.transition = "";
+  content.style.transform = "";
+  activeSwipeRow = rowEl;
+}
+
+function shouldIgnoreSwipeRowGestureTarget(target) {
+  if (!(target instanceof Element)) return true;
+  if (target.closest(".swipe-row__actions, .swipe-row__action")) return true;
+  if (target.closest("input, textarea, select, [contenteditable='true'], summary, video, audio")) return true;
+  if (target.closest("[data-open-journal-image], .journal-item__image, .tag--interactive, .tag--link-category, .tag--link-variety, .tag--link-tag, .tag--link-entry-type")) return true;
+  return false;
+}
+
+function ensureSwipeRowStructure(contentElement, kind, itemId) {
+  if (!(contentElement instanceof HTMLElement)) return null;
+  let rowEl = contentElement.closest(".swipe-row");
+  if (!(rowEl instanceof HTMLElement) || !contentElement.parentElement?.classList.contains("swipe-row__content")) {
+    const parent = contentElement.parentNode;
+    if (!(parent instanceof Node)) return null;
+    rowEl = document.createElement("div");
+    rowEl.className = "swipe-row";
+    const contentWrap = document.createElement("div");
+    contentWrap.className = "swipe-row__content";
+    const actionsWrap = document.createElement("div");
+    actionsWrap.className = "swipe-row__actions";
+    parent.insertBefore(rowEl, contentElement);
+    contentWrap.appendChild(contentElement);
+    rowEl.appendChild(contentWrap);
+    rowEl.appendChild(actionsWrap);
+  }
+  rowEl.dataset.swipeKind = String(kind || "").trim();
+  rowEl.dataset.swipeId = String(itemId || "").trim();
+  return rowEl;
+}
+
+function isSwipeDeletableCategory(item) {
+  const normalizedId = String(item?.id || "").trim();
+  if (!normalizedId) return false;
+  if (ALWAYS_PROTECTED_CATEGORY_IDS.includes(normalizedId)) return false;
+  if (ROOT_CATEGORY_IDS.includes(normalizedId)) return false;
+  if (STRUCTURE_CATEGORY_IDS.includes(normalizedId)) return false;
+  return true;
+}
+
+function getSwipeActionsForItem(kind, item) {
+  if (kind === "journal") {
+    return [
+      { key: "edit", label: "✏️", action: "edit", title: "Upraviť" }
+    ];
+  }
+
+  if (kind === "task") {
+    return [
+      { key: "toggle", label: item?.done ? "↩️" : "✔️", action: "toggle-done", title: item?.done ? "Vrátiť medzi rozpracované" : "Označiť ako hotové" },
+      { key: "edit", label: "✏️", action: "edit", title: "Otvoriť plán práce" }
+    ];
+  }
+
+  if (kind === "card") {
+    return [
+      { key: "edit", label: "✏️", action: "edit", title: "Upraviť" },
+      { key: "top", label: item?.top ? "⭐" : "☆", action: "toggle-top", title: item?.top ? "Zrušiť top" : "Označiť ako top" }
+    ];
+  }
+
+  if (kind === "category") {
+    return [
+      { key: "edit", label: "✏️", action: "edit", title: "Upraviť" }
+    ];
+  }
+
+  return [];
+}
+
+function renderSwipeActions(rowEl, kind, item, handlers) {
+  if (!(rowEl instanceof HTMLElement)) return;
+  const actionsEl = rowEl.querySelector(":scope > .swipe-row__actions");
+  if (!(actionsEl instanceof HTMLElement)) return;
+
+  const actions = getSwipeActionsForItem(kind, item);
+  rowEl._swipeItem = item;
+  rowEl._swipeHandlers = handlers || null;
+  rowEl.dataset.swipeActionsCount = String(actions.length || 0);
+  rowEl.style.setProperty("--swipe-row-open-width", `${Math.max(1, actions.length) * SWIPE_ROW_ACTION_BUTTON_WIDTH}px`);
+  rowEl.classList.toggle("swipe-row--single", actions.length === 1);
+  rowEl.classList.toggle("swipe-row--double", actions.length === 2);
+  rowEl.classList.toggle("swipe-row--triple", actions.length >= 3);
+
+  actionsEl.innerHTML = actions.map((action) => `
+    <button
+      type="button"
+      class="swipe-row__action swipe-row__action--${escapeAttribute(action.key)}"
+      data-swipe-action="${escapeAttribute(action.action)}"
+      aria-label="${escapeAttribute(action.title)}"
+      title="${escapeAttribute(action.title)}"
+    >${escapeHtml(action.label)}</button>
+  `).join("");
+
+  actionsEl.querySelectorAll("[data-swipe-action]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const actionName = String(button.getAttribute("data-swipe-action") || "").trim();
+      if (typeof handlers?.[actionName] === "function") {
+        handlers[actionName](item, rowEl);
+      }
+      closeSwipeRow(rowEl);
+    });
+  });
+}
+
+function swipeRowDeleteConfirmMessage(rowEl) {
+  const kind = String(rowEl?.dataset?.swipeKind || "").trim();
+  if (kind === "journal") return "Naozaj chceš odstrániť tento zápis?";
+  if (kind === "task") return "Naozaj chceš odstrániť túto úlohu?";
+  if (kind === "card") return "Naozaj chceš odstrániť túto kartu?";
+  if (kind === "category") return "Naozaj chceš odstrániť túto kategóriu?";
+  return "Naozaj chceš odstrániť túto položku?";
+}
+
+function triggerSwipeRowDeleteConfirm(rowEl) {
+  if (!(rowEl instanceof HTMLElement)) return false;
+  const handlers = rowEl._swipeHandlers;
+  const item = rowEl._swipeItem;
+  if (typeof handlers?.delete !== "function") return false;
+  if (!window.confirm(swipeRowDeleteConfirmMessage(rowEl))) return false;
+  handlers.delete(item, rowEl);
+  closeSwipeRow(rowEl);
+  return true;
+}
+
+function attachSwipeRow(rowEl) {
+  if (!(rowEl instanceof HTMLElement)) return;
+  if (!swipeRowsEnabled()) return;
+  if (rowEl.__swipeBound) return;
+  rowEl.__swipeBound = true;
+
+  const content = swipeRowContentEl(rowEl);
+  if (!(content instanceof HTMLElement)) return;
+
+  let startX = 0;
+  let startY = 0;
+  let currentX = 0;
+  let tracking = false;
+  let direction = "";
+  let startTime = 0;
+  let pressTimer = 0;
+  let suppressClickUntil = 0;
+
+  const resetTracking = () => {
+    tracking = false;
+    direction = "";
+    startTime = 0;
+  };
+
+  const clearLongPressTimer = () => {
+    if (!pressTimer) return;
+    window.clearTimeout(pressTimer);
+    pressTimer = 0;
+  };
+
+  content.addEventListener("click", (event) => {
+    if (Date.now() < suppressClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (!rowEl.classList.contains("swipe-row--open")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeSwipeRow(rowEl);
+  }, true);
+
+  content.addEventListener("touchstart", (event) => {
+    if (!swipeRowsEnabled()) return;
+    if (event.touches.length !== 1) return;
+    const target = event.target;
+    if (shouldIgnoreSwipeRowGestureTarget(target)) return;
+    if (rowEl.classList.contains("swipe-row--open")) return;
+    if (activeSwipeRow && activeSwipeRow !== rowEl) {
+      closeSwipeRow(activeSwipeRow);
+    }
+    const touch = event.touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    currentX = touch.clientX;
+    tracking = true;
+    direction = "";
+    startTime = Date.now();
+    content.style.transition = "none";
+    clearLongPressTimer();
+    if (typeof rowEl._swipeHandlers?.delete === "function") {
+      pressTimer = window.setTimeout(() => {
+        clearLongPressTimer();
+        tracking = false;
+        direction = "";
+        suppressClickUntil = Date.now() + 420;
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          navigator.vibrate(10);
+        }
+        triggerSwipeRowDeleteConfirm(rowEl);
+      }, 500);
+    }
+  }, { passive: true });
+
+  content.addEventListener("touchmove", (event) => {
+    if (!tracking || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    currentX = touch.clientX;
+
+    if (!direction) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      direction = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
+
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      clearLongPressTimer();
+    }
+
+    if (direction !== "x") return;
+    if (dx > 0) return;
+
+    const maxOffset = Number(rowEl.dataset.swipeActionsCount || 0) * SWIPE_ROW_ACTION_BUTTON_WIDTH || (2 * SWIPE_ROW_ACTION_BUTTON_WIDTH);
+    const limitedDx = Math.max(dx, -maxOffset);
+    content.style.transform = `translateX(${limitedDx}px)`;
+  }, { passive: true });
+
+  content.addEventListener("touchend", () => {
+    clearLongPressTimer();
+    if (!tracking) return;
+
+    const dx = currentX - startX;
+    const duration = Date.now() - startTime;
+    content.style.transition = "";
+
+    if (direction === "x" && dx < -70 && duration < 1200) {
+      openSwipeRow(rowEl);
+    } else {
+      closeSwipeRow(rowEl);
+    }
+
+    resetTracking();
+  }, { passive: true });
+
+  content.addEventListener("touchcancel", () => {
+    clearLongPressTimer();
+    content.style.transition = "";
+    closeSwipeRow(rowEl);
+    resetTracking();
+  }, { passive: true });
+}
+
+function openTaskManagerForSwipe(taskId = "") {
+  const normalizedTaskId = String(taskId || "").trim();
+  const scrollToTask = () => {
+    if (!normalizedTaskId || !detailContent) return;
+    const selectorValue = escapeSwipeSelectorValue(normalizedTaskId);
+    const target = detailContent.querySelector(`[data-toggle-task="${selectorValue}"]`)?.closest(".swipe-row, .task-item");
+    if (!(target instanceof HTMLElement)) return;
+    target.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
+
+  if (detailModal?.open && detailModal.classList.contains("detail-modal--worklog-manager")) {
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(scrollToTask);
+    } else {
+      scrollToTask();
+    }
+    return;
+  }
+
+  openTaskManager();
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(scrollToTask);
+    });
+  } else {
+    scrollToTask();
+  }
+}
+
+function toggleCardTopFromSwipe(item) {
+  const normalizedId = String(item?.id || "").trim();
+  const existing = state.varieties.find((entry) => entry.id === normalizedId);
+  if (!existing) return;
+  const previousTop = Boolean(existing.top);
+  existing.top = !previousTop;
+  if (!persist()) {
+    existing.top = previousTop;
+    return;
+  }
+  render();
+}
+
+function deleteCardFromSwipe(item) {
+  const normalizedId = String(item?.id || "").trim();
+  const existing = state.varieties.find((entry) => entry.id === normalizedId);
+  if (!existing) return;
+  const previousUndoState = snapshotUndoStateValue();
+  setUndoState({
+    type: "variety",
+    variety: clone(existing)
+  });
+  const deleteResult = softDeleteStateRecord("varieties", existing.id, "card", { previousUndoState });
+  if (!deleteResult) {
+    restoreUndoStateSnapshot(previousUndoState);
+    return;
+  }
+  if (!persist()) {
+    rollbackSoftDeleteResult(deleteResult);
+    return;
+  }
+  render();
+  showUndoDeleteToast("Karta zmazaná");
+}
+
+function bindJournalSwipeRows(root = document) {
+  if (!swipeRowsEnabled() || !(root instanceof Element || root === document)) return;
+  const scope = root === document ? document : root;
+  scope.querySelectorAll(".journal-overlay-card[data-open-journal-overlay-entry], .sidebar-preview-card[data-open-journal-sidebar-entry], .journal-item--manager-compact").forEach((itemEl) => {
+    if (!(itemEl instanceof HTMLElement)) return;
+    const itemId = String(
+      itemEl.getAttribute("data-open-journal-overlay-entry")
+      || itemEl.getAttribute("data-open-journal-sidebar-entry")
+      || itemEl.querySelector("[data-delete-worklog-journal]")?.getAttribute("data-delete-worklog-journal")
+      || itemEl.querySelector("[data-open-journal-image]")?.getAttribute("data-open-journal-image")
+      || ""
+    ).trim();
+    if (!itemId) return;
+    const item = normalizedJournalList().find((entry) => entry.id === itemId);
+    if (!item) return;
+    const rowEl = ensureSwipeRowStructure(itemEl, "journal", itemId);
+    if (!(rowEl instanceof HTMLElement)) return;
+    renderSwipeActions(rowEl, "journal", item, {
+      edit: () => {
+        if (itemEl.classList.contains("journal-item--manager-compact") || rowEl.closest(".worklog-manager")) {
+          openAddEntryFlow(item.id);
+          return;
+        }
+        openJournalComposer(item.id, "", {
+          returnToTagKey: String(rowEl.closest("#journal-overlay-root")?.dataset.journalActiveTagKey || "").trim(),
+          historyMode: "preserve"
+        });
+      },
+      delete: () => {
+        const existingDeleteButton = rowEl.querySelector("[data-delete-worklog-journal], [data-delete-journal-overlay], [data-delete-journal]");
+        if (existingDeleteButton instanceof HTMLElement) {
+          existingDeleteButton.click();
+          return;
+        }
+        const deleteResult = softDeleteStateRecord("journal", item.id, "journal");
+        if (!deleteResult) return;
+        if (!persist()) {
+          rollbackSoftDeleteResult(deleteResult);
+          return;
+        }
+        render();
+        showUndoDeleteToast("Zápis zmazaný");
+        if (rowEl.closest("#journal-overlay-root")) {
+          openJournalOverlayList(String(rowEl.closest("#journal-overlay-root")?.dataset.journalActiveTagKey || "").trim(), { historyMode: "preserve" });
+        }
+      }
+    });
+    attachSwipeRow(rowEl);
+  });
+}
+
+function bindTaskSwipeRows(root = document) {
+  if (!swipeRowsEnabled() || !(root instanceof Element || root === document)) return;
+  const scope = root === document ? document : root;
+  scope.querySelectorAll(".task-item").forEach((itemEl) => {
+    if (!(itemEl instanceof HTMLElement)) return;
+    const itemId = String(
+      itemEl.querySelector("[data-toggle-task]")?.getAttribute("data-toggle-task")
+      || itemEl.querySelector("[data-delete-task]")?.getAttribute("data-delete-task")
+      || ""
+    ).trim();
+    if (!itemId) return;
+    const item = state.customTasks.find((task) => task.id === itemId);
+    if (!item) return;
+    const rowEl = ensureSwipeRowStructure(itemEl, "task", itemId);
+    if (!(rowEl instanceof HTMLElement)) return;
+    renderSwipeActions(rowEl, "task", item, {
+      "toggle-done": () => {
+        const checkbox = rowEl.querySelector("[data-toggle-task]");
+        if (checkbox instanceof HTMLElement) {
+          checkbox.click();
+        }
+      },
+      edit: () => {
+        openTaskManagerForSwipe(item.id);
+      },
+      delete: () => {
+        const deleteButton = rowEl.querySelector("[data-delete-task]");
+        if (deleteButton instanceof HTMLElement) {
+          deleteButton.click();
+        }
+      }
+    });
+    attachSwipeRow(rowEl);
+  });
+}
+
+function bindCardSwipeRows(root = document) {
+  if (!swipeRowsEnabled() || !(root instanceof Element || root === document)) return;
+  const scope = root === document ? document : root;
+  scope.querySelectorAll(".catalog-card__main-hit--preview[data-open-variety]").forEach((buttonEl) => {
+    if (!(buttonEl instanceof HTMLElement)) return;
+    const itemId = String(buttonEl.getAttribute("data-open-variety") || "").trim();
+    if (!itemId) return;
+    const item = state.varieties.find((entry) => entry.id === itemId);
+    if (!item) return;
+    const cardEl = buttonEl.closest(".catalog-card");
+    const rowEl = ensureSwipeRowStructure(cardEl, "card", itemId);
+    if (!(rowEl instanceof HTMLElement)) return;
+    renderSwipeActions(rowEl, "card", item, {
+      edit: () => {
+        openStoredCardEditor(item.id);
+      },
+      "toggle-top": () => {
+        toggleCardTopFromSwipe(item);
+      },
+      delete: () => {
+        deleteCardFromSwipe(item);
+      }
+    });
+    attachSwipeRow(rowEl);
+  });
+}
+
+function bindCategorySwipeRows(root = document) {
+  if (!swipeRowsEnabled() || !(root instanceof Element || root === document)) return;
+  const scope = root === document ? document : root;
+  scope.querySelectorAll(".catalog-card__main-hit[data-open-category], .catalog-card__main-hit[data-open-main-category]").forEach((buttonEl) => {
+    if (!(buttonEl instanceof HTMLElement)) return;
+    const itemId = String(buttonEl.getAttribute("data-open-category") || buttonEl.getAttribute("data-open-main-category") || "").trim();
+    if (!itemId) return;
+    const item = state.categories.find((entry) => entry.id === itemId);
+    if (!item) return;
+    const cardEl = buttonEl.closest(".catalog-card");
+    const rowEl = ensureSwipeRowStructure(cardEl, "category", itemId);
+    if (!(rowEl instanceof HTMLElement)) return;
+    renderSwipeActions(rowEl, "category", item, {
+      edit: () => {
+        openCategoryManager(item.id);
+      },
+      delete: () => {
+        if (!isSwipeDeletableCategory(item)) return;
+        deleteCategory(item.id);
+      }
+    });
+    attachSwipeRow(rowEl);
+  });
+}
+
+function bindSwipeRows(root = document) {
+  if (!swipeRowsEnabled()) return;
+  if (activeSwipeRow && !activeSwipeRow.isConnected) {
+    activeSwipeRow = null;
+  }
+  bindJournalSwipeRows(root);
+  bindTaskSwipeRows(root);
+  bindCardSwipeRows(root);
+  bindCategorySwipeRows(root);
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("click", (event) => {
+    if (!(activeSwipeRow instanceof HTMLElement)) return;
+    const target = event.target;
+    if (target instanceof Node && activeSwipeRow.contains(target)) return;
+    closeActiveSwipeRow();
+  }, true);
 }
 
 function focusFieldSoon(field, { preventScroll = true } = {}) {
@@ -5405,6 +5968,7 @@ function bindJournalOverlayCardActions(container) {
   });
 
   bindWalkMapActivators(container);
+  bindJournalSwipeRows(container);
 }
 
 function openJournalOverlayList(initialTagKey = "", options = {}) {
@@ -8550,6 +9114,7 @@ function renderMainMenu() {
   `;
 
   syncDeferredCategoryCardImages(mainMenuEl);
+  bindSwipeRows(mainMenuEl);
 
   const hasMobileWeatherDebugControls = Boolean(
     mainMenuEl.querySelector("[data-mobile-weather-debug], [data-mobile-weather-cloud], [data-mobile-weather-phase], [data-mobile-weather-season], [data-mobile-weather-wind-range], [data-mobile-weather-precip-range], [data-mobile-weather-temp-range], [data-mobile-weather-scene-toggle], [data-mobile-weather-audio-panel], [data-mobile-weather-audio-inline]")
@@ -10772,6 +11337,8 @@ function renderCatalog() {
       openJournalOverlayList(categoryJournalThemeKey);
     });
   }
+
+  bindSwipeRows(catalogEl);
 
 }
 
@@ -14469,6 +15036,7 @@ function renderTasks() {
     });
   bindTaskActions(customTaskListEl);
   bindThingLinks(customTaskListEl);
+  bindSwipeRows(customTaskListEl);
 }
 
 const INITIAL_JOURNAL_RENDER_COUNT = 10;
@@ -14765,6 +15333,7 @@ function renderJournal() {
     });
 
     bindThingLinks(journalSidebarEl);
+    bindJournalSwipeRows(journalSidebarEl);
   }
 
   if (journalListEl) {
@@ -14883,6 +15452,298 @@ function latestJournalImages() {
     .slice(0, 12);
 }
 
+const MEMORY_PHOTO_TRANSITION_MS = 500;
+const MEMORY_TIP_TRANSITION_MS = 250;
+const MEMORY_TIP_SWAP_DELAY_MS = 120;
+
+function memoryHeroItemKey(item = {}) {
+  return [
+    String(item?.entryId || "").trim(),
+    String(item?.index ?? "").trim(),
+    String(item?.image || "").trim()
+  ].join("|");
+}
+
+function memoryHeroNoteText(item = {}) {
+  const rawText = String(item?.entryText || "").trim();
+  return rawText ? trimText(rawText, 160) : "";
+}
+
+function memoryBackdropStyleAttribute(source = "") {
+  const normalizedSource = String(source || "").trim();
+  if (
+    !isDirectRenderableImageSource(normalizedSource)
+    || normalizedSource.startsWith("data:")
+    || normalizedSource.startsWith("blob:")
+  ) return "";
+  return ` style="${escapeAttribute(`background-image:url(${JSON.stringify(normalizedSource)})`)}"`;
+}
+
+function createMemoryPhotoElement(item, { active = false } = {}) {
+  const markup = renderJournalImageTag(
+    item?.image,
+    item?.entryTitle || "Spomienka",
+    {
+      entryId: item?.entryId || "",
+      index: item?.index || 0,
+      className: `memory-photo${active ? " active" : ""}`,
+      forceDeferred: true
+    }
+  );
+  if (!markup) return null;
+  const template = document.createElement("template");
+  template.innerHTML = markup.trim();
+  const img = template.content.firstElementChild;
+  if (!(img instanceof HTMLImageElement)) return null;
+  img.dataset.memoryKey = memoryHeroItemKey(item);
+  return img;
+}
+
+function syncMemoryHeroOrientation(memoryHero, imageEl) {
+  if (!(memoryHero instanceof HTMLElement) || !(imageEl instanceof HTMLImageElement)) return;
+
+  const apply = () => {
+    const width = Number(imageEl.naturalWidth || 0);
+    const height = Number(imageEl.naturalHeight || 0);
+    if (!width || !height) return;
+    const isPortrait = height > width;
+    memoryHero.classList.toggle("memory-strip__hero--portrait", isPortrait);
+    memoryHero.classList.toggle("memory-strip__hero--landscape", !isPortrait);
+  };
+
+  if (typeof imageEl._memoryOrientationHandler === "function") {
+    imageEl.removeEventListener("load", imageEl._memoryOrientationHandler);
+  }
+  imageEl._memoryOrientationHandler = apply;
+  imageEl.addEventListener("load", imageEl._memoryOrientationHandler, { once: true });
+
+  if (imageEl.complete && imageEl.naturalWidth && imageEl.naturalHeight) {
+    apply();
+  }
+}
+
+function updateMemoryTip(memoryHero, newText = "") {
+  if (!(memoryHero instanceof HTMLElement)) return;
+  let tipEl = memoryHero.querySelector(".memory-tip");
+  const safeText = String(newText || "").trim();
+
+  const clearTimers = (element) => {
+    if (!(element instanceof HTMLElement)) return;
+    if (element._memoryTipSwapTimer) {
+      window.clearTimeout(element._memoryTipSwapTimer);
+      element._memoryTipSwapTimer = 0;
+    }
+    if (element._memoryTipEnterTimer) {
+      window.clearTimeout(element._memoryTipEnterTimer);
+      element._memoryTipEnterTimer = 0;
+    }
+    if (element._memoryTipRemoveTimer) {
+      window.clearTimeout(element._memoryTipRemoveTimer);
+      element._memoryTipRemoveTimer = 0;
+    }
+  };
+
+  if (!safeText) {
+    if (!(tipEl instanceof HTMLElement)) return;
+    clearTimers(tipEl);
+    tipEl.classList.remove("enter");
+    tipEl.classList.add("exit");
+    tipEl._memoryTipRemoveTimer = window.setTimeout(() => {
+      if (tipEl?.isConnected) tipEl.remove();
+    }, MEMORY_TIP_TRANSITION_MS);
+    return;
+  }
+
+  if (!(tipEl instanceof HTMLElement)) {
+    tipEl = document.createElement("span");
+    tipEl.className = "memory-strip__note memory-tip";
+    tipEl.textContent = safeText;
+    memoryHero.appendChild(tipEl);
+    window.requestAnimationFrame(() => {
+      tipEl.classList.add("enter");
+      tipEl._memoryTipEnterTimer = window.setTimeout(() => {
+        tipEl?.classList.remove("enter");
+      }, MEMORY_TIP_TRANSITION_MS);
+    });
+    return;
+  }
+
+  if (tipEl.textContent === safeText) return;
+
+  clearTimers(tipEl);
+  tipEl.classList.remove("enter");
+  tipEl.classList.add("exit");
+  tipEl._memoryTipSwapTimer = window.setTimeout(() => {
+    if (!(tipEl instanceof HTMLElement) || !tipEl.isConnected) return;
+    tipEl.textContent = safeText;
+    tipEl.classList.remove("exit");
+    tipEl.classList.add("enter");
+    tipEl._memoryTipEnterTimer = window.setTimeout(() => {
+      tipEl?.classList.remove("enter");
+    }, MEMORY_TIP_TRANSITION_MS);
+  }, MEMORY_TIP_SWAP_DELAY_MS);
+}
+
+function swapMemoryPhoto(memoryHero, item) {
+  if (!(memoryHero instanceof HTMLElement) || !item) return;
+  const frame = memoryHero.querySelector(".memory-frame");
+  if (!(frame instanceof HTMLElement)) return;
+
+  const nextKey = memoryHeroItemKey(item);
+  const current = frame.querySelector(".memory-photo.active") || frame.querySelector(".memory-photo");
+  if (current instanceof HTMLImageElement && current.dataset.memoryKey === nextKey) {
+    syncMemoryHeroOrientation(memoryHero, current);
+    return;
+  }
+
+  if (frame._memoryPhotoCleanupTimer) {
+    window.clearTimeout(frame._memoryPhotoCleanupTimer);
+    frame._memoryPhotoCleanupTimer = 0;
+  }
+
+  frame.querySelectorAll(".memory-photo").forEach((photo) => {
+    if (photo !== current) photo.remove();
+  });
+
+  const next = createMemoryPhotoElement(item);
+  if (!(next instanceof HTMLImageElement)) return;
+
+  frame.dataset.memoryDirection = memoryCarouselTransitionDirection === "prev" ? "prev" : "next";
+  frame.appendChild(next);
+  syncDeferredJournalImages(frame, { eagerCount: 2 });
+  syncMemoryHeroOrientation(memoryHero, next);
+
+  window.requestAnimationFrame(() => {
+    next.classList.add("active");
+    if (current instanceof HTMLElement) {
+      current.classList.remove("active");
+      current.classList.add("exit");
+    }
+  });
+
+  frame._memoryPhotoCleanupTimer = window.setTimeout(() => {
+    if (current?.isConnected) current.remove();
+    frame.querySelectorAll(".memory-photo").forEach((photo) => {
+      if (photo !== next) photo.remove();
+    });
+    frame.removeAttribute("data-memory-direction");
+  }, MEMORY_PHOTO_TRANSITION_MS + 40);
+}
+
+function renderMemoryHeroMarkup(item) {
+  const noteText = memoryHeroNoteText(item);
+  return `
+    <div class="memory-strip__frame">
+      <div
+        class="memory-strip__hero"
+        aria-label="${escapeAttribute(item.entryTitle)}"
+        role="button"
+        tabindex="0"
+        data-open-memory-entry="${escapeAttribute(item.entryId)}"
+        data-memory-key="${escapeAttribute(memoryHeroItemKey(item))}"
+      >
+        <span class="memory-strip__backdrop"${memoryBackdropStyleAttribute(item.image)}></span>
+        <div class="memory-frame">
+          ${renderJournalImageTag(
+            item.image,
+            item.entryTitle,
+            {
+              entryId: item.entryId,
+              index: item.index,
+              className: "memory-photo active",
+              forceDeferred: true
+            }
+          )}
+        </div>
+        <span class="memory-strip__subtitle">${escapeHtml(formatRelativeTime(item.entryDate))}</span>
+        ${noteText ? `<span class="memory-strip__note memory-tip">${escapeHtml(noteText)}</span>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function updateMemoryHero(memoryHero, item) {
+  if (!(memoryHero instanceof HTMLElement) || !item) return;
+  memoryHero.setAttribute("aria-label", String(item.entryTitle || "").trim());
+  memoryHero.setAttribute("data-open-memory-entry", String(item.entryId || "").trim());
+  memoryHero.setAttribute("data-memory-key", memoryHeroItemKey(item));
+  const subtitleEl = memoryHero.querySelector(".memory-strip__subtitle");
+  if (subtitleEl) {
+    subtitleEl.textContent = formatRelativeTime(item.entryDate);
+  }
+  const backdropEl = memoryHero.querySelector(".memory-strip__backdrop");
+  if (backdropEl instanceof HTMLElement) {
+    if (
+      isDirectRenderableImageSource(item.image)
+      && !String(item.image || "").trim().startsWith("data:")
+      && !String(item.image || "").trim().startsWith("blob:")
+    ) {
+      backdropEl.style.backgroundImage = `url(${JSON.stringify(String(item.image || "").trim())})`;
+    } else {
+      backdropEl.style.removeProperty("background-image");
+    }
+  }
+  swapMemoryPhoto(memoryHero, item);
+  updateMemoryTip(memoryHero, memoryHeroNoteText(item));
+}
+
+function openLinkedMemoryEntry(memoryHero) {
+  if (!(memoryHero instanceof HTMLElement)) return;
+  const entryId = String(memoryHero.getAttribute("data-open-memory-entry") || "").trim();
+  if (!entryId) return;
+  openJournalOverlayEntry(entryId);
+}
+
+function bindMemoryHeroInteractions(memoryHero) {
+  if (!(memoryHero instanceof HTMLElement) || memoryHero.dataset.boundMemoryHero === "true") return;
+  memoryHero.dataset.boundMemoryHero = "true";
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchActive = false;
+  let swipeConsumed = false;
+
+  memoryHero.addEventListener("touchstart", (event) => {
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchActive = true;
+    swipeConsumed = false;
+  }, { passive: true });
+
+  memoryHero.addEventListener("touchcancel", () => {
+    touchActive = false;
+  }, { passive: true });
+
+  memoryHero.addEventListener("touchend", (event) => {
+    if (!touchActive) return;
+    touchActive = false;
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+    if (Math.abs(deltaX) < 28 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    const memoryItems = latestJournalImages();
+    if (memoryItems.length < 2) return;
+    swipeConsumed = true;
+    memoryCarouselTransitionDirection = deltaX < 0 ? "next" : "prev";
+    memoryCarouselIndex = (memoryCarouselIndex + (deltaX < 0 ? 1 : -1) + memoryItems.length) % memoryItems.length;
+    renderMemories();
+  }, { passive: true });
+
+  memoryHero.addEventListener("click", () => {
+    if (swipeConsumed) return;
+    openLinkedMemoryEntry(memoryHero);
+  });
+
+  memoryHero.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openLinkedMemoryEntry(memoryHero);
+  });
+}
+
 function renderMemories() {
   if (!memoryStripEl) return;
   const memoryItems = latestJournalImages();
@@ -14900,109 +15761,29 @@ function renderMemories() {
   if (memoryCarouselIndex >= memoryItems.length) {
     memoryCarouselIndex = 0;
   }
+  const currentMemoryItem = memoryItems[memoryCarouselIndex] || null;
+  const existingMemoryHero = memoryStripEl.querySelector(".memory-strip__hero");
 
-  memoryStripEl.innerHTML = memoryItems.length
-    ? `
-      <div class="memory-strip__frame">
-        <div
-          class="memory-strip__hero"
-          aria-label="${escapeAttribute(memoryItems[memoryCarouselIndex].entryTitle)}"
-          role="button"
-          tabindex="0"
-          data-open-memory-entry="${escapeAttribute(memoryItems[memoryCarouselIndex].entryId)}"
-        >
-          <span class="memory-strip__backdrop"></span>
-          <span class="memory-strip__subtitle">${escapeHtml(formatRelativeTime(memoryItems[memoryCarouselIndex].entryDate))}</span>
-          ${renderJournalImageTag(
-            memoryItems[memoryCarouselIndex].image,
-            memoryItems[memoryCarouselIndex].entryTitle,
-            {
-              entryId: memoryItems[memoryCarouselIndex].entryId,
-              index: memoryItems[memoryCarouselIndex].index,
-              forceDeferred: true
-            }
-          )}
-          ${memoryItems[memoryCarouselIndex].entryText
-            ? `<span class="memory-strip__note">${escapeHtml(trimText(memoryItems[memoryCarouselIndex].entryText, 160))}</span>`
-            : ""}
-        </div>
-      </div>
-    `
-    : (useCleanHome
-      ? cleanHomeEmptyMarkup
-      : renderWarmEmptyState({
-        title: "Tu sa budú usádzať tvoje spomienky",
-        text: "Pridaj prvý zápis s fotkou a tento priestor ožije.",
-        compact: true
-      }));
+  if (currentMemoryItem && existingMemoryHero instanceof HTMLElement) {
+    updateMemoryHero(existingMemoryHero, currentMemoryItem);
+  } else {
+    memoryStripEl.innerHTML = currentMemoryItem
+      ? renderMemoryHeroMarkup(currentMemoryItem)
+      : (useCleanHome
+        ? cleanHomeEmptyMarkup
+        : renderWarmEmptyState({
+          title: "Tu sa budú usádzať tvoje spomienky",
+          text: "Pridaj prvý zápis s fotkou a tento priestor ožije.",
+          compact: true
+        }));
+  }
 
   const memoryHero = memoryStripEl.querySelector(".memory-strip__hero");
-  const memoryHeroImage = memoryHero?.querySelector("img");
+  const memoryHeroImage = memoryHero?.querySelector(".memory-photo.active, .memory-photo");
   syncDeferredJournalImages(memoryStripEl, { eagerCount: 1 });
-  if (memoryHero && memoryHeroImage) {
-    const openLinkedJournalEntry = () => {
-      const entryId = String(memoryHero.getAttribute("data-open-memory-entry") || "").trim();
-      if (!entryId) return;
-      openJournalOverlayEntry(entryId);
-    };
-
-    const syncMemoryHeroOrientation = () => {
-      const isPortrait = memoryHeroImage.naturalHeight > memoryHeroImage.naturalWidth;
-      memoryHero.classList.toggle("memory-strip__hero--portrait", isPortrait);
-      memoryHero.classList.toggle("memory-strip__hero--landscape", !isPortrait);
-    };
-
-    if (memoryHeroImage.complete && memoryHeroImage.naturalWidth && memoryHeroImage.naturalHeight) {
-      syncMemoryHeroOrientation();
-    } else {
-      memoryHeroImage.addEventListener("load", syncMemoryHeroOrientation, { once: true });
-    }
-
-    if (memoryItems.length > 1) {
-      let touchStartX = 0;
-      let touchStartY = 0;
-      let touchActive = false;
-      let swipeConsumed = false;
-
-      memoryHero.addEventListener("touchstart", (event) => {
-        const touch = event.changedTouches?.[0];
-        if (!touch) return;
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-        touchActive = true;
-        swipeConsumed = false;
-      }, { passive: true });
-
-      memoryHero.addEventListener("touchcancel", () => {
-        touchActive = false;
-      }, { passive: true });
-
-      memoryHero.addEventListener("touchend", (event) => {
-        if (!touchActive) return;
-        touchActive = false;
-        const touch = event.changedTouches?.[0];
-        if (!touch) return;
-        const deltaX = touch.clientX - touchStartX;
-        const deltaY = touch.clientY - touchStartY;
-        if (Math.abs(deltaX) < 28 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
-        swipeConsumed = true;
-        memoryCarouselIndex = (memoryCarouselIndex + (deltaX < 0 ? 1 : -1) + memoryItems.length) % memoryItems.length;
-        renderMemories();
-      }, { passive: true });
-
-      memoryHero.addEventListener("click", () => {
-        if (swipeConsumed) return;
-        openLinkedJournalEntry();
-      });
-    } else {
-      memoryHero.addEventListener("click", openLinkedJournalEntry);
-    }
-
-    memoryHero.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      openLinkedJournalEntry();
-    });
+  if (memoryHero && memoryHeroImage instanceof HTMLImageElement) {
+    syncMemoryHeroOrientation(memoryHero, memoryHeroImage);
+    bindMemoryHeroInteractions(memoryHero);
   }
 
   const openAllJournalButton = document.getElementById("open-all-journal-from-memories");
@@ -15675,6 +16456,8 @@ function renderTaskManagerList(taskList, taskCount, rerender) {
       showUndoDeleteToast("Úloha zmazaná");
     });
   });
+
+  bindSwipeRows(taskList);
 }
 
 function renderJournalManagerList(journalList, journalCount, rerender) {
@@ -15691,6 +16474,7 @@ function renderJournalManagerList(journalList, journalCount, rerender) {
     renderBatchMarkup: (slice) => slice.map((entry) => renderJournalManagerCard(entry)).join(""),
     afterBatchRender: (container) => {
       bindJournalManagerListActions(container, rerender);
+      bindJournalSwipeRows(container);
     }
   });
 }
@@ -19853,6 +20637,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     });
 
     renderUniversalGalleryEditor();
+    scheduleThumbSaveBarSync();
   };
 
   renderEditor();
@@ -21934,7 +22719,6 @@ function categoryPlaceholderImage(category) {
         <text x="400" y="390" text-anchor="middle" font-size="188" font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, sans-serif">${preset.emoji}</text>
       </g>
       <text x="400" y="584" text-anchor="middle" font-family="Trebuchet MS, Arial, sans-serif" font-size="42" font-weight="700" fill="${preset.accent}">${label}</text>
-      <text x="400" y="630" text-anchor="middle" font-family="Trebuchet MS, Arial, sans-serif" font-size="24" fill="${preset.accent}" fill-opacity="0.74">dočasný ilustračný náhľad</text>
     </svg>
   `)}`;
   categoryPlaceholderImageCache.set(cacheKey, placeholder);
@@ -21981,7 +22765,6 @@ function cardPlaceholderImage(cardTypeValue = "variety") {
       </g>
       <rect x="188" y="502" width="424" height="94" rx="28" fill="${preset.accent}" fill-opacity="0.1"/>
       <text x="400" y="560" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" font-weight="700" fill="${preset.accent}">${preset.label}</text>
-      <text x="400" y="616" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="${preset.accent}" fill-opacity="0.72">dočasný ilustračný náhľad</text>
     </svg>
   `)}`;
   cardPlaceholderImageCache.set(cardTypeValue, placeholder);
