@@ -4691,7 +4691,6 @@ document.addEventListener("touchend", (event) => {
   const absX = Math.abs(deltaX);
   const absY = Math.abs(deltaY);
   const gestureDurationMs = Date.now() - gestureState.startTime;
-  const currentScrollTop = resolveGestureScrollTop(gestureState.startTarget);
 
   gestureState.tracking = false;
 
@@ -4723,30 +4722,6 @@ document.addEventListener("touchend", (event) => {
     gestureState.startTarget = null;
     gestureDirection = null;
     return;
-  }
-
-  if (
-    gestureDirection === "y"
-    &&
-    deltaY < -GESTURE_CONFIG.threshold
-    && gestureState.startY > (window.innerHeight - GESTURE_CONFIG.bottomZone)
-    && absY > absX
-    && !isAnyOverlayOpen()
-  ) {
-    openQuickAdd();
-    gestureState.startTarget = null;
-    gestureDirection = null;
-    return;
-  }
-
-  if (
-    gestureDirection === "y"
-    &&
-    deltaY > GESTURE_CONFIG.threshold
-    && absY > absX
-    && currentScrollTop === 0
-  ) {
-    closeTopmostOverlay();
   }
 
   gestureState.startTarget = null;
@@ -4910,6 +4885,104 @@ function syncHorizontalTypeStrips(root = document) {
   }
 
   window.setTimeout(run, 0);
+}
+
+function cardTypeStrip(root = document) {
+  return horizontalTypeStrips(root).find((strip) => strip instanceof HTMLElement && strip.querySelector("[data-card-type]")) || null;
+}
+
+function visibleCardTypeButtons(root = document) {
+  const strip = cardTypeStrip(root);
+  if (!(strip instanceof HTMLElement)) return [];
+  return [...strip.querySelectorAll("[data-card-type]")].filter((button) => (
+    button instanceof HTMLButtonElement
+    && !button.disabled
+    && button.getClientRects().length
+  ));
+}
+
+function adjacentCardTypeButton(root = document, step = 1) {
+  const strip = cardTypeStrip(root);
+  const buttons = visibleCardTypeButtons(root);
+  if (!(strip instanceof HTMLElement) || buttons.length < 2) return null;
+  const activeItem = activeHorizontalTypeStripItem(strip);
+  const activeIndex = buttons.findIndex((button) => button === activeItem);
+  const safeActiveIndex = activeIndex >= 0 ? activeIndex : 0;
+  const targetIndex = safeActiveIndex + step;
+  if (targetIndex < 0 || targetIndex >= buttons.length) return null;
+  return buttons[targetIndex] || null;
+}
+
+function attachCardTypePreviewSwipe(preview, root = document) {
+  if (!(preview instanceof HTMLElement)) return () => false;
+  if (typeof document === "undefined" || typeof window === "undefined") return () => false;
+  if (!document.body?.classList.contains("app-mobile-shell")) return () => false;
+
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+  let direction = null;
+  let suppressClickUntil = 0;
+  const swipeThreshold = 56;
+  const directionThreshold = 8;
+
+  const reset = () => {
+    tracking = false;
+    direction = null;
+  };
+
+  preview.addEventListener("touchstart", (event) => {
+    if (event.touches.length !== 1) return;
+    if (visibleCardTypeButtons(root).length < 2) return;
+    const touch = event.touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    tracking = true;
+    direction = null;
+  }, { passive: true });
+
+  preview.addEventListener("touchmove", (event) => {
+    if (!tracking || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    if (!direction && (Math.abs(deltaX) > directionThreshold || Math.abs(deltaY) > directionThreshold)) {
+      direction = Math.abs(deltaX) > Math.abs(deltaY) ? "x" : "y";
+    }
+  }, { passive: true });
+
+  preview.addEventListener("touchend", (event) => {
+    if (!tracking) {
+      reset();
+      return;
+    }
+    const touch = event.changedTouches?.[0];
+    if (!touch) {
+      reset();
+      return;
+    }
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    if (!direction && (absX > directionThreshold || absY > directionThreshold)) {
+      direction = absX > absY ? "x" : "y";
+    }
+    if (direction !== "x" || deltaX >= 0 || absX < swipeThreshold || absX <= absY) {
+      reset();
+      return;
+    }
+    const nextButton = adjacentCardTypeButton(root, 1);
+    if (nextButton) {
+      suppressClickUntil = Date.now() + 320;
+      nextButton.click();
+    }
+    reset();
+  }, { passive: true });
+
+  preview.addEventListener("touchcancel", reset, { passive: true });
+
+  return () => Date.now() < suppressClickUntil;
 }
 
 function focusFieldSoon(field, { preventScroll = true } = {}) {
@@ -17171,7 +17244,10 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     openEditorImagePicker();
   });
 
+  const shouldSuppressPreviewClick = attachCardTypePreviewSwipe(preview, detailContent);
+
   preview.addEventListener("click", () => {
+    if (shouldSuppressPreviewClick()) return;
     if (!draftImages.length) {
       openEditorImagePicker();
       return;
@@ -19765,7 +19841,10 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       showUndoDeleteToast("Karta zmazaná");
     });
 
+    const shouldSuppressPreviewClick = attachCardTypePreviewSwipe(preview, detailContent);
+
     preview.addEventListener("click", () => {
+      if (shouldSuppressPreviewClick()) return;
       if (!draftImages.length) {
         openEditorImagePicker();
         return;

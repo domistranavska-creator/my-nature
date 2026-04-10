@@ -96,7 +96,7 @@ body.app-mobile-shell .thumb-save-bar {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   padding: 12px;
   z-index: 1000;
   pointer-events: none;
@@ -123,7 +123,7 @@ body.app-mobile-shell .thumb-save-btn:disabled {
 }
 
 body.app-mobile-shell form.has-thumb-save-bar {
-  padding-bottom: 124px !important;
+  padding-bottom: 112px !important;
 }
 
 button,
@@ -36585,6 +36585,12 @@ body.app-mobile-shell .mobile-camera-picker__sheet {
   padding: 18px !important;
 }
 
+body.app-mobile-shell .detail-modal > #mobile-camera-picker-host .mobile-camera-picker__sheet,
+body.app-mobile-shell .journal-overlay-root > #mobile-camera-picker-host .mobile-camera-picker__sheet {
+  bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  max-height: calc(100dvh - 132px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+}
+
 body.app-mobile-shell .detail-modal__content::before,
 body.app-mobile-shell .detail-modal__content::after,
 body.app-mobile-shell .journal-overlay-shell::before,
@@ -41000,6 +41006,44 @@ body.app-mobile-shell .detail-modal--editor .entry-mode-switch--cards .entry-mod
   min-width: 118px !important;
   padding-inline: 14px !important;
   white-space: nowrap !important;
+}
+
+/* Mobile bottom nav polish:
+   keep the same actions, but let the bar sit naturally in the system bottom area
+   instead of floating as a separate capsule above the content. */
+body.app-mobile-shell .mobile-bottom-nav {
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: auto !important;
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom)) !important;
+  border-width: 1px 0 0 !important;
+  border-style: solid !important;
+  border-color: rgba(170, 183, 195, 0.24) !important;
+  border-radius: 24px 24px 0 0 !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(248, 250, 252, 0.98)) !important;
+  box-shadow: 0 -6px 18px rgba(31, 45, 64, 0.08) !important;
+  backdrop-filter: blur(10px) saturate(1.01) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(1.01) !important;
+}
+
+body.app-mobile-preview.app-mobile-shell .mobile-bottom-nav {
+  left: 50% !important;
+  right: auto !important;
+  width: min(430px, 100vw) !important;
+  bottom: 0 !important;
+  transform: translateX(-50%) !important;
+}
+
+body.app-mobile-shell .mobile-bottom-nav__button {
+  min-height: 48px !important;
+  padding: 5px 4px 3px !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell .mobile-bottom-nav__button--camera {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 /* Final mobile quick-add comfort:
