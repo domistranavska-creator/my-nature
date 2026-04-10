@@ -11,7 +11,19 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Môj prírodný svet">
   <title>Môj prírodný svet</title>
-  <script>document.documentElement.classList.add("app-startup-stable");</script>
+  <script>
+    (function () {
+      const root = document.documentElement;
+      root.classList.add("app-startup-stable");
+      try {
+        if (window.innerWidth <= 760) {
+          root.classList.add("app-startup-mobile-shell");
+        }
+      } catch (error) {
+        // Startup class helper nesmie blokovať načítanie appky.
+      }
+    }());
+  </script>
   <link rel="manifest" href="manifest.webmanifest?v=2026-04-04-0077">
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2026-04-04-0077">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2026-04-04-0077">

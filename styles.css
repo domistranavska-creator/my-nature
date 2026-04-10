@@ -47,6 +47,35 @@ html.app-startup-stable .mobile-sky-weather-pill {
   visibility: hidden;
 }
 
+html.app-startup-stable.app-startup-mobile-shell body {
+  overflow: hidden;
+}
+
+html.app-startup-stable.app-startup-mobile-shell body > .page-shell {
+  opacity: 0;
+  visibility: hidden;
+}
+
+html.app-startup-stable.app-startup-mobile-shell body::before {
+  content: "Môj prírodný svet";
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 22% 24%, rgba(223, 255, 122, 0.18), transparent 22%),
+    radial-gradient(circle at 76% 18%, rgba(255, 244, 207, 0.16), transparent 18%),
+    linear-gradient(180deg, rgba(19, 34, 56, 0.98), rgba(41, 76, 126, 0.96));
+  color: rgba(255, 249, 240, 0.98);
+  font-size: clamp(1.9rem, 8vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-align: center;
+  text-shadow: 0 10px 26px rgba(8, 16, 30, 0.22);
+  z-index: 9999;
+}
+
 .instant-feedback-target {
   touch-action: manipulation;
   transition: transform 100ms ease, opacity 100ms ease;
@@ -61,6 +90,40 @@ html.app-startup-stable .mobile-sky-weather-pill {
 .is-loading {
   opacity: 0.6;
   pointer-events: none;
+}
+
+body.app-mobile-shell .thumb-save-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  padding: 12px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+body.app-mobile-shell .thumb-save-btn {
+  width: min(100%, 480px);
+  max-width: 480px;
+  margin: 0 auto;
+  display: block;
+  padding: 14px 18px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  background: #2e7d32;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
+body.app-mobile-shell .thumb-save-btn:disabled {
+  opacity: 0.55;
+}
+
+body.app-mobile-shell form.has-thumb-save-bar {
+  padding-bottom: 124px !important;
 }
 
 button,
@@ -34617,6 +34680,13 @@ body.app-mobile-shell #mobile-camera-picker-host {
   z-index: 9800 !important;
 }
 
+body.app-mobile-shell .detail-modal > #mobile-camera-picker-host,
+body.app-mobile-shell .journal-overlay-root > #mobile-camera-picker-host {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 60 !important;
+}
+
 body.app-mobile-shell #mobile-camera-picker-host[hidden] {
   display: none !important;
 }
@@ -42527,6 +42597,12 @@ body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item_
   width: 18px !important;
   height: 18px !important;
   stroke-width: 2.1 !important;
+}
+
+body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__actions--mobile .task-item__action-icon-emoji {
+  display: block !important;
+  font-size: 1.05rem !important;
+  line-height: 1 !important;
 }
 
 body.app-mobile-shell .detail-modal--worklog .task-item--mobile-list .task-item__row--meta {
