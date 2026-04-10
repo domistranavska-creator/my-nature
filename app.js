@@ -860,6 +860,96 @@ function buildWalkPhotoStop(point, imageIndex = 0, recordedAt = "") {
   };
 }
 
+const WALK_GPS_DISPLAY_INITIAL_MAX_ACCEPTED_ACCURACY_METERS = 45;
+const WALK_GPS_DISPLAY_MAX_ACCEPTED_ACCURACY_METERS = 80;
+const WALK_GPS_DISPLAY_MIN_CLEARANCE_METERS = 12;
+const WALK_GPS_DISPLAY_MAX_WALKING_SPEED_KMH = 12;
+
+function sanitizeWalkGpsPointsForDisplay(points = []) {
+  const normalizedPoints = normalizeWalkGpsPoints(points);
+  if (!normalizedPoints.length) return [];
+  const filteredPoints = [];
+  normalizedPoints.forEach((point) => {
+    const accuracyMeters = Number(point?.accuracyMeters);
+    if (Number.isFinite(accuracyMeters) && accuracyMeters > WALK_GPS_DISPLAY_MAX_ACCEPTED_ACCURACY_METERS) {
+      return;
+    }
+    if (!filteredPoints.length) {
+      if (Number.isFinite(accuracyMeters) && accuracyMeters > WALK_GPS_DISPLAY_INITIAL_MAX_ACCEPTED_ACCURACY_METERS) {
+        return;
+      }
+      filteredPoints.push(point);
+      return;
+    }
+    const previousPoint = filteredPoints[filteredPoints.length - 1] || null;
+    if (!previousPoint) {
+      filteredPoints.push(point);
+      return;
+    }
+    const distanceKm = walkGpsDistanceKm([previousPoint, point]) || 0;
+    const distanceMeters = distanceKm * 1000;
+    const previousTime = Date.parse(previousPoint.recordedAt || "");
+    const nextTime = Date.parse(point.recordedAt || "");
+    const secondsDiff = Number.isFinite(previousTime) && Number.isFinite(nextTime)
+      ? Math.abs(nextTime - previousTime) / 1000
+      : Number.POSITIVE_INFINITY;
+    if (distanceMeters <= WALK_GPS_DISPLAY_MIN_CLEARANCE_METERS && secondsDiff < 20) {
+      return;
+    }
+    if (Number.isFinite(secondsDiff) && secondsDiff > 0) {
+      const speedKmh = distanceKm / (secondsDiff / 3600);
+      if (speedKmh > WALK_GPS_DISPLAY_MAX_WALKING_SPEED_KMH) {
+        return;
+      }
+    }
+    filteredPoints.push(point);
+  });
+  return filteredPoints.length ? filteredPoints : normalizedPoints;
+}
+
+function resolveWalkPhotoRecordedAtForFile(file, points = []) {
+  const normalizedPoints = normalizeWalkGpsPoints(points);
+  const fallbackRecordedAt = String(normalizedPoints[normalizedPoints.length - 1]?.recordedAt || new Date().toISOString()).trim() || new Date().toISOString();
+  const fileStamp = Number(file?.lastModified || 0);
+  if (!Number.isFinite(fileStamp) || fileStamp <= 0 || normalizedPoints.length < 2) {
+    return fallbackRecordedAt;
+  }
+  const firstPointTime = Date.parse(normalizedPoints[0]?.recordedAt || "");
+  const lastPointTime = Date.parse(normalizedPoints[normalizedPoints.length - 1]?.recordedAt || "");
+  if (!Number.isFinite(firstPointTime) || !Number.isFinite(lastPointTime)) {
+    return new Date(fileStamp).toISOString();
+  }
+  const paddedStart = firstPointTime - (30 * 60 * 1000);
+  const paddedEnd = lastPointTime + (30 * 60 * 1000);
+  if (fileStamp < paddedStart || fileStamp > paddedEnd) {
+    return fallbackRecordedAt;
+  }
+  return new Date(fileStamp).toISOString();
+}
+
+function buildWalkPhotoStopsForSubmission({
+  gpsPoints = [],
+  existingPhotoStops = [],
+  existingImageCount = 0,
+  pendingFiles = []
+} = {}) {
+  const normalizedPoints = sanitizeWalkGpsPointsForDisplay(gpsPoints);
+  const preservedStops = normalizeWalkPhotoStops(existingPhotoStops)
+    .filter((item) => Number.isFinite(Number(item?.imageIndex)) && Number(item.imageIndex) < Math.max(0, Number(existingImageCount) || 0));
+  if (!normalizedPoints.length || !Array.isArray(pendingFiles) || !pendingFiles.length) {
+    return preservedStops;
+  }
+  const nextStops = pendingFiles
+    .map((file, pendingIndex) => {
+      const imageIndex = Math.max(0, Number(existingImageCount) || 0) + pendingIndex;
+      const recordedAt = resolveWalkPhotoRecordedAtForFile(file, normalizedPoints);
+      const nearestPoint = nearestWalkGpsPoint(normalizedPoints, recordedAt) || normalizedPoints[normalizedPoints.length - 1] || null;
+      return buildWalkPhotoStop(nearestPoint, imageIndex, recordedAt);
+    })
+    .filter(Boolean);
+  return [...preservedStops, ...nextStops];
+}
+
 function walkGpsDistanceKm(points = []) {
   if (!Array.isArray(points) || points.length < 2) return null;
   const originalKey = `walk-distance:${walkGpsPointsCacheKey(points)}`;
@@ -1067,13 +1157,47 @@ function journalHeaderWeather(entry = {}) {
 
 function markAppBootReady() {
   if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const hadStartupMask = root.classList.contains("app-startup-stable")
+    || root.classList.contains("app-startup-mobile-shell");
   if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
     window.requestAnimationFrame(() => {
-      document.documentElement.classList.remove("app-startup-stable");
+      root.classList.remove("app-startup-stable");
+      root.classList.remove("app-startup-mobile-shell");
+      if (hadStartupMask) {
+        syncMobileTopStripVisibility();
+      }
     });
     return;
   }
-  document.documentElement.classList.remove("app-startup-stable");
+  root.classList.remove("app-startup-stable");
+  root.classList.remove("app-startup-mobile-shell");
+  if (hadStartupMask) {
+    syncMobileTopStripVisibility();
+  }
+}
+
+function isCloudSignedInForHomeExperience() {
+  const authMirror = loadSupabaseAuthMirror();
+  return Boolean(String(authMirror?.email || "").trim());
+}
+
+function shouldUseCleanLoggedOutHome() {
+  return !isFocusedView && !isCloudSignedInForHomeExperience();
+}
+
+function syncLoggedOutHomeExperience() {
+  if (typeof document === "undefined") return;
+  const useCleanHome = shouldUseCleanLoggedOutHome();
+  document.body.classList.toggle("app-clean-logged-out-home", useCleanHome);
+  if (worklogPanelToggleEl) {
+    worklogPanelToggleEl.hidden = useCleanHome;
+    if (useCleanHome) {
+      worklogPanelToggleEl.style.setProperty("display", "none", "important");
+    } else {
+      worklogPanelToggleEl.style.removeProperty("display");
+    }
+  }
 }
 
 function installBootRefreshMask() {
@@ -3641,6 +3765,258 @@ function inferVisibleOverlayHistoryKind() {
   return "";
 }
 
+function isAnyOverlayOpen() {
+  return Boolean(
+    isMobileCameraPickerOpen()
+    || imageLightboxEl?.open
+    || journalOverlayRoot()
+    || detailModal?.open
+    || toolbarAddMenuEl?.open
+  );
+}
+
+function closeTopmostOverlay() {
+  // Priorita zhora nadol: mobile picker -> lightbox -> journal -> detail -> add menu.
+  if (isMobileCameraPickerOpen() && typeof closeMobileCameraPicker === "function") {
+    closeMobileCameraPicker({ skipHistory: false });
+    return true;
+  }
+
+  if (imageLightboxEl?.open && typeof closeImageLightbox === "function") {
+    closeImageLightbox();
+    return true;
+  }
+
+  if (journalOverlayRoot() && typeof closeJournalOverlay === "function") {
+    closeJournalOverlay();
+    return true;
+  }
+
+  if (detailModal?.open && typeof detailModal.close === "function") {
+    detailModal.close();
+    return true;
+  }
+
+  if (toolbarAddMenuEl?.open && typeof closeToolbarAddMenu === "function") {
+    closeToolbarAddMenu({ skipHistory: false });
+    return true;
+  }
+
+  return false;
+}
+
+const GESTURE_CONFIG = {
+  threshold: 60,
+  edgeZone: 30,
+  bottomZone: 100,
+  cooldownMs: 300,
+  maxDurationMs: 900
+};
+
+let gestureState = {
+  startX: 0,
+  startY: 0,
+  startTime: 0,
+  tracking: false,
+  cooldown: false,
+  startTarget: null,
+  bodyTransformBefore: "",
+  bodyPreviewActive: false
+};
+
+let gestureDirection = null;
+
+function shouldEnableGlobalSwipeGestures() {
+  return typeof document !== "undefined"
+    && typeof window !== "undefined"
+    && isRealMobileRuntimeMode();
+}
+
+function isGestureIgnoredTarget(target) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest([
+    "input",
+    "textarea",
+    "select",
+    "option",
+    "button",
+    "label",
+    "summary",
+    "[contenteditable=\"true\"]",
+    "[type=\"range\"]",
+    "#toolbar-search",
+    ".toolbar-search__results",
+    ".leaflet-container",
+    ".journal-walk__map",
+    ".memory-strip__hero",
+    ".image-lightbox__figure",
+    ".image-lightbox__image"
+  ].join(", ")));
+}
+
+function resolveGestureScrollTop(target = null) {
+  let current = target instanceof Element ? target : null;
+  while (current && current !== document.body) {
+    if (current instanceof HTMLElement) {
+      const style = window.getComputedStyle(current);
+      const overflowY = String(style.overflowY || "").toLowerCase();
+      if ((overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && current.scrollHeight > current.clientHeight + 4) {
+        return Math.max(0, current.scrollTop || 0);
+      }
+    }
+    current = current.parentElement;
+  }
+  return Math.max(
+    0,
+    window.scrollY || window.pageYOffset || document.documentElement?.scrollTop || 0
+  );
+}
+
+function clearGlobalGestureBodyPreview() {
+  if (typeof document === "undefined") return;
+  if (!gestureState.bodyPreviewActive) return;
+  document.body.style.transform = gestureState.bodyTransformBefore;
+  gestureState.bodyPreviewActive = false;
+}
+
+function openQuickAdd() {
+  if (typeof toggleToolbarAddMenuFromMobileNav !== "function") return false;
+  toggleToolbarAddMenuFromMobileNav();
+  return true;
+}
+
+let thumbSaveBarSyncRaf = 0;
+
+function removeThumbSaveBar() {
+  if (typeof document === "undefined") return;
+  document.querySelectorAll(".thumb-save-bar").forEach((element) => element.remove());
+  document.querySelectorAll(".has-thumb-save-bar").forEach((element) => {
+    element.classList.remove("has-thumb-save-bar");
+  });
+}
+
+function isVisibleThumbSaveTarget(element) {
+  if (!(element instanceof HTMLElement)) return false;
+  if (element.hidden) return false;
+  if (element.closest(".thumb-save-bar")) return false;
+  if (element.closest("[hidden]")) return false;
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function resolveThumbSaveSubmitButton(root, form) {
+  if (!(root instanceof Element) || !(form instanceof HTMLFormElement)) return null;
+  const formId = String(form.id || "").trim();
+  const externalCandidates = formId
+    ? [...root.querySelectorAll(`button[type="submit"][form="${formId}"], input[type="submit"][form="${formId}"]`)]
+    : [];
+  const internalCandidates = [...form.querySelectorAll('button[type="submit"], input[type="submit"]')];
+  return [...externalCandidates, ...internalCandidates].find((candidate) => isVisibleThumbSaveTarget(candidate)) || null;
+}
+
+function resolveThumbSaveContext() {
+  if (typeof document === "undefined") return null;
+  if (!document.body?.classList.contains("app-mobile-shell")) return null;
+
+  const journalRoot = journalOverlayRoot();
+  if (journalRoot && String(journalRoot.dataset.journalOverlayView || "").trim() === "compose") {
+    const form = journalRoot.querySelector("form");
+    if (form instanceof HTMLFormElement) {
+      return {
+        root: journalRoot,
+        form,
+        submitButton: resolveThumbSaveSubmitButton(journalRoot, form)
+      };
+    }
+  }
+
+  if (detailModal?.open) {
+    const isEditorLike =
+      detailModal.classList.contains("detail-modal--editor")
+      || detailModal.classList.contains("detail-modal--batch")
+      || detailModal.classList.contains("detail-modal--photo-quick")
+      || detailModal.classList.contains("detail-modal--worklog-manager");
+    if (!isEditorLike) return null;
+    const root = detailContent || detailModal;
+    const form = root?.querySelector("form");
+    if (form instanceof HTMLFormElement) {
+      return {
+        root,
+        form,
+        submitButton: resolveThumbSaveSubmitButton(root, form)
+      };
+    }
+  }
+
+  return null;
+}
+
+function ensureThumbSaveBar(formElement) {
+  if (typeof document === "undefined" || typeof window === "undefined") return null;
+  if (!(formElement instanceof HTMLFormElement)) return null;
+  if (!document.body?.classList.contains("app-mobile-shell")) return null;
+
+  const root = formElement.closest("#journal-overlay-root, #detail-modal") || formElement;
+  const submitButton = resolveThumbSaveSubmitButton(root, formElement);
+  if (!submitButton) {
+    removeThumbSaveBar();
+    return null;
+  }
+
+  document.querySelectorAll(".thumb-save-bar").forEach((element) => {
+    if (!formElement.contains(element)) {
+      element.remove();
+    }
+  });
+  document.querySelectorAll(".has-thumb-save-bar").forEach((element) => {
+    if (element !== formElement) {
+      element.classList.remove("has-thumb-save-bar");
+    }
+  });
+
+  formElement.classList.add("has-thumb-save-bar");
+  let bar = formElement.querySelector(".thumb-save-bar");
+  if (!(bar instanceof HTMLElement)) {
+    bar = document.createElement("div");
+    bar.className = "thumb-save-bar";
+    bar.innerHTML = `<button class="thumb-save-btn" type="button">Uložiť</button>`;
+    formElement.appendChild(bar);
+  }
+
+  const stickyButton = bar.querySelector(".thumb-save-btn");
+  if (!(stickyButton instanceof HTMLButtonElement)) return bar;
+  const nextLabel = String(submitButton.textContent || "").trim() || "Uložiť";
+  stickyButton.textContent = nextLabel;
+  stickyButton.disabled = Boolean(submitButton.disabled);
+  stickyButton.setAttribute("aria-label", nextLabel);
+  stickyButton.onclick = () => {
+    if (submitButton.disabled) return;
+    submitButton.click();
+  };
+  return bar;
+}
+
+function syncThumbSaveBar() {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  const context = resolveThumbSaveContext();
+  if (!(context?.form instanceof HTMLFormElement)) {
+    removeThumbSaveBar();
+    return;
+  }
+  ensureThumbSaveBar(context.form);
+}
+
+function scheduleThumbSaveBarSync() {
+  if (typeof window === "undefined") return;
+  if (thumbSaveBarSyncRaf) return;
+  thumbSaveBarSyncRaf = window.requestAnimationFrame(() => {
+    thumbSaveBarSyncRaf = 0;
+    syncThumbSaveBar();
+  });
+}
+
 function isJournalOverlayHistoryKind(kind = "") {
   const normalizedKind = String(kind || "").trim();
   return normalizedKind === "journal"
@@ -3890,6 +4266,7 @@ function openDetailModalDialog() {
   detailModal.scrollTop = 0;
   if (detailContent) detailContent.scrollTop = 0;
   refreshWalkMaps(detailContent || detailModal);
+  scheduleThumbSaveBarSync();
 }
 const imageLightboxImageEl = document.getElementById("image-lightbox-image");
 const imageLightboxCountEl = document.getElementById("image-lightbox-count");
@@ -4241,6 +4618,169 @@ window.addEventListener("pagehide", () => {
 syncDocumentVisibilityRuntimeState();
 scheduleImageBackgroundCleanup();
 
+document.addEventListener("touchstart", (event) => {
+  if (!shouldEnableGlobalSwipeGestures()) return;
+  if (event.touches.length !== 1) return;
+  const touch = event.touches[0];
+  if (!touch) return;
+  const startTarget = event.target instanceof Element ? event.target : null;
+  if (isGestureIgnoredTarget(startTarget)) return;
+
+  gestureState.startX = touch.clientX;
+  gestureState.startY = touch.clientY;
+  gestureState.startTime = Date.now();
+  gestureState.tracking = true;
+  gestureState.startTarget = startTarget;
+  gestureState.bodyTransformBefore = document.body.style.transform || "";
+  gestureState.bodyPreviewActive = false;
+  gestureDirection = null;
+}, { passive: true });
+
+document.addEventListener("touchmove", (event) => {
+  if (!gestureState.tracking || !shouldEnableGlobalSwipeGestures()) return;
+  const touch = event.touches[0];
+  if (!touch) return;
+  const deltaX = touch.clientX - gestureState.startX;
+  const deltaY = touch.clientY - gestureState.startY;
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+
+  if (!gestureDirection) {
+    if (absX > absY) {
+      gestureDirection = "x";
+    } else if (absY > absX) {
+      gestureDirection = "y";
+    }
+  }
+
+  if (
+    gestureDirection === "x"
+    &&
+    gestureState.startX < GESTURE_CONFIG.edgeZone
+    && deltaX > 0
+    && Math.abs(deltaX) > 20
+    && absX > absY
+  ) {
+    document.body.style.transform = `translateX(${Math.min(deltaX, 20)}px)`;
+    gestureState.bodyPreviewActive = true;
+    return;
+  }
+
+  clearGlobalGestureBodyPreview();
+}, { passive: true });
+
+document.addEventListener("touchend", (event) => {
+  clearGlobalGestureBodyPreview();
+  if (!gestureState.tracking || gestureState.cooldown || !shouldEnableGlobalSwipeGestures()) {
+    gestureState.tracking = false;
+    gestureState.startTarget = null;
+    gestureDirection = null;
+    return;
+  }
+
+  const touch = event.changedTouches?.[0];
+  if (!touch) {
+    gestureState.tracking = false;
+    gestureState.startTarget = null;
+    gestureDirection = null;
+    return;
+  }
+
+  const deltaX = touch.clientX - gestureState.startX;
+  const deltaY = touch.clientY - gestureState.startY;
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+  const gestureDurationMs = Date.now() - gestureState.startTime;
+  const currentScrollTop = resolveGestureScrollTop(gestureState.startTarget);
+
+  gestureState.tracking = false;
+
+  if (gestureDurationMs > GESTURE_CONFIG.maxDurationMs) {
+    gestureState.startTarget = null;
+    gestureDirection = null;
+    return;
+  }
+
+  if (absX < GESTURE_CONFIG.threshold && absY < GESTURE_CONFIG.threshold) {
+    gestureState.startTarget = null;
+    gestureDirection = null;
+    return;
+  }
+
+  gestureState.cooldown = true;
+  window.setTimeout(() => {
+    gestureState.cooldown = false;
+  }, GESTURE_CONFIG.cooldownMs);
+
+  if (
+    gestureDirection === "x"
+    &&
+    deltaX > GESTURE_CONFIG.threshold
+    && gestureState.startX < GESTURE_CONFIG.edgeZone
+    && absX > absY
+  ) {
+    closeTopmostOverlay();
+    gestureState.startTarget = null;
+    gestureDirection = null;
+    return;
+  }
+
+  if (
+    gestureDirection === "y"
+    &&
+    deltaY < -GESTURE_CONFIG.threshold
+    && gestureState.startY > (window.innerHeight - GESTURE_CONFIG.bottomZone)
+    && absY > absX
+    && !isAnyOverlayOpen()
+  ) {
+    openQuickAdd();
+    gestureState.startTarget = null;
+    gestureDirection = null;
+    return;
+  }
+
+  if (
+    gestureDirection === "y"
+    &&
+    deltaY > GESTURE_CONFIG.threshold
+    && absY > absX
+    && currentScrollTop === 0
+  ) {
+    closeTopmostOverlay();
+  }
+
+  gestureState.startTarget = null;
+  gestureDirection = null;
+}, { passive: true });
+
+document.addEventListener("touchcancel", () => {
+  clearGlobalGestureBodyPreview();
+  gestureState.tracking = false;
+  gestureState.startTarget = null;
+  gestureDirection = null;
+}, { passive: true });
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (!target.closest("#journal-overlay-root, #detail-modal")) return;
+  scheduleThumbSaveBarSync();
+}, true);
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (!target.closest("#journal-overlay-root, #detail-modal")) return;
+  scheduleThumbSaveBarSync();
+}, true);
+
+document.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (!target.closest("#journal-overlay-root, #detail-modal")) return;
+  scheduleThumbSaveBarSync();
+}, true);
+
 function closeToolbarAddMenu({ skipHistory = true } = {}) {
   restoreToolbarAddMenuOverlay();
   if (!toolbarAddMenuEl?.open) return;
@@ -4455,6 +4995,7 @@ function closeJournalOverlay(options = {}) {
       ? "journal-compose"
       : (rootView === "entry" ? "journal-entry" : "journal"));
   if (root) root.remove();
+  removeThumbSaveBar();
   unlockBodyScroll("journal");
   journalOverlayPreviousOverflow = null;
   document.removeEventListener("keydown", handleJournalOverlayEscape);
@@ -4465,6 +5006,7 @@ function closeJournalOverlay(options = {}) {
   }
   syncWeatherBackgroundLoopVisibility();
   syncMobileOverlayBottomNavPlacement();
+  scheduleThumbSaveBarSync();
 }
 
 function ensureJournalOverlayRoot(options = {}) {
@@ -5051,12 +5593,7 @@ function openJournalOverlayEntry(entryId = "", returnTagKey = "", options = {}) 
 
 function renderJournalComposerImagePreview(existingImages, pendingUrls, existingVideo = "", pendingVideoUrl = "") {
   const items = [
-    ...existingImages.map((image, index) => `
-      <div class="journal-form__image journal-form__image--pending">
-        <img src="${escapeAttribute(image)}" alt="Uložená fotka ${index + 1}" loading="lazy" decoding="async" fetchpriority="low">
-        <button class="journal-form__image-remove" type="button" data-remove-existing-image="${index}" aria-label="Odstrániť fotku">x</button>
-      </div>
-    `),
+    ...existingImages.map((image, index) => renderJournalExistingImagePreviewItem(image, index)),
     ...pendingUrls.map((image, index) => `
       <div class="journal-form__image journal-form__image--pending">
         <img src="${escapeAttribute(image)}" alt="Nová fotka ${index + 1}" loading="lazy" decoding="async" fetchpriority="low">
@@ -5081,6 +5618,127 @@ function renderJournalComposerImagePreview(existingImages, pendingUrls, existing
     `);
   }
   return items.join("");
+}
+
+function renderJournalExistingImagePreviewItem(image, index, removeAttributeName = "data-remove-existing-image") {
+  const normalizedSource = String(image || "").trim();
+  const hasDirectSource = isDirectRenderableImageSource(normalizedSource);
+  const initialSource = hasDirectSource ? normalizedSource : placeholderImage();
+  const lazySourceAttribute = !hasDirectSource && normalizedSource
+    ? ` data-journal-composer-existing-source="${escapeAttribute(normalizedSource)}"`
+    : "";
+  return `
+      <div class="journal-form__image journal-form__image--pending">
+        <img src="${escapeAttribute(initialSource)}"${lazySourceAttribute} alt="Uložená fotka ${index + 1}" loading="lazy" decoding="async" fetchpriority="low">
+        <button class="journal-form__image-remove" type="button" ${removeAttributeName}="${index}" aria-label="Odstrániť fotku">x</button>
+      </div>
+    `;
+}
+
+async function hydrateJournalComposerPreviewImages(root, renderToken = "") {
+  if (!(root instanceof Element)) return;
+  const token = String(renderToken || "").trim();
+  const images = [...root.querySelectorAll("img[data-journal-composer-existing-source]")];
+  for (const img of images) {
+    if (!(img instanceof HTMLImageElement)) continue;
+    if (img.dataset.journalComposerPreviewHydrating === "true") continue;
+    const source = String(img.getAttribute("data-journal-composer-existing-source") || "").trim();
+    if (!source) continue;
+    img.dataset.journalComposerPreviewHydrating = "true";
+    try {
+      const renderableSource = await resolveRenderableSupabaseImageSource(source);
+      if (!img.isConnected || !root.isConnected) continue;
+      if (token && String(root.getAttribute("data-journal-composer-preview-token") || "").trim() !== token) continue;
+      if (!isDirectRenderableImageSource(renderableSource)) continue;
+      img.src = renderableSource;
+      img.removeAttribute("data-journal-composer-existing-source");
+    } catch (error) {
+      // Pri preview nech radšej ostane placeholder než rozbitý obrázok.
+    } finally {
+      img.removeAttribute("data-journal-composer-preview-hydrating");
+    }
+  }
+}
+
+function getDraftKey(formType) {
+  return `draft_${String(formType || "").trim()}`;
+}
+
+function saveDraft(formType, data) {
+  try {
+    localStorage.setItem(getDraftKey(formType), JSON.stringify(data));
+  } catch (error) {
+    console.warn("Nepodarilo sa uložiť draft formulára", formType, error);
+  }
+}
+
+function loadDraft(formType) {
+  try {
+    const raw = localStorage.getItem(getDraftKey(formType));
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.warn("Nepodarilo sa načítať draft formulára", formType, error);
+    return null;
+  }
+}
+
+function clearDraft(formType) {
+  try {
+    localStorage.removeItem(getDraftKey(formType));
+  } catch (error) {
+    console.warn("Nepodarilo sa zmazať draft formulára", formType, error);
+  }
+}
+
+function collectDraftFormData(formElement) {
+  if (!(formElement instanceof HTMLFormElement)) return null;
+  const formData = new FormData(formElement);
+  const data = {};
+  formData.forEach((value, key) => {
+    if (value instanceof File) return;
+    const normalizedValue = String(value ?? "");
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      if (Array.isArray(data[key])) {
+        data[key].push(normalizedValue);
+      } else {
+        data[key] = [data[key], normalizedValue];
+      }
+      return;
+    }
+    data[key] = normalizedValue;
+  });
+  data.__entryMode = String(formElement.dataset.entryMode || "").trim();
+  return data;
+}
+
+function applyDraftValuesToForm(formElement, draftData = {}) {
+  if (!(formElement instanceof HTMLFormElement) || !draftData || typeof draftData !== "object") return;
+  Object.entries(draftData).forEach(([key, value]) => {
+    if (key === "__entryMode") return;
+    const fields = [...formElement.querySelectorAll(`[name="${CSS.escape(String(key))}"]`)];
+    if (!fields.length) return;
+    const values = Array.isArray(value) ? value.map((item) => String(item ?? "")) : [String(value ?? "")];
+    const fieldType = String(fields[0]?.getAttribute?.("type") || "").trim().toLowerCase();
+    if (fieldType === "radio") {
+      fields.forEach((field) => {
+        if (!(field instanceof HTMLInputElement)) return;
+        field.checked = values.includes(String(field.value || ""));
+      });
+      return;
+    }
+    if (fieldType === "checkbox") {
+      fields.forEach((field) => {
+        if (!(field instanceof HTMLInputElement)) return;
+        field.checked = values.includes(String(field.value || ""));
+      });
+      return;
+    }
+    fields.forEach((field, index) => {
+      if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) return;
+      const nextValue = values[Math.min(index, values.length - 1)] ?? values[0] ?? "";
+      field.value = nextValue;
+    });
+  });
 }
 
 function openJournalQuickActions(activeType = "") {
@@ -5432,6 +6090,9 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const linkedVarietyWrap = formEl?.querySelector('[data-linked-variety-wrap="journal-overlay"]');
   const relationDisclosure = formEl?.querySelector("[data-relation-disclosure]") || null;
   const relationSummary = relationDisclosure?.querySelector("[data-relation-summary]") || null;
+  const journalDraftFormType = editingEntry?.id
+    ? `journal-edit-${String(editingEntry.id).trim()}`
+    : "journal-new";
   let currentWeatherSnapshot = editingEntry?.weather || null;
   let lastSyncedEntryType = initialEntryType;
   let walkGpsPoints = normalizeWalkGpsPoints(editingEntry?.walk?.gpsPoints);
@@ -5449,8 +6110,34 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   let walkGpsLivePolyline = null;
   let walkGpsLiveStartMarker = null;
   let walkGpsLiveEndMarker = null;
+  let restoredDraftMode = "";
+  let journalDraftAutosaveEnabled = false;
 
   const waitForNextPaint = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+  const persistJournalComposerDraft = () => {
+    if (!journalDraftAutosaveEnabled) return;
+    if (!(formEl instanceof HTMLFormElement)) return;
+    const draftData = collectDraftFormData(formEl);
+    if (!draftData) return;
+    saveDraft(journalDraftFormType, draftData);
+  };
+
+  const restoreJournalComposerDraft = () => {
+    if (!(formEl instanceof HTMLFormElement)) return false;
+    const draft = loadDraft(journalDraftFormType);
+    if (!draft || typeof draft !== "object") return false;
+    const desiredLinkedVarietyId = String(draft.linkedVarietyId || "").trim();
+    applyDraftValuesToForm(formEl, draft);
+    renderLinkedVarietyOptions();
+    if (linkedVarietySelect && desiredLinkedVarietyId) {
+      const hasDesiredOption = [...linkedVarietySelect.options].some((option) => String(option.value || "").trim() === desiredLinkedVarietyId);
+      linkedVarietySelect.value = hasDesiredOption ? desiredLinkedVarietyId : "";
+    }
+    syncJournalRelationSummary();
+    restoredDraftMode = String(draft.__entryMode || "").trim();
+    return true;
+  };
 
   const autoJournalTitleForType = (entryTypeValue, weatherSnapshot = currentWeatherSnapshot || editingEntry?.weather || null) => journalAutoTitle(entryTypeValue, {
     tags: formEl?.elements.tags?.value || editingEntry?.tags || "",
@@ -6029,8 +6716,11 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     clearPendingUrls();
     pendingUrls = pendingFiles.map((file) => URL.createObjectURL(file));
     pendingVideoUrl = pendingVideoFile ? URL.createObjectURL(pendingVideoFile) : "";
+    const renderToken = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    imagePreviewEl.dataset.journalComposerPreviewToken = renderToken;
     imagePreviewEl.innerHTML = renderJournalComposerImagePreview(existingImages, pendingUrls, existingVideo, pendingVideoUrl);
     imagePreviewEl.hidden = !imagePreviewEl.innerHTML.trim();
+    hydrateJournalComposerPreviewImages(imagePreviewEl, renderToken).catch(() => {});
     syncVideoUploadStatus();
 
     imagePreviewEl.querySelectorAll("[data-remove-existing-image]").forEach((button) => {
@@ -6122,6 +6812,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
       button.classList.toggle("is-selected", isSelected);
       button.setAttribute("aria-pressed", isSelected ? "true" : "false");
     });
+    persistJournalComposerDraft();
   };
 
   const syncEntryTypeUi = () => {
@@ -6199,6 +6890,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
       advancedDetailsEl.hidden = mode !== "full";
       advancedDetailsEl.open = mode === "full";
     }
+    persistJournalComposerDraft();
   };
 
   const renderWeatherHint = async () => {
@@ -6331,6 +7023,14 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     });
   });
 
+  formEl?.addEventListener("input", () => {
+    persistJournalComposerDraft();
+  });
+
+  formEl?.addEventListener("change", () => {
+    persistJournalComposerDraft();
+  });
+
   dateInput?.addEventListener("change", () => {
     renderWeatherHint().catch(() => {});
   });
@@ -6346,19 +7046,22 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
     syncTitleAutoDerivedState();
   });
 
-  setEntryMode(defaultEntryMode);
+  restoreJournalComposerDraft();
+  setEntryMode(restoredDraftMode || defaultEntryMode);
   if (titleInput) {
     titleInput.dataset.autoDerived = String(
       !String(titleInput.value || "").trim()
       || String(titleInput.value || "").trim() === autoJournalTitleForType(initialEntryType, editingEntry?.weather || null)
     );
   }
-  syncMoodPicker(editingEntry?.mood || "");
+  syncMoodPicker(formEl?.elements.mood?.value || editingEntry?.mood || "");
   syncEntryTypeUi();
   renderPreview();
   renderWalkGpsState();
   renderWeatherHint().catch(() => {});
   syncMobileOverlayBottomNavPlacement();
+  scheduleThumbSaveBarSync();
+  journalDraftAutosaveEnabled = true;
 
   formEl?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -6523,6 +7226,7 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
       }
 
       rememberLastUsedJournalEntryType(selectedEntryType);
+      clearDraft(journalDraftFormType);
       stopWalkGpsTracking({ silent: true });
       render();
       openJournalReturnView();
@@ -7186,12 +7890,14 @@ function wireStaticEvents() {
     if (!shouldPreserveDetailReturnContext) {
       detailReturnContext = null;
     }
-    detailReturnContextRestoreSuppressed = false;
-    preserveDetailReturnContextOnClose = false;
+  detailReturnContextRestoreSuppressed = false;
+  preserveDetailReturnContextOnClose = false;
 
+    removeThumbSaveBar();
     unlockDetailBodyScroll();
     syncWeatherBackgroundLoopVisibility();
     syncMobileOverlayBottomNavPlacement();
+    scheduleThumbSaveBarSync();
     detailModalBackOverride = null;
     if (!shouldSuppressDetailReturnContext && closingDetailReturnContext && !shouldPreserveDetailReturnContext) {
       if (overlayHistoryNavigating) {
@@ -7537,6 +8243,7 @@ function render() {
     const shouldKeepToolbarAddMenuOpen = Boolean(toolbarAddMenuEl?.open);
     ensureActiveCategory();
     syncMobilePreviewClass();
+    syncLoggedOutHomeExperience();
     if (!shouldKeepToolbarAddMenuOpen) {
       closeToolbarAddMenu();
     }
@@ -7544,6 +8251,7 @@ function render() {
     updateUndoButton();
     updateRestoreResetButton();
     updateMenuVisibility();
+    safeStep("toolbar tlačidlá", syncResponsiveToolbarButtonPlacement);
     if (activeSeasonTitleEl) {
       activeSeasonTitleEl.textContent = `Sezóna ${currentSeasonYear()}`;
     }
@@ -8985,6 +9693,15 @@ function handleGenericMobileMediaFile(file) {
   handleGenericMobileMediaFiles(file);
 }
 
+function resolveMobileCameraPickerMountTarget() {
+  if (typeof document === "undefined") return null;
+  const openDetailModal = document.querySelector(".detail-modal[open]");
+  if (openDetailModal instanceof HTMLElement) return openDetailModal;
+  const journalRoot = journalOverlayRoot();
+  if (journalRoot instanceof HTMLElement && !journalRoot.hidden) return journalRoot;
+  return document.body;
+}
+
 function ensureMobileCameraPicker() {
   if (typeof document === "undefined") return null;
   let host = document.getElementById("mobile-camera-picker-host");
@@ -9015,12 +9732,15 @@ function ensureMobileCameraPicker() {
       <input class="mobile-camera-picker__native-input" id="mobile-media-capture-input" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" capture="environment" multiple tabindex="-1" aria-hidden="true">
       <input class="mobile-camera-picker__native-input" id="mobile-media-gallery-input" type="file" accept="${escapeAttribute(`${IMAGE_FILE_ACCEPT},${VIDEO_FILE_ACCEPT}`)}" multiple tabindex="-1" aria-hidden="true">
     `;
-    document.body.appendChild(host);
   }
 
-  if (host.parentElement !== document.body) {
-    document.body.appendChild(host);
+  const mountTarget = resolveMobileCameraPickerMountTarget();
+  if (!mountTarget) return host;
+
+  if (host.parentElement !== mountTarget) {
+    mountTarget.appendChild(host);
   }
+  host.dataset.mountTarget = mountTarget === document.body ? "body" : "overlay";
 
   if (host.dataset.bound !== "true") {
     host.dataset.bound = "true";
@@ -9562,6 +10282,9 @@ function syncMobileTopStripVisibility() {
       menuPanelEl.style.removeProperty("margin-top");
     }
   }
+  if (!shouldHideLegacyTopStrip || showHomeFloatingTopBar) {
+    syncResponsiveToolbarButtonPlacement();
+  }
 }
 
 function renderWarmEmptyState({
@@ -9593,6 +10316,12 @@ function renderProgressOverview() {
     clearInterval(sowingTipInterval);
     sowingTipInterval = null;
   }
+  if (shouldUseCleanLoggedOutHome()) {
+    progressOverviewEl.hidden = true;
+    progressOverviewEl.innerHTML = "";
+    return;
+  }
+  progressOverviewEl.hidden = false;
 
   const tasks = combinedTasks();
   const completedTasks = tasks.filter((item) => item.done).length;
@@ -14085,6 +14814,15 @@ function renderMemories() {
   if (!memoryStripEl) return;
   const memoryItems = latestJournalImages();
   const totalJournalEntries = activeSyncCount(state.journal);
+  const useCleanHome = shouldUseCleanLoggedOutHome();
+  const cleanHomeEmptyMarkup = renderWarmEmptyState({
+    title: "Tvoje miesto pre momenty z prírody",
+    text: "Začni prvou fotkou alebo krátkym zápisom. Postupne to tu ožije.",
+    compact: true,
+    actionLabel: "Pridať prvý moment",
+    actionAttr: 'data-open-clean-home-journal',
+    actionClass: "button"
+  });
 
   if (memoryCarouselIndex >= memoryItems.length) {
     memoryCarouselIndex = 0;
@@ -14117,11 +14855,13 @@ function renderMemories() {
         </div>
       </div>
     `
-    : renderWarmEmptyState({
-      title: "Tu sa budú usádzať tvoje spomienky",
-      text: "Pridaj prvý zápis s fotkou a tento priestor ožije.",
-      compact: true
-    });
+    : (useCleanHome
+      ? cleanHomeEmptyMarkup
+      : renderWarmEmptyState({
+        title: "Tu sa budú usádzať tvoje spomienky",
+        text: "Pridaj prvý zápis s fotkou a tento priestor ožije.",
+        compact: true
+      }));
 
   const memoryHero = memoryStripEl.querySelector(".memory-strip__hero");
   const memoryHeroImage = memoryHero?.querySelector("img");
@@ -14194,14 +14934,22 @@ function renderMemories() {
 
   const openAllJournalButton = document.getElementById("open-all-journal-from-memories");
   if (openAllJournalButton) {
-    openAllJournalButton.textContent = totalJournalEntries
-      ? `Zobraziť všetky zápisy (${totalJournalEntries})`
-      : "Otvoriť denník";
-    openAllJournalButton.onclick = () => {
-      forceOpenJournalManager();
-      return false;
-    };
+    openAllJournalButton.hidden = useCleanHome;
+    if (!useCleanHome) {
+      openAllJournalButton.textContent = totalJournalEntries
+        ? `Zobraziť všetky zápisy (${totalJournalEntries})`
+        : "Otvoriť denník";
+      openAllJournalButton.onclick = () => {
+        forceOpenJournalManager();
+        return false;
+      };
+    } else {
+      openAllJournalButton.onclick = null;
+    }
   }
+  memoryStripEl.querySelectorAll("[data-open-clean-home-journal]").forEach((button) => {
+    button.addEventListener("click", () => openJournalComposer());
+  });
 }
 
 function insightWeatherSignals() {
@@ -14284,8 +15032,8 @@ function weatherInsightWeekTip(week, eyebrow = "") {
     return {
       key: `weather-week-frost-${week.key}-${frostDay.date}`,
       eyebrow,
-      title: `${week.label}: chladné rána`,
-      body: `${capitalizeLabel(frostDay.label)} ${frostDay.calendarLabel} môže minimum padnúť na ${Math.round(frostDay.minTempC || 0)} °C. Citlivejšie výsevy, priesady a kvitnúce veci radšej sleduj alebo chráň.`
+      title: `${week.label}: pozor na mráz`,
+      body: `${capitalizeLabel(frostDay.label)} ${frostDay.calendarLabel} môže minimum padnúť na ${Math.round(frostDay.minTempC || 0)} °C. Citlivejšie veci radšej prikry.`
     };
   }
 
@@ -14293,8 +15041,8 @@ function weatherInsightWeekTip(week, eyebrow = "") {
     return {
       key: `weather-week-storm-${week.key}-${stormDay.date}`,
       eyebrow,
-      title: `${week.label}: sleduj búrky a krúpy`,
-      body: `${capitalizeLabel(stormDay.label)} ${stormDay.calendarLabel} môže prísť prudší zásah. Oplatí sa skontrolovať nádoby, opory a všetko krehké alebo čerstvo vysadené.`
+      title: `${week.label}: sleduj búrky`,
+      body: `${capitalizeLabel(stormDay.label)} ${stormDay.calendarLabel} môžu prísť búrky alebo krúpy. Pozri opory, nádoby a krehké rastliny.`
     };
   }
 
@@ -14302,8 +15050,8 @@ function weatherInsightWeekTip(week, eyebrow = "") {
     return {
       key: `weather-week-rain-${week.key}`,
       eyebrow,
-      title: `${week.label}: daždivejší priebeh`,
-      body: `Od pondelka do nedele to vyzerá približne na ${summary.totalRain || "viac zrážok"}. Sleduj premokrenie nádob, odtok vody, blato a tlak na choroby.`
+      title: `${week.label}: viac dažďa`,
+      body: `Vyzerá to asi na ${summary.totalRain || "viac vlahy"}. Sleduj blato, premokrenie a tlak na plesne.`
     };
   }
 
@@ -14311,8 +15059,8 @@ function weatherInsightWeekTip(week, eyebrow = "") {
     return {
       key: `weather-week-dry-${week.key}`,
       eyebrow,
-      title: `${week.label}: skôr suchší priebeh`,
-      body: `Zatiaľ vychádza len okolo ${summary.totalRain || "málo zrážok"}. Skontroluj nádoby, skleník a vrchnú vrstvu pôdy, hlavne pri čerstvých výsevoch a priesadách.`
+      title: `${week.label}: skôr sucho`,
+      body: `Zrážok má byť len okolo ${summary.totalRain || "málo"}. Pozri nádoby, skleník a čerstvé výsevy.`
     };
   }
 
@@ -14321,7 +15069,7 @@ function weatherInsightWeekTip(week, eyebrow = "") {
       key: `weather-week-heat-${week.key}`,
       eyebrow,
       title: `${week.label}: teplejšie dni`,
-      body: `Maximum môže ísť približne na ${Math.round(summary.hottestMax || 0)} °C. V skleníku a nádobách sleduj rýchle presychanie, vetranie a tienenie.`
+      body: `Maximum môže ísť približne na ${Math.round(summary.hottestMax || 0)} °C. Nádoby a skleník budú rýchlejšie presychať.`
     };
   }
 
@@ -14329,8 +15077,8 @@ function weatherInsightWeekTip(week, eyebrow = "") {
     return {
       key: `weather-week-wind-${week.key}`,
       eyebrow,
-      title: `${week.label}: veterné dni`,
-      body: `Vietor môže ísť približne na ${summary.maxWind || ""}. Skontroluj opory, vysychanie substrátu a či niečo nefúka priamo na citlivejšie rastliny.`
+      title: `${week.label}: veterno`,
+      body: `Vietor môže ísť približne na ${summary.maxWind || ""}. Skontroluj opory a rýchlejšie presychanie pôdy.`
     };
   }
 
@@ -14338,8 +15086,8 @@ function weatherInsightWeekTip(week, eyebrow = "") {
     return {
       key: `weather-week-cold-${week.key}`,
       eyebrow,
-      title: `${week.label}: chladnejší priebeh`,
-      body: `Najnižšie ranné teploty môžu byť okolo ${Math.round(summary.coldestMin)} °C. Pri skorých výsevoch a skleníku sa oplatí sledovať nočný pokles viac než popoludnie.`
+      title: `${week.label}: chladnejšie rána`,
+      body: `Ráno môže byť okolo ${Math.round(summary.coldestMin)} °C. Pri skorých výsevoch sleduj hlavne nočný pokles.`
     };
   }
 
@@ -14347,7 +15095,7 @@ function weatherInsightWeekTip(week, eyebrow = "") {
     key: `weather-week-overview-${week.key}`,
     eyebrow,
     title: `${week.label}: pokojnejší priebeh`,
-    body: `Zatiaľ to vyzerá skôr na ${summary.skyLabel || "pokojnejší týždeň"}, približne ${summary.totalRain || "0 mm"} zrážok a vietor skôr do ${summary.maxWind || "slabších hodnôt"}.`
+    body: `${summary.skyLabel || "Pokojnejšie dni"}, zrážky asi ${summary.totalRain || "0 mm"} a vietor skôr mierny.`
   };
 }
 
@@ -14365,8 +15113,8 @@ function weatherGrowingWindowTip(weather = insightWeatherSignals()) {
   return {
     key: `weather-growing-window-${firstDay.date}-${lastDay.date}`,
     eyebrow: "Pestovanie",
-    title: "Stabilnejšie okno na výsev a presádzanie",
-    body: `${capitalizeLabel(firstDay.label)} až ${lastDay.label} vyzerajú podmienky pokojnejšie: rána bez výrazného chladu, slabší vietor a miernejšie denné teploty. To je lepšie okno na výsev, presádzanie aj jemnejšiu prácu v záhonoch.`
+    title: "Blíži sa pokojnejšie okno",
+    body: `${capitalizeLabel(firstDay.label)} až ${lastDay.label} vyzerajú pokojnejšie dni. Pekné okno na výsev, presádzanie aj jemné práce.`
   };
 }
 
@@ -14377,8 +15125,8 @@ function weatherMoisturePressureTip(weather = insightWeatherSignals()) {
   return {
     key: `weather-moisture-pressure-${wetDay.date}`,
     eyebrow: "Pestovanie",
-    title: "Po vlhkejšom dni sleduj slimáky a tlak na plesne",
-    body: `${capitalizeLabel(wetDay.label)} ${wetDay.calendarLabel} môže prísť viac vlahy. Po takomto priebehu sa oplatí skontrolovať hustejšie porasty, spodné listy, slimáky a či niekde nestojí voda v nádobách.`
+    title: "Po daždi sleduj slimáky a plesne",
+    body: `${capitalizeLabel(wetDay.label)} ${wetDay.calendarLabel} môže prísť viac vlahy. Potom pozri husté porasty, spodné listy a miesta, kde stojí voda.`
   };
 }
 
@@ -14393,8 +15141,8 @@ function weatherHarvestWindowTip(weather = insightWeatherSignals()) {
   return {
     key: `weather-harvest-window-${dryDays[0].date}-${dryDays[1].date}`,
     eyebrow: "Úroda",
-    title: "Suchšie okno na zber a spracovanie",
-    body: `${capitalizeLabel(dryDays[0].label)} a ${dryDays[1].label} vyzerajú suchšie a pokojnejšie. To býva lepší čas na zber, sušenie aj presun úrody bez zbytočnej vlhkosti navyše.`
+    title: "Blíži sa suchšie okno na zber",
+    body: `${capitalizeLabel(dryDays[0].label)} a ${dryDays[1].label} vyzerajú suchšie. Dobrý čas na zber, sušenie aj spracovanie.`
   };
 }
 
@@ -14414,7 +15162,7 @@ function weatherTrendBridgeTip(weather = insightWeatherSignals()) {
       key: "weather-trend-bridge-wet",
       eyebrow: "Vývoj počasia",
       title: `Za 7 dní: ${totalRainLabel}`,
-      body: `${rainyDaysLabel}. Max deň: ${maxRainLabel}.`
+      body: `${rainyDaysLabel}. Pôda si oddýchne, ale tlak na plesne porastie.`
     };
   }
 
@@ -14423,7 +15171,7 @@ function weatherTrendBridgeTip(weather = insightWeatherSignals()) {
       key: "weather-trend-bridge-dry",
       eyebrow: "Vývoj počasia",
       title: `Za 7 dní: ${totalRainLabel}`,
-      body: `${rainyDaysLabel}. Max deň: ${maxRainLabel}.`
+      body: `${rainyDaysLabel}. Ak máš nádoby a mladé výsevy, sleduj presychanie.`
     };
   }
 
@@ -14432,7 +15180,7 @@ function weatherTrendBridgeTip(weather = insightWeatherSignals()) {
       key: "weather-trend-bridge-burst",
       eyebrow: "Vývoj počasia",
       title: `Najsilnejší deň: ${maxRainLabel}`,
-      body: `Za 7 dní spolu ${totalRainLabel}.`
+      body: `Za 7 dní spolu ${totalRainLabel}. Sleduj odtok a preliatie nádob.`
     };
   }
 
@@ -14440,7 +15188,7 @@ function weatherTrendBridgeTip(weather = insightWeatherSignals()) {
     key: "weather-trend-bridge-calm",
     eyebrow: "Vývoj počasia",
     title: `Za 7 dní: ${totalRainLabel}`,
-    body: `${rainyDaysLabel}. Max deň: ${maxRainLabel}.`
+    body: `${rainyDaysLabel}. Skôr vyrovnaný priebeh bez väčšieho extrému.`
   };
 }
 
@@ -14457,8 +15205,8 @@ function weatherSnapshotGardenTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-snapshot-moisture",
       eyebrow: "Dnes v záhrade",
-      title: "Dnes je vlhší tlak na porasty",
-      body: `Vzduch a povrch sú dnes vlhšie, takže sa oplatí sledovať slimáky, spodné listy, zahustené porasty a či niekde nestojí voda. Pri nádobe alebo skleníku môže tlak na plesne rásť rýchlejšie.`
+      title: "Dnes je vlhko",
+      body: `Po daždi a vlhku sa oplatí pozrieť slimáky, spodné listy a miesta, kde stojí voda.`
     };
   }
 
@@ -14467,7 +15215,7 @@ function weatherSnapshotGardenTip(weather = insightWeatherSignals()) {
       key: "weather-snapshot-wind",
       eyebrow: "Dnes v záhrade",
       title: "Dnes viac vysušuje vietor",
-      body: `Aj keď nemusí byť extrémne teplo, vietor vie rýchlo vysušiť nádoby, povrch pôdy aj mladé sadenice. Pozri opory, fólie a citlivejšie listy otočené do prievanu.`
+      body: `Aj bez horúčavy vie vietor rýchlo vysušiť nádoby a mladé listy. Skontroluj opory aj priesady.`
     };
   }
 
@@ -14475,8 +15223,8 @@ function weatherSnapshotGardenTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-snapshot-heat",
       eyebrow: "Dnes v záhrade",
-      title: "Dnes si pýta pozornosť presychanie",
-      body: `Pri dnešnej teplote okolo ${Math.round(temperatureC)} °C sa môžu rýchlejšie prehriať nádoby, skleník aj čerstvé výsevy. Sleduj vetranie, tienenie a rýchlosť presychania vrchnej vrstvy.`
+      title: "Dnes rýchlo presychá",
+      body: `Okolo ${Math.round(temperatureC)} °C budú nádoby, skleník a vrchná vrstva pôdy schnúť rýchlejšie.`
     };
   }
 
@@ -14484,8 +15232,8 @@ function weatherSnapshotGardenTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-snapshot-cold",
       eyebrow: "Dnes v záhrade",
-      title: "Dnes je citlivejší chlad",
-      body: `Pri dnešnom chlade sa viac oplatí sledovať jemné priesady, skoré výsevy a rast v nádobách. Ranný priebeh môže byť dôležitejší než obedné zlepšenie.`
+      title: "Dnes je ráno chladné",
+      body: `Citlivejšie priesady a skoré výsevy si dnes pýtajú viac pozornosti.`
     };
   }
 
@@ -14493,8 +15241,8 @@ function weatherSnapshotGardenTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-snapshot-calm",
       eyebrow: "Dnes v záhrade",
-      title: "Dnes je pokojnejšie okno na jemné práce",
-      body: `Počasie je dnes skôr pokojné, takže je to lepší čas na kontrolu porastov, presádzanie, triedenie úrody alebo drobné práce, ktoré nechceš robiť v strese z vetra či dažďa.`
+      title: "Dnes je pekné okno na jemné práce",
+      body: `Pokojnejší deň sa hodí na presádzanie, kontrolu porastov alebo drobné práce bez stresu z vetra a dažďa.`
     };
   }
 
@@ -14511,7 +15259,7 @@ function weatherSowingContextTip(weather = insightWeatherSignals()) {
       key: `weather-sowing-frost-${weather.frostDay.date}`,
       eyebrow: "Výsev a pestovanie",
       title: firstTip.title,
-      body: `${firstTip.meta}. Len si daj pozor, že ${capitalizeLabel(weather.frostDay.label)} môže ešte prísť chladnejšie ráno, takže citlivejšie veci radšej nenechaj bez ochrany.`
+      body: `${firstTip.meta}. Len rátaj s tým, že ${capitalizeLabel(weather.frostDay.label)} môže prísť chladné ráno, tak citlivé veci prikry.`
     };
   }
 
@@ -14525,7 +15273,7 @@ function weatherSowingContextTip(weather = insightWeatherSignals()) {
       key: `weather-sowing-caution-${weather.rainDay?.date || weather.stormDay?.date || weather.windDay?.date || "now"}`,
       eyebrow: "Výsev a pestovanie",
       title: firstTip.title,
-      body: `${firstTip.meta}. Čas síce sedí, ale najbližšie dni môžu priniesť ${signalLabel}, takže pri výseve a presádzaní sa oplatí rátať s väčšou opatrnosťou a kontrolou povrchu pôdy.`
+      body: `${firstTip.meta}. Čas síce sedí, ale najbližšie dni môžu priniesť ${signalLabel}, preto choď opatrnejšie.`
     };
   }
 
@@ -14533,7 +15281,7 @@ function weatherSowingContextTip(weather = insightWeatherSignals()) {
     key: `weather-sowing-good-${slugify(firstTip.title)}`,
     eyebrow: "Výsev a pestovanie",
     title: firstTip.title,
-    body: `${firstTip.meta}. Podľa počasia teraz nevidím výraznejší blokér, takže to vyzerá ako celkom priaznivé okno na jemné práce okolo výsevu a štartu rastu.`
+    body: `${firstTip.meta}. Podľa počasia je teraz celkom príjemné okno na výsev a štart rastu.`
   };
 }
 
@@ -14554,7 +15302,7 @@ function weatherPreviousVsCurrentWeekTip(weather = insightWeatherSignals()) {
       key: "weather-compare-previous-current-rain-more",
       eyebrow: "Porovnanie týždňov",
       title: "Tento týždeň je mokrejší než minulý",
-      body: `Minulý týždeň spadlo približne ${previousSummary.totalRain || "menej vody"}, teraz to vyzerá skôr na ${currentSummary.totalRain || "vyšší úhrn"}. To je dobré pre preschnutú pôdu, ale rastie riziko blata, slimákov a tlaku na plesne.`
+      body: `Minulý týždeň spadlo približne ${previousSummary.totalRain || "menej vody"}, teraz to vyzerá skôr na ${currentSummary.totalRain || "vyšší úhrn"}. Pozor na blato, slimáky a plesne.`
     };
   }
 
@@ -14562,8 +15310,8 @@ function weatherPreviousVsCurrentWeekTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-compare-previous-current-rain-less",
       eyebrow: "Porovnanie týždňov",
-      title: "Dobrá správa: tento týždeň môže viac preschnúť",
-      body: `Po minulom vlhkejšom týždni s približne ${previousSummary.totalRain || "vyšším úhrnom"} to teraz vyzerá na ${currentSummary.totalRain || "menej zrážok"}. To môže pomôcť pôde aj úrode preschnúť, len sleduj nádoby a mladé výsevy.`
+      title: "Tento týždeň môže viac preschnúť",
+      body: `Po minulom vlhkejšom týždni s približne ${previousSummary.totalRain || "vyšším úhrnom"} to teraz vyzerá na ${currentSummary.totalRain || "menej zrážok"}. Sleduj nádoby a mladé výsevy.`
     };
   }
 
@@ -14571,8 +15319,8 @@ function weatherPreviousVsCurrentWeekTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-compare-previous-current-colder",
       eyebrow: "Porovnanie týždňov",
-      title: "Tento týždeň sú rána citlivejšie než minulý",
-      body: `Minulý týždeň išlo minimum približne na ${Math.round(previousMin)} °C, teraz môže padnúť k ${Math.round(currentMin)} °C. Pri skorom pestovaní a priesadách sa oplatí väčšia opatrnosť než minulý týždeň.`
+      title: "Tento týždeň sú rána chladnejšie",
+      body: `Minulý týždeň išlo minimum približne na ${Math.round(previousMin)} °C, teraz môže padnúť k ${Math.round(currentMin)} °C. Pri priesadách buď opatrnejšia.`
     };
   }
 
@@ -14580,8 +15328,8 @@ function weatherPreviousVsCurrentWeekTip(weather = insightWeatherSignals()) {
     return {
       key: "weather-compare-previous-current-warmer",
       eyebrow: "Porovnanie týždňov",
-      title: "Tento týždeň môže ísť rast rýchlejšie, ale aj presychanie",
-      body: `Maximá môžu ísť približne z ${Math.round(previousMax)} °C na ${Math.round(currentMax)} °C. To vie pomôcť rastu a práci v záhrade, ale nádoby, skleník a jemné listy budú rýchlejšie presychať.`
+      title: "Tento týždeň môže byť teplejší",
+      body: `Maximá môžu ísť približne z ${Math.round(previousMax)} °C na ${Math.round(currentMax)} °C. Rast sa pohne, ale nádoby budú rýchlejšie schnúť.`
     };
   }
 
@@ -14658,8 +15406,8 @@ function buildSmartInsights(weather = insightWeatherSignals(), options = {}) {
         eyebrow: "Porovnanie týždňov",
         title: nextRain > currentRain ? "Budúci týždeň môže byť mokrejší" : "Budúci týždeň môže byť suchší",
         body: nextRain > currentRain
-          ? `Po tomto týždni môže prísť viac vody, približne ${weather.nextWeek.summary.totalRain || "vyšší úhrn zrážok"}. Oplatí sa myslieť na odtok, blato a tlak na choroby.`
-          : `Po tomto týždni môže prísť menej vody, len približne ${weather.nextWeek.summary.totalRain || "nižší úhrn zrážok"}. Sleduj presychanie nádob, skleníka a čerstvých výsevov.`
+          ? `Po tomto týždni môže prísť viac vody, približne ${weather.nextWeek.summary.totalRain || "vyšší úhrn zrážok"}. Mysli na odtok, blato a plesne.`
+          : `Po tomto týždni môže prísť menej vody, len približne ${weather.nextWeek.summary.totalRain || "nižší úhrn zrážok"}. Sleduj presychanie nádob a čerstvých výsevov.`
       });
     }
 
@@ -14669,8 +15417,8 @@ function buildSmartInsights(weather = insightWeatherSignals(), options = {}) {
         eyebrow: "Porovnanie týždňov",
         title: nextMin < currentMin ? "Budúci týždeň môžu prísť chladnejšie rána" : "Budúci týždeň môžu rána trochu povoliť",
         body: nextMin < currentMin
-          ? `Minimum môže klesnúť približne z ${Math.round(currentMin)} °C na ${Math.round(nextMin)} °C. Pri citlivých rastlinách rátaj s väčším rizikom ranného chladu.`
-          : `Ranné minimum môže stúpnuť približne z ${Math.round(currentMin)} °C na ${Math.round(nextMin)} °C. Stále sa však oplatí sledovať prípadný prízemný mráz v jasných nociach.`
+          ? `Minimum môže klesnúť približne z ${Math.round(currentMin)} °C na ${Math.round(nextMin)} °C. Citlivé rastliny si pýtajú väčšiu opatrnosť.`
+          : `Ranné minimum môže stúpnuť približne z ${Math.round(currentMin)} °C na ${Math.round(nextMin)} °C. Stále však sleduj prízemný mráz v jasných nociach.`
       });
     }
 
@@ -14680,8 +15428,8 @@ function buildSmartInsights(weather = insightWeatherSignals(), options = {}) {
         eyebrow: "Porovnanie týždňov",
         title: nextMax > currentMax ? "Budúci týždeň môže byť teplejší" : "Budúci týždeň môže trochu schladiť",
         body: nextMax > currentMax
-          ? `Maximá môžu stúpnuť približne z ${Math.round(currentMax)} °C na ${Math.round(nextMax)} °C. V skleníku a nádobách si skontroluj vetranie, tienenie a rýchlosť presychania.`
-          : `Maximá môžu klesnúť približne z ${Math.round(currentMax)} °C na ${Math.round(nextMax)} °C. Pri skorom pestovaní bude opäť dôležitejší nočný a ranný priebeh než obedné slnko.`
+          ? `Maximá môžu stúpnuť približne z ${Math.round(currentMax)} °C na ${Math.round(nextMax)} °C. Pozri vetranie, tienenie a presychanie.`
+          : `Maximá môžu klesnúť približne z ${Math.round(currentMax)} °C na ${Math.round(nextMax)} °C. Dôležitejšie budú zasa rána a nočný priebeh.`
       });
     }
   }
@@ -14737,6 +15485,12 @@ function renderInsightSignalDock(alerts = []) {
 
 function renderInsights() {
   if (!insightStripEl) return;
+  if (shouldUseCleanLoggedOutHome()) {
+    insightStripEl.hidden = true;
+    insightStripEl.innerHTML = "";
+    return;
+  }
+  insightStripEl.hidden = false;
   const weather = insightWeatherSignals();
   const isMobileRuntime = Boolean(document.body?.classList.contains("app-mobile-runtime"));
   const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
@@ -14778,6 +15532,7 @@ function syncOverviewHighlights() {
     clearInterval(overviewHighlightsInterval);
     overviewHighlightsInterval = null;
   }
+  if (shouldUseCleanLoggedOutHome()) return;
 
   const memoryItems = latestJournalImages();
   const weather = insightWeatherSignals();
@@ -15201,12 +15956,7 @@ function openAddEntryFlow(editingEntryId = "") {
   const renderPreview = () => {
     if (!imagePreview) return;
     clearPendingUrls();
-    const existingItems = existingImages.map((image, index) => `
-      <div class="journal-form__image journal-form__image--pending">
-        <img src="${escapeAttribute(image)}" alt="Uložená fotka ${index + 1}">
-        <button class="journal-form__image-remove" type="button" data-remove-existing-image="${index}" aria-label="Odstrániť fotku">x</button>
-      </div>
-    `);
+    const existingItems = existingImages.map((image, index) => renderJournalExistingImagePreviewItem(image, index));
     const pendingItems = pendingFiles.map((file, index) => {
       const url = URL.createObjectURL(file);
       pendingUrls.push(url);
@@ -15219,7 +15969,10 @@ function openAddEntryFlow(editingEntryId = "") {
     });
     const items = [...existingItems, ...pendingItems].join("");
     imagePreview.hidden = !items;
+    const renderToken = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    imagePreview.dataset.journalComposerPreviewToken = renderToken;
     imagePreview.innerHTML = items;
+    hydrateJournalComposerPreviewImages(imagePreview, renderToken).catch(() => {});
   };
 
   imageInput?.addEventListener("change", () => {
@@ -16991,13 +17744,7 @@ function renderTaskItem(task, { showDelete = true, labelClickable = true } = {})
           ${labelClickable ? `<label class="checkbox-row task-item__main task-item__main--mobile">${checkboxContent}</label>` : `<div class="checkbox-row task-item__main task-item__main--mobile">${checkboxContent}</div>`}
           ${showDelete ? `<div class="task-item__side task-item__actions task-item__actions--mobile">
             <button class="button button--ghost journal-item__action journal-item__action--danger" type="button" data-delete-task="${task.id}" aria-label="Vymazať úlohu" title="Vymazať">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 7h14"></path>
-                <path d="M9 7V5h6v2"></path>
-                <path d="M8 7l1 12h6l1-12"></path>
-                <path d="M10 10v6"></path>
-                <path d="M14 10v6"></path>
-              </svg>
+              <span class="task-item__action-icon-emoji" aria-hidden="true">🗑</span>
             </button>
           </div>` : ""}
         </div>
@@ -24644,7 +25391,7 @@ function buildWeatherAlerts(days = []) {
       "frost",
       "Výstraha",
       "Pozor na mráz",
-      `${capitalizeLabel(frostDay.label)} ${frostDay.calendarLabel} môže teplota klesnúť nebezpečne nízko. Citlivejšie rastliny radšej chráň.`
+      `${capitalizeLabel(frostDay.label)} ${frostDay.calendarLabel} môže prísť mráz. Citlivejšie rastliny radšej prikry.`
     );
   }
 
@@ -24654,7 +25401,7 @@ function buildWeatherAlerts(days = []) {
       "frost",
       "Predpoveď",
       snowDay.heavyRain ? "Pozor na sneženie" : "Možné sneženie",
-      `${capitalizeLabel(snowDay.label)} ${snowDay.calendarLabel} sa môže objaviť sneženie a chlad. Sleduj citlivejšie výsevy aj nádoby.`
+      `${capitalizeLabel(snowDay.label)} ${snowDay.calendarLabel} sa môže objaviť sneženie a chlad. Sleduj výsevy aj nádoby.`
     );
   }
 
@@ -24664,7 +25411,7 @@ function buildWeatherAlerts(days = []) {
       "rain",
       "Predpoveď",
       "Pozor na výdatný dážď",
-      `${capitalizeLabel(heavyRainDay.label)} ${heavyRainDay.calendarLabel} môže spadnúť výraznejšie množstvo vody. Sleduj preliatie a blato.`
+      `${capitalizeLabel(heavyRainDay.label)} ${heavyRainDay.calendarLabel} môže prísť viac vody. Sleduj odtok, preliatie a blato.`
     );
   }
 
@@ -24674,7 +25421,7 @@ function buildWeatherAlerts(days = []) {
       "storm",
       "Výstraha",
       stormDay.hail ? "Možné krúpy" : "Možné búrky",
-      `${capitalizeLabel(stormDay.label)} ${stormDay.calendarLabel} sleduj citlivejšie výsevy, kvetenstvo a nádoby.`
+      `${capitalizeLabel(stormDay.label)} ${stormDay.calendarLabel} radšej pozri krehké výsevy, kvety a nádoby.`
     );
   }
 
@@ -24694,7 +25441,7 @@ function buildWeatherAlerts(days = []) {
       "wind",
       "Predpoveď",
       "Pozor na silný vietor",
-      `${capitalizeLabel(windDay.label)} ${windDay.calendarLabel} môže vietor viac vysušovať aj lámať citlivejšie časti rastlín.`
+      `${capitalizeLabel(windDay.label)} ${windDay.calendarLabel} môže vietor rýchlo vysušovať a lámať citlivejšie časti rastlín.`
     );
   }
 
