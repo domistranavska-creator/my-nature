@@ -2,9 +2,50 @@
   const AUDIO_DEBUG_KEY = "moja-zahrada-weather-audio-debug-v1";
   const MASTER_VOLUME = 1;
   const LOOP_BOOST = 2.05;
-  const DETAIL_BOOST = 1.9;
+  const DETAIL_BOOST = 1.28;
   const MAX_BUS_GAIN = 1.55;
   const MAX_LAYER_GAIN = 2.35;
+  const MAX_DETAIL_DIRECT_GAIN = 0.82;
+  const DETAIL_DIRECTOR_HISTORY_LIMIT = 8;
+  const DETAIL_DIRECTOR_CONFIG = Object.freeze({
+    requestedKeyBias: 1.34,
+    globalCooldownMs: {
+      safe: [9000, 19000],
+      accent: [18000, 32000],
+      hero: [28000, 52000]
+    },
+    categoryCooldownMs: {
+      safe: [14000, 26000],
+      accent: [28000, 54000],
+      hero: [52000, 96000]
+    },
+    quietWindowMs: {
+      safe: [3500, 9000],
+      accent: [7000, 15000],
+      hero: [14000, 26000]
+    },
+    fadeInMs: {
+      safe: [220, 420],
+      accent: [320, 620],
+      hero: [520, 860]
+    },
+    fadeOutMs: {
+      safe: [420, 760],
+      accent: [620, 1100],
+      hero: [900, 1600]
+    },
+    recentAssetCooldownMs: 65000,
+    strongAfterglowMs: 28000,
+    maxProminentActive: 1,
+    maxTotalShots: 2,
+    baseSilenceWeight: 0.14,
+    maxSilenceWeight: 0.48
+  });
+  const DETAIL_DURATION_MULTIPLIER = Object.freeze({
+    safe: 1.14,
+    accent: 1.12,
+    hero: 1.08
+  });
   const MIX_CONTINUITY_BLEND = 0.34;
   const MIX_ENERGY_FACTOR_MIN = 0.9;
   const MIX_ENERGY_FACTOR_MAX = 1.08;
@@ -63,6 +104,33 @@
   function pickRandom(list) {
     if (!Array.isArray(list) || !list.length) return "";
     return list[Math.floor(Math.random() * list.length)] || list[0] || "";
+  }
+
+  function randomFromRange(range) {
+    if (Array.isArray(range) && range.length >= 2) {
+      return randomBetween(Number(range[0]) || 0, Number(range[1]) || Number(range[0]) || 0);
+    }
+    return Number(range) || 0;
+  }
+
+  function weightedPick(list) {
+    const weightedList = (Array.isArray(list) ? list : []).filter((item) => Number(item?.weight) > 0);
+    if (!weightedList.length) return null;
+    const totalWeight = weightedList.reduce((sum, item) => sum + Number(item.weight || 0), 0);
+    if (!(totalWeight > 0)) return null;
+    let cursor = Math.random() * totalWeight;
+    for (const item of weightedList) {
+      cursor -= Number(item.weight || 0);
+      if (cursor <= 0) return item;
+    }
+    return weightedList[weightedList.length - 1] || null;
+  }
+
+  function averageRange(range) {
+    if (Array.isArray(range) && range.length >= 2) {
+      return ((Number(range[0]) || 0) + (Number(range[1]) || Number(range[0]) || 0)) / 2;
+    }
+    return Number(range) || 0;
   }
 
   function uniq(list) {
@@ -166,6 +234,8 @@
       cooldown: 22000,
       chance: 1,
       priority: 0,
+      role: "",
+      directorBias: 1,
       maxDurationMs: 0,
       playbackRateMin: 0.98,
       playbackRateMax: 1.02,
@@ -201,7 +271,7 @@
       time: 1.18,
       weather: 1.04,
       texture: 0.98,
-      details: 1.14
+      details: 0.96
     },
     timeLayers: {
       dawn_chorus_rich: layerDef({
@@ -546,13 +616,14 @@
         allowedTimes: ["dawn", "day", "evening"],
         allowedWeather: ["clear", "partly_cloudy", "cloudy", "overcast", "fog", "drizzle", "wind_soft", "heat_haze", "post_rain", "post_storm"],
         blockedWeather: ["rain", "heavy_rain", "storm_far", "storm_near", "hail", "wind_strong", "snow_medium", "snow_heavy", "blizzard_like"],
-        baseVolume: 0.15,
+        baseVolume: 0.13,
         intervalMin: 24000,
         intervalMax: 76000,
         cooldown: 18000,
-        chance: 0.62,
+        chance: 0.54,
         priority: 1,
         category: "songbirds",
+        role: "safe",
         maxDurationMs: 1700,
         playbackRateMin: 0.98,
         playbackRateMax: 1.05,
@@ -575,6 +646,7 @@
         chance: 0.62,
         priority: 1,
         category: "bird_motion",
+        role: "safe",
         maxDurationMs: 1400,
         playbackRateMin: 0.96,
         playbackRateMax: 1.04,
@@ -592,13 +664,14 @@
         allowedWeather: ["clear", "partly_cloudy", "cloudy", "overcast", "wind_soft", "heat_haze", "post_rain", "post_storm", "frost", "snow_light"],
         blockedWeather: ["fog", "drizzle", "rain", "heavy_rain", "storm_far", "storm_near", "hail", "wind_strong", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like"],
         allowedSeasons: ["spring", "summer", "autumn", "winter"],
-        baseVolume: 0.14,
+        baseVolume: 0.11,
         intervalMin: 110000,
         intervalMax: 280000,
-        cooldown: 90000,
-        chance: 0.28,
+        cooldown: 120000,
+        chance: 0.22,
         priority: 1,
         category: "woodpecker",
+        role: "accent",
         maxDurationMs: 2200,
         playbackRateMin: 0.99,
         playbackRateMax: 1.02,
@@ -615,12 +688,14 @@
         allowedTimes: ["dawn", "day", "evening"],
         allowedWeather: ["cloudy", "overcast", "drizzle", "rain", "wind_soft", "wind_medium", "post_rain", "post_storm", "post_snow", "frost", "snow_light", "snow_medium"],
         blockedWeather: ["heavy_rain", "storm_near", "hail", "blizzard_like"],
-        baseVolume: 0.11,
+        baseVolume: 0.09,
         intervalMin: 22000,
         intervalMax: 110000,
         cooldown: 28000,
+        chance: 0.58,
         priority: 1,
         category: "corvids",
+        role: "accent",
         maxDurationMs: 4200
       }),
       owl_call: detailDef({
@@ -636,13 +711,14 @@
         allowedTimes: ["night"],
         allowedWeather: ["clear", "partly_cloudy", "cloudy", "overcast", "fog", "wind_soft", "snow_light", "snow_medium", "snow_heavy", "post_rain", "post_storm", "post_snow", "frost"],
         blockedWeather: ["drizzle", "rain", "heavy_rain", "storm_far", "storm_near", "hail", "wet_snow", "blizzard_like"],
-        baseVolume: 0.30,
-        intervalMin: 22000,
-        intervalMax: 70000,
-        cooldown: 15000,
-        chance: 0.97,
+        baseVolume: 0.18,
+        intervalMin: 40000,
+        intervalMax: 120000,
+        cooldown: 46000,
+        chance: 0.58,
         priority: 2,
         category: "owls",
+        role: "accent",
         maxDurationMs: 6200,
         panMin: -0.36,
         panMax: 0.36
@@ -662,6 +738,7 @@
         chance: 0,
         priority: 1,
         category: "mammals",
+        role: "hero",
         panMin: -0.5,
         panMax: 0.5
       }),
@@ -670,13 +747,14 @@
         allowedTimes: ["night"],
         allowedWeather: WEATHER_ORDER,
         blockedWeather: [],
-        baseVolume: 0.08,
-        intervalMin: 100000,
-        intervalMax: 260000,
-        cooldown: 180000,
-        chance: 0.30,
+        baseVolume: 0.05,
+        intervalMin: 140000,
+        intervalMax: 320000,
+        cooldown: 240000,
+        chance: 0.14,
         priority: 1,
         category: "mammals",
+        role: "accent",
         maxDurationMs: 4200,
         panMin: -0.58,
         panMax: 0.58
@@ -691,13 +769,14 @@
         allowedWeather: ["clear", "partly_cloudy", "cloudy", "wind_soft", "heat_haze", "post_rain"],
         blockedWeather: ["overcast", "fog", "drizzle", "rain", "heavy_rain", "storm_far", "storm_near", "wind_medium", "wind_strong", "hail", "snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "frost"],
         allowedSeasons: ["spring", "summer", "autumn"],
-        baseVolume: 0.12,
-        intervalMin: 24000,
-        intervalMax: 80000,
-        cooldown: 20000,
-        chance: 0,
+        baseVolume: 0.08,
+        intervalMin: 36000,
+        intervalMax: 100000,
+        cooldown: 30000,
+        chance: 0.18,
         priority: 1,
         category: "insects",
+        role: "safe",
         playbackRateMin: 0.97,
         playbackRateMax: 1.03,
         panMin: -0.55,
@@ -714,13 +793,14 @@
         blockedWeather: ["overcast", "fog", "drizzle", "rain", "heavy_rain", "storm_far", "storm_near", "wind_medium", "wind_strong", "hail", "snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "frost"],
         allowedSeasons: ["spring", "summer", "autumn"],
         minTemperatureC: 10,
-        baseVolume: 0.11,
+        baseVolume: 0.09,
         intervalMin: 36000,
         intervalMax: 110000,
         cooldown: 24000,
-        chance: 0.72,
+        chance: 0.46,
         priority: 1,
         category: "insects",
+        role: "safe",
         playbackRateMin: 0.96,
         playbackRateMax: 1.02,
         panMin: -0.52,
@@ -735,12 +815,13 @@
         allowedTimes: ["day", "evening"],
         allowedWeather: ["clear", "partly_cloudy", "cloudy", "wind_soft", "heat_haze"],
         blockedWeather: ["rain", "heavy_rain", "storm_far", "storm_near", "hail", "wind_strong", "snow_light", "snow_medium", "snow_heavy", "blizzard_like"],
-        baseVolume: 0.10,
+        baseVolume: 0.09,
         intervalMin: 70000,
         intervalMax: 190000,
         cooldown: 90000,
-        chance: 0.44,
+        chance: 0.34,
         category: "doves",
+        role: "safe",
         maxDurationMs: 2600
       }),
       cuckoo_call: detailDef({
@@ -751,13 +832,14 @@
         allowedWeather: ["clear", "partly_cloudy", "cloudy", "wind_soft", "post_rain"],
         blockedWeather: ["fog", "drizzle", "rain", "heavy_rain", "storm_far", "storm_near", "hail", "wind_strong", "snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "frost"],
         allowedSeasons: ["spring", "summer"],
-        baseVolume: 0.11,
+        baseVolume: 0.09,
         intervalMin: 70000,
         intervalMax: 180000,
         cooldown: 65000,
-        chance: 0.52,
+        chance: 0.32,
         priority: 1,
         category: "songbirds",
+        role: "accent",
         maxDurationMs: 2200,
         playbackRateMin: 0.98,
         playbackRateMax: 1.02,
@@ -774,13 +856,14 @@
         allowedWeather: ["clear", "partly_cloudy", "cloudy", "overcast", "wind_soft", "post_rain"],
         blockedWeather: ["rain", "heavy_rain", "storm_far", "storm_near", "hail", "wind_strong", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like"],
         allowedSeasons: ["summer", "autumn"],
-        baseVolume: 0.14,
+        baseVolume: 0.09,
         intervalMin: 30000,
         intervalMax: 120000,
         cooldown: 26000,
-        chance: 0,
+        chance: 0.22,
         priority: 1,
         category: "mammals",
+        role: "safe",
         playbackRateMin: 0.96,
         playbackRateMax: 1.03,
         panMin: -0.46,
@@ -801,9 +884,10 @@
         intervalMin: 50000,
         intervalMax: 150000,
         cooldown: 42000,
-        chance: 0.18,
+        chance: 0.12,
         priority: 1,
         category: "insects",
+        role: "safe",
         maxDurationMs: 1000,
         playbackRateMin: 0.99,
         playbackRateMax: 1.03,
@@ -820,13 +904,14 @@
         blockedWeather: ["fog", "drizzle", "rain", "heavy_rain", "storm_near", "hail", "snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "frost"],
         allowedTemperature: ["mild", "warm", "hot"],
         allowedSeasons: ["spring", "summer", "autumn"],
-        baseVolume: 0.08,
+        baseVolume: 0.07,
         intervalMin: 70000,
         intervalMax: 180000,
         cooldown: 60000,
-        chance: 0.34,
+        chance: 0.22,
         priority: 1,
         category: "amphibians",
+        role: "accent",
         maxDurationMs: 2400,
         playbackRateMin: 0.98,
         playbackRateMax: 1.02,
@@ -840,11 +925,12 @@
         ],
         allowedTimes: ["dawn", "day", "evening", "night"],
         allowedWeather: ["post_rain", "post_storm", "drizzle"],
-        baseVolume: 0.13,
-        intervalMin: 12000,
-        intervalMax: 38000,
-        cooldown: 9000,
-        category: "drips"
+        baseVolume: 0.09,
+        intervalMin: 18000,
+        intervalMax: 48000,
+        cooldown: 16000,
+        category: "drips",
+        role: "safe"
       }),
       thunder_far: detailDef({
         fileList: [
@@ -853,13 +939,14 @@
         ],
         allowedTimes: ["dawn", "day", "evening", "night"],
         allowedWeather: ["storm_far", "storm_near"],
-        baseVolume: 0.22,
+        baseVolume: 0.18,
         intervalMin: 35000,
         intervalMax: 95000,
-        cooldown: 20000,
+        cooldown: 26000,
         priority: 3,
-        chance: 0.86,
+        chance: 0.72,
         category: "thunder",
+        role: "hero",
         panMin: -0.6,
         panMax: 0.6
       }),
@@ -870,13 +957,14 @@
         ],
         allowedTimes: ["dawn", "day", "evening", "night"],
         allowedWeather: ["storm_near"],
-        baseVolume: 0.28,
+        baseVolume: 0.22,
         intervalMin: 18000,
         intervalMax: 52000,
-        cooldown: 14000,
+        cooldown: 22000,
         priority: 4,
-        chance: 0.95,
+        chance: 0.84,
         category: "thunder",
+        role: "hero",
         playbackRateMin: 0.95,
         playbackRateMax: 1.01,
         panMin: -0.64,
@@ -1174,16 +1262,16 @@
 
   const SCENE_OVERRIDES = {
     dawn: {
-      clear: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "bee_pass", "bumblebee_pass", "cuckoo_call"], groupVolumes: { details: 1.18, time: 1.04, texture: 1.04 } },
-      wind_soft: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "crow_call", "cuckoo_call"], groupVolumes: { details: 1.14, weather: 0.92, texture: 1.02 } },
+      clear: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "bee_pass", "bumblebee_pass", "cuckoo_call"], groupVolumes: { details: 1.04, time: 1.04, texture: 1.04 } },
+      wind_soft: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "crow_call", "cuckoo_call"], groupVolumes: { details: 1.00, weather: 0.92, texture: 1.02 } },
       overcast: { timeLayers: ["dawn_chorus_sparse", "dawn_garden_air"], groupVolumes: { time: 0.84, details: 0.92 } },
       fog: { timeLayers: [], allowDetails: ["day_bird_call"], groupVolumes: { time: 0.42, weather: 0, texture: 0, details: 0.74 } },
       drizzle: { timeLayers: ["dawn_chorus_sparse", "dawn_garden_air"], allowDetails: ["tree_drips", "day_bird_call"], groupVolumes: { time: 0.72, details: 0.92 } },
-      post_rain: { allowDetails: ["tree_drips", "day_bird_call", "bird_wings", "cuckoo_call"], groupVolumes: { details: 1.12, texture: 1.08 } }
+      post_rain: { allowDetails: ["tree_drips", "day_bird_call", "bird_wings", "cuckoo_call"], groupVolumes: { details: 0.98, texture: 1.08 } }
     },
     day: {
-      clear: { allowDetails: ["day_bird_call", "bird_wings", "bee_pass", "bumblebee_pass", "woodpecker", "dove_call", "cuckoo_call", "squirrel_rustle"], groupVolumes: { details: 1.14, time: 1.02, texture: 1.06 } },
-      wind_soft: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "crow_call", "dove_call", "cuckoo_call", "squirrel_rustle"], groupVolumes: { details: 1.12, weather: 0.90, texture: 1.04 } },
+      clear: { allowDetails: ["day_bird_call", "bird_wings", "bee_pass", "bumblebee_pass", "woodpecker", "dove_call", "cuckoo_call", "squirrel_rustle"], groupVolumes: { details: 1.00, time: 1.02, texture: 1.06 } },
+      wind_soft: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "crow_call", "dove_call", "cuckoo_call", "squirrel_rustle"], groupVolumes: { details: 0.98, weather: 0.90, texture: 1.04 } },
       heat_haze: { allowDetails: ["bee_pass", "bumblebee_pass", "day_bird_call", "bird_wings", "woodpecker", "dove_call", "mosquito_pass"], groupVolumes: { time: 0.80, texture: 0.94, details: 0.90 } },
       fog: { timeLayers: [], allowDetails: ["day_bird_call"], groupVolumes: { time: 0.38, weather: 0, texture: 0, details: 0.76 } },
       overcast: {
@@ -1192,30 +1280,30 @@
         blockDetails: ["bee_pass", "bumblebee_pass", "bird_wings", "dove_call", "cuckoo_call"],
         groupVolumes: { time: 0.90, weather: 0.72, texture: 0.42, details: 0.92 }
       },
-      post_rain: { allowDetails: ["tree_drips", "day_bird_call", "bird_wings", "crow_call", "dove_call", "woodpecker", "squirrel_rustle"], groupVolumes: { details: 1.12, texture: 1.08 } }
+      post_rain: { allowDetails: ["tree_drips", "day_bird_call", "bird_wings", "crow_call", "dove_call", "woodpecker", "squirrel_rustle"], groupVolumes: { details: 1.00, texture: 1.08 } }
     },
     evening: {
-      clear: { allowDetails: ["day_bird_call", "bird_wings", "dove_call", "woodpecker", "frog_call", "mosquito_pass", "squirrel_rustle"], groupVolumes: { time: 1.02, details: 1.06, texture: 1.12 } },
-      wind_soft: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "crow_call", "dove_call", "frog_call", "squirrel_rustle"], groupVolumes: { details: 1.10, weather: 0.90, texture: 1.02 } },
+      clear: { allowDetails: ["day_bird_call", "bird_wings", "dove_call", "woodpecker", "frog_call", "mosquito_pass", "squirrel_rustle"], groupVolumes: { time: 1.02, details: 0.94, texture: 1.12 } },
+      wind_soft: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "crow_call", "dove_call", "frog_call", "squirrel_rustle"], groupVolumes: { details: 0.96, weather: 0.90, texture: 1.02 } },
       partly_cloudy: { allowDetails: ["day_bird_call", "bird_wings", "woodpecker", "frog_call", "mosquito_pass"], groupVolumes: { time: 0.98, details: 0.96, texture: 1.08 } },
       fog: { timeLayers: [], allowDetails: ["day_bird_call"], groupVolumes: { time: 0.34, weather: 0, texture: 0, details: 0.80 } },
-      overcast: { allowDetails: ["day_bird_call", "crow_call", "woodpecker"], groupVolumes: { time: 0.86, details: 1.02 } },
-      post_rain: { allowDetails: ["tree_drips", "day_bird_call", "bird_wings", "crow_call", "woodpecker", "frog_call"], groupVolumes: { details: 1.14, texture: 1.14 } }
+      overcast: { allowDetails: ["day_bird_call", "crow_call", "woodpecker"], groupVolumes: { time: 0.86, details: 0.92 } },
+      post_rain: { allowDetails: ["tree_drips", "day_bird_call", "bird_wings", "crow_call", "woodpecker", "frog_call"], groupVolumes: { details: 1.00, texture: 1.14 } }
     },
     night: {
-      clear: { allowDetails: ["owl_call", "dog_far", "frog_call", "mosquito_pass"], groupVolumes: { details: 1.34, texture: 1.00 } },
-      wind_soft: { allowDetails: ["owl_call", "dog_far"], groupVolumes: { details: 1.10, weather: 0.90, texture: 0.96 } },
-      partly_cloudy: { allowDetails: ["owl_call", "dog_far", "frog_call", "mosquito_pass"], groupVolumes: { details: 1.26, texture: 0.98 } },
-      cloudy: { allowDetails: ["owl_call", "dog_far", "frog_call"], groupVolumes: { details: 1.20, texture: 0.90 } },
-      overcast: { allowDetails: ["owl_call", "dog_far", "frog_call"], groupVolumes: { time: 0.90, texture: 0.78, details: 1.16 } },
-      fog: { allowDetails: ["owl_call", "dog_far"], groupVolumes: { time: 0.68, weather: 0, texture: 0, details: 0.96 } },
+      clear: { allowDetails: ["owl_call", "dog_far", "frog_call", "mosquito_pass"], groupVolumes: { details: 1.06, texture: 1.00 } },
+      wind_soft: { allowDetails: ["owl_call", "dog_far"], groupVolumes: { details: 0.92, weather: 0.90, texture: 0.96 } },
+      partly_cloudy: { allowDetails: ["owl_call", "dog_far", "frog_call", "mosquito_pass"], groupVolumes: { details: 1.00, texture: 0.98 } },
+      cloudy: { allowDetails: ["owl_call", "dog_far", "frog_call"], groupVolumes: { details: 0.96, texture: 0.90 } },
+      overcast: { allowDetails: ["owl_call", "dog_far", "frog_call"], groupVolumes: { time: 0.90, texture: 0.78, details: 0.92 } },
+      fog: { allowDetails: ["owl_call", "dog_far"], groupVolumes: { time: 0.68, weather: 0, texture: 0, details: 0.82 } },
       rain: { textureLayers: [], groupVolumes: { texture: 0.30 } },
       heavy_rain: { textureLayers: [], groupVolumes: { texture: 0.18 } },
       storm_near: { textureLayers: [], groupVolumes: { texture: 0.12 } },
-      post_rain: { allowDetails: ["tree_drips", "owl_call", "dog_far", "frog_call"], groupVolumes: { details: 1.20, texture: 0.94 } },
-      post_storm: { allowDetails: ["tree_drips", "owl_call", "dog_far", "frog_call"], groupVolumes: { details: 1.16, texture: 0.90 } },
-      post_snow: { allowDetails: ["owl_call", "dog_far"], groupVolumes: { details: 1.18, texture: 0.62 } },
-      frost: { allowDetails: ["owl_call", "dog_far"], groupVolumes: { details: 1.18, texture: 0.60 } }
+      post_rain: { allowDetails: ["tree_drips", "owl_call", "dog_far", "frog_call"], groupVolumes: { details: 0.96, texture: 0.94 } },
+      post_storm: { allowDetails: ["tree_drips", "owl_call", "dog_far", "frog_call"], groupVolumes: { details: 0.90, texture: 0.90 } },
+      post_snow: { allowDetails: ["owl_call", "dog_far"], groupVolumes: { details: 0.92, texture: 0.62 } },
+      frost: { allowDetails: ["owl_call", "dog_far"], groupVolumes: { details: 0.90, texture: 0.60 } }
     }
   };
 
@@ -1307,6 +1395,7 @@
       this.oneShots = new Set();
       this.detailTimers = new Map();
       this.detailCooldowns = new Map();
+      this.resetDetailDirectorState();
       this.lastInput = null;
       this.state = createDefaultSoundState();
       this.evaluation = null;
@@ -1374,6 +1463,36 @@
       console.log(`[weather-audio] ${tag}`, payload);
     }
 
+    resetDetailDirectorState() {
+      this.detailDirector = {
+        globalCooldownUntil: 0,
+        quietUntil: 0,
+        lastDetailTs: 0,
+        lastStrongDetailTs: 0,
+        lastDetailKey: "",
+        lastDetailRole: "",
+        recentKeys: [],
+        recentCategories: [],
+        lastByKey: new Map(),
+        lastByCategory: new Map(),
+        lastByRole: new Map(),
+        lastByAsset: new Map()
+      };
+    }
+
+    detailDirectorDebugState() {
+      const director = this.detailDirector || {};
+      const now = Date.now();
+      return {
+        globalCooldownRemainingMs: Math.max(0, Math.round((director.globalCooldownUntil || 0) - now)),
+        quietRemainingMs: Math.max(0, Math.round((director.quietUntil || 0) - now)),
+        lastDetailKey: director.lastDetailKey || "",
+        lastDetailRole: director.lastDetailRole || "",
+        recentKeys: Array.isArray(director.recentKeys) ? [...director.recentKeys] : [],
+        recentCategories: Array.isArray(director.recentCategories) ? [...director.recentCategories] : []
+      };
+    }
+
     notifyStateChange(reason = "update") {
       if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
       window.dispatchEvent(new CustomEvent("weatheraudio:statechange", {
@@ -1395,7 +1514,8 @@
         currentState: { ...this.state },
         evaluation: this.evaluation,
         activeMix: this.lastActiveMix,
-        playingDetails: Array.from(this.oneShots).map((shot) => shot.key).filter(Boolean)
+        playingDetails: Array.from(this.oneShots).map((shot) => shot.key).filter(Boolean),
+        detailDirector: this.detailDirectorDebugState()
       };
     }
 
@@ -1577,6 +1697,8 @@
     clear() {
       this.stopDetailTimers();
       this.stopIncompatibleDetails([]);
+      this.detailCooldowns.clear();
+      this.resetDetailDirectorState();
       this.state = createDefaultSoundState();
       this.evaluation = null;
       this.lastActiveMix = null;
@@ -2218,26 +2340,31 @@
         details: clamp((base.details ?? 1) * (nextState.enabledDetails ? 1 : 0), 0, MAX_BUS_GAIN)
       };
 
+      groupTargets.details *= 0.86;
+
       if (priority === "medium") {
         groupTargets.time *= 0.94;
-        groupTargets.details *= 0.88;
+        groupTargets.details *= 0.82;
       }
       if (priority === "high") {
         groupTargets.time *= 0.72;
         groupTargets.texture *= 0.94;
-        groupTargets.details *= 0.56;
+        groupTargets.details *= 0.46;
       }
       if (priority === "extreme") {
         groupTargets.time *= 0.46;
         groupTargets.texture *= 0.72;
-        groupTargets.details *= 0.36;
+        groupTargets.details *= 0.24;
       }
       if (nextState.timeOfDay === "night") {
         groupTargets.time *= 0.96;
-        groupTargets.details *= 1.02;
+        groupTargets.details *= 0.88;
       }
       if (["fog", "snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "frost", "post_snow"].includes(nextState.weather)) {
-        groupTargets.details *= 0.88;
+        groupTargets.details *= 0.80;
+      }
+      if (this.sceneCalmScore(nextState) > 0.76 && priority === "low") {
+        groupTargets.details *= 0.94;
       }
       return groupTargets;
     }
@@ -2250,7 +2377,410 @@
         : typeof detailsState.target === "number"
           ? detailsState.target
           : 1;
-      return clamp(rawGain, 0, 1);
+      return clamp(rawGain * 0.92, 0, MAX_DETAIL_DIRECT_GAIN);
+    }
+
+    resolveDetailRole(detailKey, detail = SOUNDSCAPE_CONFIG.detailEvents[detailKey]) {
+      // Ostrejsie a dlhsie detaily drzime v accent/hero, aby ambience a pocasie ostali nosnou vrstvou sceny.
+      const explicitRole = String(detail?.role || "").trim().toLowerCase();
+      if (["safe", "accent", "hero"].includes(explicitRole)) return explicitRole;
+      if (detail?.category === "thunder" || (detail?.priority || 0) >= 3) return "hero";
+      if (["tree_drips", "day_bird_call", "bird_wings", "bee_pass", "bumblebee_pass", "mosquito_pass", "squirrel_rustle"].includes(detailKey)) {
+        return "safe";
+      }
+      if (["corvids", "owls", "woodpecker", "amphibians"].includes(String(detail?.category || ""))) return "accent";
+      if ((detail?.maxDurationMs || 0) >= 3200 || (detail?.baseVolume || 0) >= 0.16) return "accent";
+      return "safe";
+    }
+
+    isProminentDetailRole(role = "") {
+      return role === "accent" || role === "hero";
+    }
+
+    sceneCalmScore(nextState = this.state) {
+      return clamp(
+        1
+        - ((nextState?.rainIntensity || 0) * 0.92)
+        - ((nextState?.windIntensity || 0) * 0.46)
+        - ((nextState?.hailIntensity || 0) * 1.08)
+        - ((nextState?.snowIntensity || 0) * 0.36)
+        - ((nextState?.fogIntensity || 0) * 0.22),
+        0,
+        1
+      );
+    }
+
+    activeProminentDetailCount() {
+      let count = 0;
+      this.oneShots.forEach((shot) => {
+        if (this.isProminentDetailRole(shot?.role)) count += 1;
+      });
+      return count;
+    }
+
+    recentDirectorAge(map, key) {
+      if (!(map instanceof Map)) return Infinity;
+      const value = map.get(key) || 0;
+      return value ? Math.max(0, Date.now() - value) : Infinity;
+    }
+
+    resolveDetailCategoryWeight(detailKey, detail, nextState, evaluation, role) {
+      const weather = nextState.weather;
+      const time = nextState.timeOfDay;
+      const season = nextState.season;
+      const calm = this.sceneCalmScore(nextState);
+      let weight = clamp(detail.directorBias ?? 1, 0.1, 2.4);
+
+      switch (detail.category) {
+        case "songbirds":
+          weight *= time === "dawn" ? 1.18 : time === "day" ? 1.02 : 0.78;
+          weight *= ["clear", "partly_cloudy", "post_rain"].includes(weather)
+            ? 1.12
+            : ["cloudy", "overcast"].includes(weather) ? 0.84 : 0.58;
+          break;
+        case "bird_motion":
+          weight *= time === "day" ? 1.04 : 0.92;
+          weight *= ["clear", "partly_cloudy", "post_rain"].includes(weather) ? 1.06 : 0.78;
+          break;
+        case "woodpecker":
+          weight *= (time === "dawn" || time === "day") ? 1.18 : 0.56;
+          weight *= ["clear", "partly_cloudy", "cloudy", "post_rain", "frost", "snow_light"].includes(weather) ? 1.04 : 0.68;
+          weight *= calm > 0.68 ? 1.06 : 0.74;
+          break;
+        case "corvids":
+          weight *= time === "day" || time === "evening" ? 1.06 : 0.88;
+          weight *= ["cloudy", "overcast", "post_rain", "post_storm", "frost", "snow_light"].includes(weather)
+            ? 1.18
+            : ["clear", "partly_cloudy"].includes(weather) ? 0.62 : 0.86;
+          break;
+        case "doves":
+          weight *= ["day", "evening"].includes(time) ? 1.04 : 0.76;
+          weight *= ["clear", "partly_cloudy", "heat_haze"].includes(weather) ? 1.08 : 0.82;
+          break;
+        case "owls":
+          weight *= time === "night" ? 1.12 : 0.08;
+          weight *= ["fog", "cloudy", "overcast", "post_rain", "post_storm", "post_snow", "frost"].includes(weather) ? 1.08 : 0.84;
+          break;
+        case "insects":
+          if (detailKey === "mosquito_pass") {
+            weight *= ["evening", "night"].includes(time) ? 1.18 : 0.42;
+            weight *= season === "summer" ? 1.12 : 0.74;
+            weight *= ["post_rain", "clear", "partly_cloudy", "cloudy", "heat_haze"].includes(weather) ? 1.04 : 0.54;
+          } else {
+            weight *= ["dawn", "day"].includes(time) ? 1.08 : 0.52;
+            weight *= (nextState.temperatureBand === "warm" || nextState.temperatureBand === "hot") ? 1.14 : 0.76;
+            weight *= ["clear", "partly_cloudy", "heat_haze", "post_rain"].includes(weather) ? 1.10 : 0.58;
+          }
+          break;
+        case "mammals":
+          if (detailKey === "squirrel_rustle") {
+            weight *= ["day", "evening"].includes(time) ? 1.06 : 0.46;
+            weight *= ["summer", "autumn"].includes(season) ? 1.08 : 0.70;
+            weight *= calm > 0.70 ? 1.06 : 0.74;
+          } else if (detailKey === "dog_far") {
+            weight *= time === "night" ? 1.06 : 0.18;
+            weight *= ["cloudy", "overcast", "post_rain", "frost", "post_snow"].includes(weather) ? 1.04 : 0.84;
+            weight *= 0.56;
+          } else {
+            weight *= 0.12;
+          }
+          break;
+        case "amphibians":
+          weight *= ["evening", "night"].includes(time) ? 1.08 : 0.44;
+          weight *= ["post_rain", "post_storm", "cloudy", "overcast"].includes(weather) ? 1.14 : 0.82;
+          break;
+        case "drips":
+          weight *= ["post_rain", "post_storm", "drizzle"].includes(weather) ? 1.24 : 0.62;
+          weight *= calm > 0.46 ? 1.04 : 0.90;
+          break;
+        case "thunder":
+          weight *= weather === "storm_near" ? 1.14 : 0.92;
+          weight *= 0.92 + (nextState.intensity * 0.24);
+          break;
+        default:
+          weight *= 1;
+      }
+
+      if (evaluation?.priority === "medium") {
+        weight *= role === "safe" ? 0.88 : role === "hero" ? 0.86 : 0.62;
+      } else if (evaluation?.priority === "high") {
+        if (detail.category === "thunder") {
+          weight *= 1.02;
+        } else if (detail.category === "drips") {
+          weight *= 0.86;
+        } else {
+          weight *= role === "safe" ? 0.56 : 0.24;
+        }
+      } else if (evaluation?.priority === "extreme") {
+        if (detail.category === "thunder") {
+          weight *= 1.04;
+        } else {
+          weight *= detailKey === "tree_drips" ? 0.22 : 0.06;
+        }
+      }
+
+      return clamp(weight, 0, 4.2);
+    }
+
+    resolveDetailDirectorWeight(detailKey, detail, nextState, evaluation, triggerKey = "") {
+      const director = this.detailDirector || {};
+      const role = this.resolveDetailRole(detailKey, detail);
+      const now = Date.now();
+      const calm = this.sceneCalmScore(nextState);
+      let weight = clamp(detail.chance ?? 1, 0.02, 1.2);
+
+      weight *= role === "safe" ? 1 : role === "accent" ? 0.54 : 0.22;
+      weight *= detailKey === triggerKey ? DETAIL_DIRECTOR_CONFIG.requestedKeyBias : 0.58;
+      weight *= this.resolveDetailCategoryWeight(detailKey, detail, nextState, evaluation, role);
+      weight *= calm > 0.74
+        ? (role === "safe" ? 1.08 : 0.94)
+        : calm < 0.34 ? (role === "hero" ? 1 : 0.72) : 1;
+
+      const recentKeyAge = this.recentDirectorAge(director.lastByKey, detailKey);
+      const recentCategoryAge = this.recentDirectorAge(director.lastByCategory, detail.category);
+      const recentRoleAge = this.recentDirectorAge(director.lastByRole, role);
+      if (recentKeyAge < Math.max(detail.cooldown || 0, 1) * 2.1) {
+        weight *= clamp(recentKeyAge / Math.max((detail.cooldown || 1) * 2.1, 1), 0.08, 1);
+      }
+      if (recentCategoryAge < this.resolveDetailCategoryCooldownMs(detailKey, detail, nextState, evaluation, role) * 1.5) {
+        weight *= clamp(recentCategoryAge / Math.max(this.resolveDetailCategoryCooldownMs(detailKey, detail, nextState, evaluation, role) * 1.5, 1), 0.22, 1);
+      }
+      if (this.isProminentDetailRole(role) && recentRoleAge < this.resolveDetailRoleCooldownMs(role, nextState, evaluation) * 1.4) {
+        weight *= clamp(recentRoleAge / Math.max(this.resolveDetailRoleCooldownMs(role, nextState, evaluation) * 1.4, 1), 0.18, 1);
+      }
+      if (director.lastStrongDetailTs && (now - director.lastStrongDetailTs) < DETAIL_DIRECTOR_CONFIG.strongAfterglowMs) {
+        weight *= role === "safe" ? 0.88 : 0.54;
+      }
+
+      return clamp(weight, 0, 4.2);
+    }
+
+    resolveDetailGlobalCooldownMs(detailKey, detail, nextState, evaluation, role) {
+      let cooldownMs = randomFromRange(DETAIL_DIRECTOR_CONFIG.globalCooldownMs[role] || DETAIL_DIRECTOR_CONFIG.globalCooldownMs.safe);
+      if (evaluation?.priority === "medium") cooldownMs *= 1.08;
+      if (evaluation?.priority === "high") cooldownMs *= 1.24;
+      if (evaluation?.priority === "extreme") cooldownMs *= 1.42;
+      if (detail.category === "thunder") cooldownMs *= nextState.weather === "storm_near" ? 0.82 : 0.96;
+      if (detailKey === "tree_drips") cooldownMs *= 0.74;
+      return Math.round(cooldownMs);
+    }
+
+    resolveDetailCategoryCooldownMs(detailKey, detail, nextState, evaluation, role) {
+      let cooldownMs = averageRange(DETAIL_DIRECTOR_CONFIG.categoryCooldownMs[role] || DETAIL_DIRECTOR_CONFIG.categoryCooldownMs.safe);
+      if (detail.category === "mammals") cooldownMs *= 1.26;
+      if (detail.category === "drips") cooldownMs *= 0.72;
+      if (detail.category === "thunder") cooldownMs *= nextState.weather === "storm_near" ? 0.88 : 1.04;
+      if (evaluation?.priority === "high" || evaluation?.priority === "extreme") cooldownMs *= 1.12;
+      return Math.round(cooldownMs);
+    }
+
+    resolveDetailRoleCooldownMs(role, nextState, evaluation) {
+      let cooldownMs = averageRange(DETAIL_DIRECTOR_CONFIG.globalCooldownMs[role] || DETAIL_DIRECTOR_CONFIG.globalCooldownMs.safe) * (role === "hero" ? 1.18 : 1.04);
+      if (evaluation?.priority === "high") cooldownMs *= 1.08;
+      if (evaluation?.priority === "extreme") cooldownMs *= 1.18;
+      return Math.round(cooldownMs);
+    }
+
+    resolveDetailQuietWindowMs(role, nextState, evaluation, afterPlayback = false) {
+      let quietMs = randomFromRange(DETAIL_DIRECTOR_CONFIG.quietWindowMs[role] || DETAIL_DIRECTOR_CONFIG.quietWindowMs.safe);
+      if (!afterPlayback) quietMs *= 0.82;
+      if (evaluation?.priority === "medium") quietMs *= 1.06;
+      if (evaluation?.priority === "high") quietMs *= 1.18;
+      if (evaluation?.priority === "extreme") quietMs *= 1.28;
+      if (nextState.timeOfDay === "night") quietMs *= 1.08;
+      return Math.round(quietMs);
+    }
+
+    buildDirectedDetailCandidates(triggerKey, nextState, evaluation = this.evaluation) {
+      const allowedSet = new Set(asArray(evaluation?.allowedDetails));
+      return Object.keys(SOUNDSCAPE_CONFIG.detailEvents).map((detailKey) => {
+        if (!allowedSet.has(detailKey)) return null;
+        const detail = SOUNDSCAPE_CONFIG.detailEvents[detailKey];
+        const eligible = this.isDetailEligible(detailKey, nextState, { includeReason: true });
+        if (!eligible.allowed) return null;
+        const directorCheck = this.canDirectorUseDetail(detailKey, detail, nextState, evaluation, { includeReason: true });
+        if (!directorCheck.allowed) return null;
+        const role = this.resolveDetailRole(detailKey, detail);
+        const weight = this.resolveDetailDirectorWeight(detailKey, detail, nextState, evaluation, triggerKey);
+        if (!(weight > 0.01)) return null;
+        return { detailKey, detail, role, weight };
+      }).filter(Boolean);
+    }
+
+    resolveDetailSilenceWeight(triggerKey, candidates, nextState, evaluation = this.evaluation) {
+      const director = this.detailDirector || {};
+      const now = Date.now();
+      const calm = this.sceneCalmScore(nextState);
+      const triggerDetail = SOUNDSCAPE_CONFIG.detailEvents[triggerKey];
+      const triggerRole = triggerDetail ? this.resolveDetailRole(triggerKey, triggerDetail) : "safe";
+      let weight = DETAIL_DIRECTOR_CONFIG.baseSilenceWeight;
+
+      if (!(director.lastDetailTs || 0) && !this.oneShots.size) weight *= 0.12;
+      if (calm > 0.74) weight += 0.05;
+      if (evaluation?.priority === "medium") weight += 0.10;
+      if (evaluation?.priority === "high") weight += 0.20;
+      if (evaluation?.priority === "extreme") weight += 0.30;
+      if ((director.lastDetailTs || 0) && (now - director.lastDetailTs) < 22000) weight += 0.10;
+      if (this.oneShots.size) weight += 0.10;
+      if (this.isProminentDetailRole(triggerRole)) weight += 0.05;
+      if (!candidates.length) weight += 0.22;
+
+      return clamp(weight, 0.08, DETAIL_DIRECTOR_CONFIG.maxSilenceWeight);
+    }
+
+    registerDetailDirectorPlayback(detailKey, detail, assetPath, nextState, evaluation, role) {
+      const director = this.detailDirector || {};
+      const now = Date.now();
+      director.lastDetailTs = now;
+      director.lastDetailKey = detailKey;
+      director.lastDetailRole = role;
+      if (this.isProminentDetailRole(role)) {
+        director.lastStrongDetailTs = now;
+      }
+      director.globalCooldownUntil = Math.max(
+        Number(director.globalCooldownUntil) || 0,
+        now + this.resolveDetailGlobalCooldownMs(detailKey, detail, nextState, evaluation, role)
+      );
+      director.quietUntil = Math.max(
+        Number(director.quietUntil) || 0,
+        now + this.resolveDetailQuietWindowMs(role, nextState, evaluation, true)
+      );
+      director.lastByKey.set(detailKey, now);
+      director.lastByCategory.set(detail.category, now);
+      director.lastByRole.set(role, now);
+      if (assetPath) {
+        director.lastByAsset.set(assetPath, now);
+      }
+      director.recentKeys = [detailKey, ...director.recentKeys.filter((item) => item !== detailKey)].slice(0, DETAIL_DIRECTOR_HISTORY_LIMIT);
+      director.recentCategories = [detail.category, ...director.recentCategories.filter((item) => item !== detail.category)].slice(0, DETAIL_DIRECTOR_HISTORY_LIMIT);
+      const extraKeyCooldown = Math.max(
+        detail.cooldown || 0,
+        Math.round(this.resolveDetailCategoryCooldownMs(detailKey, detail, nextState, evaluation, role) * (role === "safe" ? 0.82 : 1))
+      );
+      this.detailCooldowns.set(detailKey, now + extraKeyCooldown);
+    }
+
+    registerDetailDirectorSilence(triggerKey, nextState, evaluation = this.evaluation) {
+      const triggerDetail = SOUNDSCAPE_CONFIG.detailEvents[triggerKey];
+      const role = triggerDetail ? this.resolveDetailRole(triggerKey, triggerDetail) : "safe";
+      const until = Date.now() + this.resolveDetailQuietWindowMs(role, nextState, evaluation, false);
+      this.detailDirector.quietUntil = Math.max(Number(this.detailDirector.quietUntil) || 0, until);
+    }
+
+    canDirectorUseDetail(detailKey, detail, nextState, evaluation = this.evaluation, { includeReason = false } = {}) {
+      const director = this.detailDirector || {};
+      const now = Date.now();
+      const role = this.resolveDetailRole(detailKey, detail);
+      if (this.oneShots.size >= DETAIL_DIRECTOR_CONFIG.maxTotalShots) {
+        return includeReason ? { allowed: false, reason: "total-active" } : false;
+      }
+      if (this.isProminentDetailRole(role) && this.activeProminentDetailCount() >= DETAIL_DIRECTOR_CONFIG.maxProminentActive) {
+        return includeReason ? { allowed: false, reason: "prominent-active" } : false;
+      }
+      if ((director.globalCooldownUntil || 0) > now) {
+        return includeReason ? { allowed: false, reason: "global-cooldown" } : false;
+      }
+      if ((director.quietUntil || 0) > now) {
+        return includeReason ? { allowed: false, reason: "quiet-window" } : false;
+      }
+      const categoryAge = this.recentDirectorAge(director.lastByCategory, detail.category);
+      if (categoryAge < this.resolveDetailCategoryCooldownMs(detailKey, detail, nextState, evaluation, role)) {
+        return includeReason ? { allowed: false, reason: "category-cooldown" } : false;
+      }
+      const roleAge = this.recentDirectorAge(director.lastByRole, role);
+      if (this.isProminentDetailRole(role) && roleAge < this.resolveDetailRoleCooldownMs(role, nextState, evaluation)) {
+        return includeReason ? { allowed: false, reason: "role-cooldown" } : false;
+      }
+      if (this.isProminentDetailRole(role) && director.lastStrongDetailTs && (now - director.lastStrongDetailTs) < DETAIL_DIRECTOR_CONFIG.strongAfterglowMs && detail.category !== "thunder") {
+        return includeReason ? { allowed: false, reason: "strong-afterglow" } : false;
+      }
+      return includeReason ? { allowed: true, reason: "" } : true;
+    }
+
+    attemptDirectedDetail(triggerKey, evaluation = this.evaluation) {
+      if (!evaluation || !this.state.enabledDetails || !this.enabled || !this.activated) {
+        return { played: false, reason: "engine-disabled" };
+      }
+      const director = this.detailDirector || {};
+      const now = Date.now();
+      if ((director.globalCooldownUntil || 0) > now) {
+        return { played: false, reason: "global-cooldown" };
+      }
+      if ((director.quietUntil || 0) > now) {
+        return { played: false, reason: "quiet-window" };
+      }
+      const candidates = this.buildDirectedDetailCandidates(triggerKey, this.state, evaluation);
+      if (!candidates.length) {
+        return { played: false, reason: "no-candidates" };
+      }
+      const silenceWeight = this.resolveDetailSilenceWeight(triggerKey, candidates, this.state, evaluation);
+      const choice = weightedPick([
+        ...candidates.map((candidate) => ({
+          type: "detail",
+          detailKey: candidate.detailKey,
+          role: candidate.role,
+          weight: candidate.weight
+        })),
+        {
+          type: "silence",
+          weight: silenceWeight
+        }
+      ]);
+
+      if (!choice || choice.type !== "detail") {
+        this.registerDetailDirectorSilence(triggerKey, this.state, evaluation);
+        return { played: false, reason: "director-silence" };
+      }
+
+      const played = this.playRandomDetail(choice.detailKey, { evaluation, triggerKey, role: choice.role });
+      if (!played) {
+        return { played: false, reason: "play-failed", detailKey: choice.detailKey };
+      }
+      if (choice.detailKey !== triggerKey) {
+        this.scheduleDetail(choice.detailKey, evaluation, false);
+      }
+      return { played: true, detailKey: choice.detailKey, reason: "" };
+    }
+
+    pickDetailAsset(detailKey, detail) {
+      const director = this.detailDirector || {};
+      const recentAssetLimit = DETAIL_DIRECTOR_CONFIG.recentAssetCooldownMs;
+      const now = Date.now();
+      const freshList = detail.fileList.filter((assetPath) => {
+        const lastPlayedAt = director.lastByAsset.get(assetPath) || 0;
+        return !lastPlayedAt || (now - lastPlayedAt) >= recentAssetLimit;
+      });
+      const candidateList = freshList.length ? freshList : detail.fileList.filter((assetPath) => assetPath !== director.lastPlayedAsset);
+      const selectedAsset = pickRandom(candidateList.length ? candidateList : detail.fileList);
+      director.lastPlayedAsset = selectedAsset || director.lastPlayedAsset || "";
+      return selectedAsset;
+    }
+
+    resolveDetailFadeMs(detailKey, detail, role, type = "fadeIn") {
+      const ranges = type === "fadeOut"
+        ? DETAIL_DIRECTOR_CONFIG.fadeOutMs
+        : DETAIL_DIRECTOR_CONFIG.fadeInMs;
+      let fadeMs = randomFromRange(ranges[role] || ranges.safe);
+      if (detail.category === "thunder" && type === "fadeOut") fadeMs *= 1.18;
+      if (detailKey === "tree_drips" && type === "fadeIn") fadeMs *= 0.78;
+      return Math.round(fadeMs);
+    }
+
+    resolveShotEnvelope(shot, now = Date.now()) {
+      if (!shot) return 0;
+      if (!shot.fadeOutStartTs && shot.stopAtTs && shot.fadeOutMs > 0 && now >= (shot.stopAtTs - shot.fadeOutMs)) {
+        shot.fadeOutStartTs = Math.max(shot.startedAt, shot.stopAtTs - shot.fadeOutMs);
+      }
+      const fadeInProgress = shot.fadeInMs > 0
+        ? clamp((now - shot.startedAt) / Math.max(shot.fadeInMs, 1), 0, 1)
+        : 1;
+      if (!shot.fadeOutStartTs) {
+        return fadeInProgress;
+      }
+      const fadeOutProgress = shot.fadeOutMs > 0
+        ? clamp((now - shot.fadeOutStartTs) / Math.max(shot.fadeOutMs, 1), 0, 1)
+        : 1;
+      return clamp(Math.min(fadeInProgress, 1 - fadeOutProgress), 0, 1);
     }
 
     applyLayerMix(activeMix, evaluation) {
@@ -2426,9 +2956,22 @@
         }
       });
 
+      const shotNow = Date.now();
       this.oneShots.forEach((shot) => {
-        if (!shot?.audio || shot.gainNode) return;
-        shot.audio.volume = clamp((shot.baseVolume || 0) * directMasterVolume * directDetailGain, 0, 1);
+        if (!shot?.audio) return;
+        const envelope = this.resolveShotEnvelope(shot, shotNow);
+        if (shot.gainNode) {
+          shot.gainNode.gain.value = clamp((shot.baseVolume || 0) * envelope, 0, MAX_LAYER_GAIN);
+        } else {
+          shot.audio.volume = clamp((shot.baseVolume || 0) * directMasterVolume * directDetailGain * envelope, 0, 1);
+        }
+        if (shot.cleanup && shot.fadeOutStartTs && envelope <= 0.002 && shotNow >= (shot.fadeOutStartTs + Math.max(shot.fadeOutMs || 0, 80))) {
+          shot.cleanup();
+          return;
+        }
+        if (!shot.audio.paused || envelope > 0.002) {
+          keepRunning = true;
+        }
       });
 
       if (keepRunning && typeof window !== "undefined") {
@@ -2459,65 +3002,83 @@
       const delay = this.randomizedDetailDelay(detailKey, detail, warmStart);
       const timer = window.setTimeout(() => {
         this.detailTimers.delete(detailKey);
-        const result = this.isDetailEligible(detailKey, this.state, { includeReason: true });
-        if (result.allowed && Math.random() <= (detail.chance ?? 1)) {
-          this.playRandomDetail(detailKey);
-        } else {
-          this.debugLog("detail-skip", { detailKey, reason: result.reason || "chance" });
+        const activeEvaluation = this.evaluation || evaluation;
+        const result = this.attemptDirectedDetail(detailKey, activeEvaluation);
+        if (!result.played) {
+          this.debugLog("detail-skip", { detailKey, reason: result.reason || "director-skip" });
         }
-        this.scheduleDetail(detailKey, evaluation, false);
+        this.scheduleDetail(detailKey, activeEvaluation, false);
       }, delay);
       this.detailTimers.set(detailKey, timer);
     }
 
     randomizedDetailDelay(detailKey, detail, warmStart = false) {
       const baseDelay = randomBetween(detail.intervalMin, detail.intervalMax);
+      const role = this.resolveDetailRole(detailKey, detail);
       if (warmStart) {
         if (detailKey === "mosquito_pass") return clamp(baseDelay * 0.22, 8000, 24000);
         if (detailKey === "frog_call") return clamp(baseDelay * 0.24, 12000, 32000);
         if (detailKey === "squirrel_rustle") return clamp(baseDelay * 0.28, 15000, 36000);
         if (detailKey === "woodpecker") return clamp(baseDelay * 0.42, 26000, 70000);
         if (detailKey === "bee_pass" || detailKey === "bumblebee_pass") return clamp(baseDelay * 0.26, 9000, 28000);
+        const warmDelay = baseDelay * (role === "safe" ? 0.24 : role === "accent" ? 0.32 : 0.44);
+        return clamp(
+          warmDelay,
+          role === "safe" ? 6000 : role === "accent" ? 10000 : 16000,
+          role === "safe" ? 18000 : role === "accent" ? 28000 : 42000
+        );
       }
       const weather = this.state.weather;
-      if (detailKey === "thunder_near") return baseDelay * clamp(1 - (this.state.intensity * 0.24), 0.55, 1);
-      if (detailKey === "thunder_far") return baseDelay * clamp(1 - (this.state.intensity * 0.18), 0.66, 1.02);
+      let delay = baseDelay;
+      if (detailKey === "thunder_near") delay *= clamp(1 - (this.state.intensity * 0.24), 0.55, 1);
+      if (detailKey === "thunder_far") delay *= clamp(1 - (this.state.intensity * 0.18), 0.66, 1.02);
       if (detailKey === "day_bird_call") {
-        if (this.state.timeOfDay === "dawn") return baseDelay * 0.72;
-        if (weather === "overcast") return baseDelay * 1.26;
-        if (weather === "cloudy") return baseDelay * 1.18;
-        if (weather === "partly_cloudy") return baseDelay * 0.96;
-        if (weather === "clear") return baseDelay * 0.88;
+        if (this.state.timeOfDay === "dawn") delay *= 0.72;
+        else if (weather === "overcast") delay *= 1.26;
+        else if (weather === "cloudy") delay *= 1.18;
+        else if (weather === "partly_cloudy") delay *= 0.96;
+        else if (weather === "clear") delay *= 0.88;
       }
-      if (detailKey === "bee_pass") return baseDelay * clamp(1.04 - (this.state.heatIntensity * 0.24), 0.72, 1.08);
-      if (detailKey === "bumblebee_pass") return baseDelay * clamp(1.10 - (this.state.heatIntensity * 0.18), 0.82, 1.14);
+      if (detailKey === "bee_pass") delay *= clamp(1.04 - (this.state.heatIntensity * 0.24), 0.72, 1.08);
+      if (detailKey === "bumblebee_pass") delay *= clamp(1.10 - (this.state.heatIntensity * 0.18), 0.82, 1.14);
       if (detailKey === "crow_call") {
-        if (weather === "overcast") return baseDelay * 1.22;
-        if (weather === "cloudy") return baseDelay * 1.08;
-        if (weather === "post_rain" || weather === "post_storm" || weather === "frost") return baseDelay * 0.86;
+        if (weather === "overcast") delay *= 1.22;
+        else if (weather === "cloudy") delay *= 1.08;
+        else if (weather === "post_rain" || weather === "post_storm" || weather === "frost") delay *= 0.86;
       }
-      if (detailKey === "cuckoo_call" && this.state.timeOfDay === "dawn") return baseDelay * 0.78;
-      if (detailKey === "dove_call" && (weather === "clear" || weather === "partly_cloudy")) return baseDelay * 1.12;
-      if (detailKey === "dove_call") return baseDelay * 1.26;
-      if (detailKey === "woodpecker") return baseDelay * (this.state.timeOfDay === "evening" ? 1.54 : 1.32);
-      if (detailKey === "owl_call" && (weather === "clear" || weather === "partly_cloudy")) return baseDelay * 0.70;
-      if (detailKey === "owl_call" && weather === "fog") return baseDelay * 0.86;
-      if (detailKey === "owl_call" && (weather === "cloudy" || weather === "overcast" || weather === "post_rain" || weather === "post_storm" || weather === "frost" || weather === "post_snow")) return baseDelay * 0.78;
-      if (detailKey === "dog_far") return baseDelay * (weather === "clear" || weather === "partly_cloudy" || weather === "cloudy" || weather === "overcast" ? 0.76 : 0.94);
-      if (detailKey === "mosquito_pass") return baseDelay * (this.state.temperatureBand === "hot" ? 0.54 : 0.68);
-      if (detailKey === "frog_call" && (weather === "post_rain" || weather === "post_storm")) return baseDelay * 0.64;
-      if (detailKey === "frog_call") return baseDelay * (this.state.timeOfDay === "night" ? 0.78 : 0.90);
-      if (detailKey === "squirrel_rustle" && this.state.season === "autumn") return baseDelay * 0.68;
-      if (detailKey === "squirrel_rustle") return baseDelay * 0.78;
-      return baseDelay;
+      if (detailKey === "cuckoo_call" && this.state.timeOfDay === "dawn") delay *= 0.78;
+      if (detailKey === "dove_call" && (weather === "clear" || weather === "partly_cloudy")) delay *= 1.12;
+      if (detailKey === "dove_call" && !["clear", "partly_cloudy"].includes(weather)) delay *= 1.26;
+      if (detailKey === "woodpecker") delay *= (this.state.timeOfDay === "evening" ? 1.54 : 1.32);
+      if (detailKey === "owl_call" && (weather === "clear" || weather === "partly_cloudy")) delay *= 0.70;
+      if (detailKey === "owl_call" && weather === "fog") delay *= 0.86;
+      if (detailKey === "owl_call" && (weather === "cloudy" || weather === "overcast" || weather === "post_rain" || weather === "post_storm" || weather === "frost" || weather === "post_snow")) delay *= 0.78;
+      if (detailKey === "dog_far") delay *= (weather === "clear" || weather === "partly_cloudy" || weather === "cloudy" || weather === "overcast" ? 0.76 : 0.94);
+      if (detailKey === "mosquito_pass") delay *= (this.state.temperatureBand === "hot" ? 0.54 : 0.68);
+      if (detailKey === "frog_call" && (weather === "post_rain" || weather === "post_storm")) delay *= 0.64;
+      if (detailKey === "frog_call" && !["post_rain", "post_storm"].includes(weather)) delay *= (this.state.timeOfDay === "night" ? 0.78 : 0.90);
+      if (detailKey === "squirrel_rustle" && this.state.season === "autumn") delay *= 0.68;
+      if (detailKey === "squirrel_rustle" && this.state.season !== "autumn") delay *= 0.78;
+      delay *= role === "safe" ? 0.92 : role === "accent" ? 1.04 : 1.18;
+      if (this.evaluation?.priority === "medium") delay *= role === "safe" ? 0.96 : 1.04;
+      if (this.evaluation?.priority === "high") delay *= role === "hero" ? 1.02 : 1.12;
+      if (this.evaluation?.priority === "extreme") delay *= role === "hero" ? 1.02 : 1.20;
+      return delay;
     }
 
-    playRandomDetail(detailKey) {
+    playRandomDetail(detailKey, options = {}) {
       const detail = SOUNDSCAPE_CONFIG.detailEvents[detailKey];
       if (!detail || !detail.fileList.length || !this.enabled || !this.activated) return false;
+      const evaluation = options.evaluation || this.evaluation;
+      const role = options.role || this.resolveDetailRole(detailKey, detail);
       const eligibility = this.isDetailEligible(detailKey, this.state, { includeReason: true });
       if (!eligibility.allowed) {
         this.debugLog("detail-blocked", { detailKey, reason: eligibility.reason });
+        return false;
+      }
+      const directorCheck = this.canDirectorUseDetail(detailKey, detail, this.state, evaluation, { includeReason: true });
+      if (!directorCheck.allowed) {
+        this.debugLog("detail-director-block", { detailKey, reason: directorCheck.reason });
         return false;
       }
       if (this.countShotsByCategory(detail.category) >= (DETAIL_CATEGORY_LIMITS[detail.category] || 1)) {
@@ -2526,7 +3087,9 @@
       }
 
       this.initAudioEngine();
-      const audio = new Audio(pickRandom(detail.fileList));
+      const assetPath = this.pickDetailAsset(detailKey, detail);
+      if (!assetPath) return false;
+      const audio = new Audio(assetPath);
       audio.preload = "auto";
       audio.loop = false;
       audio.playsInline = true;
@@ -2535,20 +3098,35 @@
       audio.defaultMuted = false;
       audio.playbackRate = randomBetween(detail.playbackRateMin, detail.playbackRateMax);
 
+      const startedAt = Date.now();
+      const fadeInMs = this.resolveDetailFadeMs(detailKey, detail, role, "fadeIn");
+      const fadeOutMs = this.resolveDetailFadeMs(detailKey, detail, role, "fadeOut");
+      const maxDurationMs = detail.maxDurationMs > 0
+        ? Math.round(detail.maxDurationMs * (DETAIL_DURATION_MULTIPLIER[role] || 1.1))
+        : 0;
+
       const shot = {
         key: detailKey,
         category: detail.category,
+        role,
+        assetPath,
         audio,
-        baseVolume: clamp(this.detailVolume(detailKey, detail) * DETAIL_BOOST, 0, MAX_LAYER_GAIN),
+        baseVolume: clamp(this.detailVolume(detailKey, detail, role) * DETAIL_BOOST, 0, MAX_LAYER_GAIN),
         gainNode: null,
-        mediaSource: null
+        mediaSource: null,
+        startedAt,
+        fadeInMs,
+        fadeOutMs,
+        fadeOutStartTs: 0,
+        stopAtTs: maxDurationMs > 0 ? (startedAt + maxDurationMs) : 0,
+        cleanup: null
       };
 
       if (this.audioContext && this.groupNodes.details) {
         try {
           const mediaSource = this.audioContext.createMediaElementSource(audio);
           const gainNode = this.audioContext.createGain();
-          gainNode.gain.value = shot.baseVolume;
+          gainNode.gain.value = 0;
           mediaSource.connect(gainNode);
           audio.volume = 1;
           if (this.audioContext.createStereoPanner) {
@@ -2566,11 +3144,14 @@
           audio.volume = clamp(shot.baseVolume * clamp(this.state.masterVolume, 0, 1) * this.resolveDirectDetailGain(), 0, 1);
         }
       } else {
-        audio.volume = clamp(shot.baseVolume * clamp(this.state.masterVolume, 0, 1) * this.resolveDirectDetailGain(), 0, 1);
+        audio.volume = 0;
       }
 
       let durationTimer = 0;
+      let cleaned = false;
       const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
         if (durationTimer && typeof window !== "undefined") {
           window.clearTimeout(durationTimer);
           durationTimer = 0;
@@ -2584,86 +3165,103 @@
         this.oneShots.delete(shot);
         this.notifyStateChange("detail-stop");
       };
+      shot.cleanup = cleanup;
 
       this.oneShots.add(shot);
-      this.detailCooldowns.set(detailKey, Date.now() + detail.cooldown);
+      this.registerDetailDirectorPlayback(detailKey, detail, assetPath, this.state, evaluation, role);
       this.notifyStateChange("detail-start");
+      audio.addEventListener("loadedmetadata", () => {
+        if (!Number.isFinite(audio.duration) || audio.duration <= 0) return;
+        const naturalStopTs = shot.startedAt + Math.round(audio.duration * 1000);
+        shot.stopAtTs = shot.stopAtTs > 0
+          ? Math.min(shot.stopAtTs, naturalStopTs)
+          : naturalStopTs;
+      }, { once: true });
       audio.addEventListener("ended", cleanup, { once: true });
       audio.addEventListener("error", cleanup, { once: true });
       const playPromise = audio.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch(() => cleanup());
       }
-      if (detail.maxDurationMs > 0 && typeof window !== "undefined") {
-        durationTimer = window.setTimeout(() => cleanup(), detail.maxDurationMs);
+      if (shot.stopAtTs > 0 && typeof window !== "undefined") {
+        durationTimer = window.setTimeout(() => cleanup(), Math.max(shot.stopAtTs - Date.now() + fadeOutMs + 240, fadeOutMs + 320));
       }
-      this.debugLog("detail-play", { detailKey, volume: this.detailVolume(detailKey, detail) });
+      this.debugLog("detail-play", { detailKey, volume: this.detailVolume(detailKey, detail, role), role, assetPath });
       return true;
     }
 
-    detailVolume(detailKey, detail) {
+    detailVolume(detailKey, detail, role = this.resolveDetailRole(detailKey, detail)) {
       const priority = this.evaluation?.priority || "low";
       let volume = detail.baseVolume;
       if (detailKey === "thunder_far" || detailKey === "thunder_near") {
-        volume *= 0.86 + (this.state.intensity * 0.42);
+        volume *= 0.82 + (this.state.intensity * 0.30);
       } else if (detailKey === "day_bird_call") {
-        const timeFactor = this.state.timeOfDay === "dawn" ? 1.18 : this.state.timeOfDay === "day" ? 0.98 : 0.80;
+        const timeFactor = this.state.timeOfDay === "dawn" ? 1.12 : this.state.timeOfDay === "day" ? 0.94 : 0.76;
         const weatherFactor = this.state.weather === "clear"
-          ? 1.06
+          ? 1.02
           : this.state.weather === "partly_cloudy"
-            ? 0.96
+            ? 0.92
             : this.state.weather === "cloudy"
-              ? 0.82
+              ? 0.78
               : this.state.weather === "overcast"
-                ? 0.78
+                ? 0.70
                 : this.state.weather === "fog" || this.state.weather === "drizzle"
-                  ? 0.58
+                  ? 0.50
                   : 0.72;
         volume *= timeFactor * weatherFactor;
       } else if (detailKey === "bee_pass") {
-        volume *= 0.92 + (this.state.heatIntensity * 0.32);
+        volume *= 0.76 + (this.state.heatIntensity * 0.18);
       } else if (detailKey === "bumblebee_pass") {
-        volume *= 0.94 + (this.state.heatIntensity * 0.22);
+        volume *= 0.78 + (this.state.heatIntensity * 0.16);
       } else if (detailKey === "crow_call") {
         volume *= this.state.weather === "overcast"
-          ? 0.74
+          ? 0.62
           : this.state.weather === "cloudy"
-            ? 0.82
-            : (this.state.weather === "post_rain" || this.state.weather === "frost") ? 0.94 : 0.90;
+            ? 0.72
+            : (this.state.weather === "post_rain" || this.state.weather === "frost") ? 0.82 : 0.74;
       } else if (detailKey === "cuckoo_call") {
-        volume *= (this.state.season === "spring" || this.state.season === "summer") ? 1.08 : 0.84;
+        volume *= (this.state.season === "spring" || this.state.season === "summer") ? 0.98 : 0.76;
       } else if (detailKey === "woodpecker") {
         volume *= this.state.timeOfDay === "evening"
-          ? 0.60
+          ? 0.52
           : this.state.weather === "frost"
-            ? 0.88
+            ? 0.76
             : this.state.weather === "heat_haze"
-              ? 0.70
-              : 0.78;
+              ? 0.60
+              : 0.68;
       } else if (detailKey === "dove_call") {
         volume *= this.state.weather === "heat_haze"
-          ? 0.76
-          : (this.state.weather === "clear" || this.state.weather === "partly_cloudy") ? 0.94 : 0.80;
+          ? 0.68
+          : (this.state.weather === "clear" || this.state.weather === "partly_cloudy") ? 0.86 : 0.72;
       } else if (detailKey === "owl_call") {
         volume *= this.state.weather === "fog"
-          ? 0.92
-          : 1.34 + ((this.state.weather === "clear" || this.state.weather === "partly_cloudy") ? 0.14 : 0.06);
+          ? 0.82
+          : 0.96 + ((this.state.weather === "clear" || this.state.weather === "partly_cloudy") ? 0.08 : 0.04);
       } else if (detailKey === "dog_far") {
-        volume *= (this.state.weather === "clear" || this.state.weather === "overcast" || this.state.weather === "cloudy" || this.state.weather === "frost" || this.state.weather === "post_snow") ? 1.02 : 0.94;
+        volume *= (this.state.weather === "clear" || this.state.weather === "overcast" || this.state.weather === "cloudy" || this.state.weather === "frost" || this.state.weather === "post_snow") ? 0.84 : 0.72;
       } else if (detailKey === "frog_call") {
-        volume *= (this.state.weather === "post_rain" || this.state.weather === "post_storm") ? 0.96 : 0.82;
+        volume *= (this.state.weather === "post_rain" || this.state.weather === "post_storm") ? 0.84 : 0.72;
       } else if (detailKey === "mosquito_pass") {
-        volume *= this.state.temperatureBand === "hot" ? 0.62 : 0.52;
+        volume *= this.state.temperatureBand === "hot" ? 0.56 : 0.46;
       } else if (detailKey === "squirrel_rustle") {
-        volume *= this.state.season === "autumn" ? 1.16 : 1.08;
+        volume *= this.state.season === "autumn" ? 0.96 : 0.86;
       } else if (detailKey === "tree_drips") {
-        volume *= (this.state.weather === "post_rain" || this.state.weather === "post_storm") ? 1.18 : 1;
+        volume *= (this.state.weather === "post_rain" || this.state.weather === "post_storm") ? 0.96 : 0.82;
       }
+      volume *= role === "safe" ? 0.94 : role === "accent" ? 0.82 : 0.78;
       if (priority === "high" || priority === "extreme") {
-        volume *= detail.category === "thunder" ? 1 : 0.72;
+        volume *= detail.category === "thunder" ? 0.94 : 0.58;
       }
-      volume *= randomBetween(0.92, 1.06);
-      return clamp(volume, 0, 1);
+      if (this.state.timeOfDay === "night" && role !== "hero") {
+        volume *= 0.92;
+      }
+      volume *= randomBetween(0.94, 1.02);
+      const cap = role === "hero"
+        ? 0.24
+        : role === "accent"
+          ? 0.17
+          : 0.13;
+      return clamp(volume, 0, cap);
     }
 
     stopIncompatibleDetails(allowedDetailKeys = []) {
@@ -2671,13 +3269,10 @@
       let changed = false;
       this.oneShots.forEach((shot) => {
         if (allowedSet.has(shot.key)) return;
-        try {
-          shot.audio.pause();
-          shot.audio.currentTime = 0;
-        } catch (error) {
-          // Ignore media cleanup issues.
+        if (!shot.fadeOutStartTs) {
+          shot.fadeOutStartTs = Date.now();
+          shot.stopAtTs = shot.fadeOutStartTs + Math.min(Math.max(shot.fadeOutMs || 220, 180), 320);
         }
-        this.oneShots.delete(shot);
         changed = true;
       });
       if (changed) this.notifyStateChange("detail-prune");

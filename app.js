@@ -1579,6 +1579,11 @@ const createJournalModule = requireFunction("createJournalModule", mojaZahradaMo
 const createQuickUiModule = requireFunction("createQuickUiModule", mojaZahradaModuleRegistry.createQuickUiModule);
 const createCategoriesModule = requireFunction("createCategoriesModule", mojaZahradaModuleRegistry.createCategoriesModule);
 const createStorageModule = requireFunction("createStorageModule", mojaZahradaModuleRegistry.createStorageModule);
+const createPreferencesModule = requireFunction("createPreferencesModule", mojaZahradaModuleRegistry.createPreferencesModule);
+const createDataTransferModule = requireFunction("createDataTransferModule", mojaZahradaModuleRegistry.createDataTransferModule);
+const createWeatherLocationModule = requireFunction("createWeatherLocationModule", mojaZahradaModuleRegistry.createWeatherLocationModule);
+const createAuthLocalModule = requireFunction("createAuthLocalModule", mojaZahradaModuleRegistry.createAuthLocalModule);
+const createActionsModule = requireFunction("createActionsModule", mojaZahradaModuleRegistry.createActionsModule);
 
 const journalModule = createJournalModule({
   canonicalizeSupabaseMediaList,
@@ -1705,6 +1710,80 @@ const {
 } = categoriesModule;
 quickUiCategoryCompatibility = isCategoryCompatibleWithCardType;
 
+const weatherLocationModule = createWeatherLocationModule({
+  WEATHER_PREFERENCES_KEY,
+  logModuleError
+});
+
+const {
+  loadWeatherPreferences,
+  saveWeatherPreferences,
+  geocodePlace
+} = weatherLocationModule;
+
+const preferencesModule = createPreferencesModule({
+  MOBILE_WEATHER_SCENE_ONLY_KEY,
+  logModuleError
+});
+
+const {
+  loadMobileWeatherSceneOnlyPreference,
+  saveMobileWeatherSceneOnlyPreference
+} = preferencesModule;
+
+const authLocalModule = createAuthLocalModule({
+  LOCAL_AUTH_PROFILE_KEY,
+  LOCAL_AUTH_SESSION_KEY,
+  makeId,
+  unlockBodyScroll,
+  syncWeatherBackgroundLoopVisibility,
+  closeToolbarAddMenu: (...args) => closeToolbarAddMenu(...args),
+  closeJournalOverlay: (...args) => closeJournalOverlay(...args),
+  closeImageLightbox: (...args) => closeImageLightbox(...args),
+  getDetailModal: () => document.getElementById("detail-modal"),
+  resetAuthGatePreviousOverflow: () => {
+    authGatePreviousOverflow = null;
+  },
+  logModuleError
+});
+
+const {
+  normalizeLocalAuthProfile,
+  loadLocalAuthProfile,
+  saveLocalAuthProfile,
+  clearLocalAuthProfile,
+  loadLocalAuthSession,
+  saveLocalAuthSession,
+  clearLocalAuthSession,
+  localAuthDisplayName,
+  isLocalAuthSessionValid,
+  makeLocalAuthSalt,
+  hashLocalAuthPassword,
+  buildLocalAuthProfile,
+  verifyLocalAuthPassword,
+  authGateRoot,
+  removeAuthGate,
+  ensureAuthGateRoot,
+  closeSecondaryOverlaysForAuthLock,
+  lockAppToAuth,
+  syncAuthGate
+} = authLocalModule;
+
+const dataTransferModule = createDataTransferModule({
+  STORAGE_KEY,
+  RESET_BACKUP_KEY,
+  getState: () => state,
+  onResetBackupSaved: () => updateRestoreResetButton(),
+  logModuleError
+});
+
+const {
+  serializeStateSnapshot,
+  exportFileTimestamp,
+  exportStateEnvelope,
+  saveResetBackup
+} = dataTransferModule;
+
 const storageModule = createStorageModule({
   STORAGE_KEY,
   clone,
@@ -1765,6 +1844,23 @@ function persist(...args) {
   return storagePersist(...args);
 }
 
+function persistInBackground(context = "") {
+  const detail = String(context || "").trim();
+  Promise.resolve().then(() => {
+    try {
+      const persisted = persist();
+      if (persisted) return;
+      console.error(detail ? `Persist failed: ${detail}` : "Persist failed");
+    } catch (error) {
+      if (detail) {
+        console.error(`Persist failed: ${detail}`, error);
+        return;
+      }
+      console.error("Persist failed", error);
+    }
+  });
+}
+
 // Runtime state bootstrapping.
 let state = loadState();
 clearAppCache();
@@ -1774,6 +1870,25 @@ journalModule.init?.();
 quickUiModule.init?.();
 categoriesModule.init?.();
 storageModule.init?.();
+const actionsModule = createActionsModule({
+  getState: () => state,
+  clearAppCache,
+  render,
+  persistInBackground,
+  softDeleteStateRecord,
+  normalizeTaskRecord,
+  showAppToast: (...args) => showAppToast(...args),
+  showUndoDeleteToast: (...args) => showUndoDeleteToast(...args),
+  logModuleError
+});
+const {
+  addTaskAction,
+  toggleTaskAction,
+  deleteTaskAction,
+  saveJournalEntryAction,
+  addJournalEntryAction,
+  deleteJournalEntryAction
+} = actionsModule;
 let activeFilter = "all";
 let isFocusedView = false;
 let derivedDataCacheVersion = 0;
@@ -1807,6 +1922,15 @@ let homeWeatherOverviewLoadPromise = null;
 let homeWeatherRefreshTimer = null;
 let authGatePreviousOverflow = null;
 let lastRenderSignature = null;
+let lastRenderSnapshot = {
+  journal: null,
+  tasks: null,
+  categories: null
+};
+let scheduledRenderFrameId = 0;
+let scheduledRenderBypassDepth = 0;
+let scheduledRenderFlushing = false;
+const scheduledRenderQueue = new Map();
 let autoCloudPushTimer = null;
 let autoCloudPullTimer = null;
 let autoCloudSyncInFlight = false;
@@ -1888,6 +2012,119 @@ function createRenderSignature(currentState) {
     auth: authRenderSignature(),
     weather: weatherRenderSignature()
   });
+}
+
+function createJournalRenderSnapshot(currentState) {
+  if (!currentState) return "empty";
+  return JSON.stringify({
+    journal: collectionRenderSignature(currentState.journal),
+    categories: collectionRenderSignature(currentState.categories),
+    cards: collectionRenderSignature(currentState.varieties),
+    isMobileShell: Boolean(document.body?.classList.contains("app-mobile-shell"))
+  });
+}
+
+function createTasksRenderSnapshot(currentState) {
+  if (!currentState) return "empty";
+  return JSON.stringify({
+    tasks: collectionRenderSignature(currentState.customTasks),
+    categories: collectionRenderSignature(currentState.categories),
+    cards: collectionRenderSignature(currentState.varieties),
+    isMobileShell: Boolean(document.body?.classList.contains("app-mobile-shell"))
+  });
+}
+
+function createCategoriesRenderSnapshot(currentState) {
+  if (!currentState) return "empty";
+  return JSON.stringify({
+    categories: collectionRenderSignature(currentState.categories),
+    cards: collectionRenderSignature(currentState.varieties),
+    journal: collectionRenderSignature(currentState.journal),
+    activeCategoryId: String(activeCategoryId || "").trim(),
+    activeFilter: String(activeFilter || "").trim() || "all",
+    focusedView: Boolean(isFocusedView),
+    isMobileShell: Boolean(document.body?.classList.contains("app-mobile-shell")),
+    weather: weatherRenderSignature()
+  });
+}
+
+function renderTasksSafe() {
+  const current = createTasksRenderSnapshot(state);
+  if (lastRenderSnapshot.tasks === current) return;
+  lastRenderSnapshot.tasks = current;
+  renderTasks();
+}
+
+function renderJournalSafe() {
+  const current = createJournalRenderSnapshot(state);
+  if (lastRenderSnapshot.journal === current) return;
+  lastRenderSnapshot.journal = current;
+  renderJournal();
+}
+
+function renderCatalogSafe() {
+  const current = createCategoriesRenderSnapshot(state);
+  if (lastRenderSnapshot.categories === current) return;
+  lastRenderSnapshot.categories = current;
+  renderCatalog();
+}
+
+function requestScheduledRenderFrame(callback) {
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    return window.requestAnimationFrame(callback);
+  }
+  return window.setTimeout(() => callback(Date.now()), 16);
+}
+
+function flushScheduledRenders() {
+  if (!scheduledRenderQueue.size) return;
+  const queue = [...scheduledRenderQueue.values()];
+  scheduledRenderQueue.clear();
+  scheduledRenderFlushing = true;
+  try {
+    queue.forEach((fn) => {
+      try {
+        fn();
+      } catch (error) {
+        console.error("Render error", error);
+      }
+    });
+  } finally {
+    scheduledRenderFlushing = false;
+    if (scheduledRenderQueue.size && !scheduledRenderFrameId) {
+      scheduledRenderFrameId = requestScheduledRenderFrame(() => {
+        scheduledRenderFrameId = 0;
+        flushScheduledRenders();
+      });
+    }
+  }
+}
+
+function scheduleRender(key, fn) {
+  if (typeof fn !== "function") return;
+  if (scheduledRenderBypassDepth > 0 || scheduledRenderFlushing) {
+    fn();
+    return;
+  }
+  const normalizedKey = String(key || "").trim() || `render-${scheduledRenderQueue.size + 1}`;
+  scheduledRenderQueue.set(normalizedKey, fn);
+  if (scheduledRenderFrameId) return;
+  scheduledRenderFrameId = requestScheduledRenderFrame(() => {
+    scheduledRenderFrameId = 0;
+    flushScheduledRenders();
+  });
+}
+
+function scheduleTasksRenderSafe() {
+  scheduleRender("tasks", () => renderTasksSafe());
+}
+
+function scheduleJournalRenderSafe() {
+  scheduleRender("journal", () => renderJournalSafe());
+}
+
+function scheduleCatalogRenderSafe() {
+  scheduleRender("categories", () => renderCatalogSafe());
 }
 
 const mainMenuEl = document.getElementById("main-menu");
@@ -5336,6 +5573,11 @@ function attachSwipeRow(rowEl) {
 
   const content = swipeRowContentEl(rowEl);
   if (!(content instanceof HTMLElement)) return;
+  content.querySelectorAll("img").forEach((img) => {
+    if (img instanceof HTMLImageElement) {
+      img.draggable = false;
+    }
+  });
 
   let startX = 0;
   let startY = 0;
@@ -5369,6 +5611,19 @@ function attachSwipeRow(rowEl) {
     event.preventDefault();
     event.stopPropagation();
     closeSwipeRow(rowEl);
+  }, true);
+
+  content.addEventListener("contextmenu", (event) => {
+    if (!swipeRowsEnabled()) return;
+    const target = event.target;
+    if (shouldIgnoreSwipeRowGestureTarget(target)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+
+  content.addEventListener("dragstart", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
   }, true);
 
   content.addEventListener("touchstart", (event) => {
@@ -5501,13 +5756,10 @@ function toggleCardTopFromSwipe(item) {
   const normalizedId = String(item?.id || "").trim();
   const existing = state.varieties.find((entry) => entry.id === normalizedId);
   if (!existing) return;
-  const previousTop = Boolean(existing.top);
-  existing.top = !previousTop;
-  if (!persist()) {
-    existing.top = previousTop;
-    return;
-  }
+  existing.top = !Boolean(existing.top);
+  clearAppCache();
   render();
+  persistInBackground("toggle card top");
 }
 
 function deleteCardFromSwipe(item) {
@@ -5524,12 +5776,10 @@ function deleteCardFromSwipe(item) {
     restoreUndoStateSnapshot(previousUndoState);
     return;
   }
-  if (!persist()) {
-    rollbackSoftDeleteResult(deleteResult);
-    return;
-  }
+  clearAppCache();
   render();
   showUndoDeleteToast("Karta zmazaná");
+  persistInBackground("delete card");
 }
 
 function bindJournalSwipeRows(root = document) {
@@ -5567,17 +5817,15 @@ function bindJournalSwipeRows(root = document) {
           existingDeleteButton.click();
           return;
         }
-        const deleteResult = softDeleteStateRecord("journal", item.id, "journal");
-        if (!deleteResult) return;
-        if (!persist()) {
-          rollbackSoftDeleteResult(deleteResult);
-          return;
-        }
-        render();
-        showUndoDeleteToast("Zápis zmazaný");
-        if (rowEl.closest("#journal-overlay-root")) {
-          openJournalOverlayList(String(rowEl.closest("#journal-overlay-root")?.dataset.journalActiveTagKey || "").trim(), { historyMode: "preserve" });
-        }
+        deleteJournalEntryAction(item.id, {
+          render: () => {
+            render();
+            if (rowEl.closest("#journal-overlay-root")) {
+              openJournalOverlayList(String(rowEl.closest("#journal-overlay-root")?.dataset.journalActiveTagKey || "").trim(), { historyMode: "preserve" });
+            }
+          },
+          persistContext: "delete journal"
+        });
       }
     });
     attachSwipeRow(rowEl);
@@ -5675,7 +5923,6 @@ function bindSwipeRows(root = document) {
     activeSwipeRow = null;
   }
   bindJournalSwipeRows(root);
-  bindTaskSwipeRows(root);
   bindCardSwipeRows(root);
   bindCategorySwipeRows(root);
 }
@@ -5750,8 +5997,6 @@ function openMainMenuView(options = {}) {
   window.scrollTo({ top: Math.max(0, menuTop - 12), behavior: navigationScrollBehavior() });
 }
 
-let journalOverlayPreviousOverflow = null;
-
 function journalOverlayRoot() {
   return document.getElementById("journal-overlay-root");
 }
@@ -5774,7 +6019,6 @@ function closeJournalOverlay(options = {}) {
   if (root) root.remove();
   removeThumbSaveBar();
   unlockBodyScroll("journal");
-  journalOverlayPreviousOverflow = null;
   document.removeEventListener("keydown", handleJournalOverlayEscape);
   if (!fromHistory) {
     clearOverlayHistory(historyKind);
@@ -5799,9 +6043,6 @@ function ensureJournalOverlayRoot(options = {}) {
     document.body.appendChild(root);
   }
 
-  if (journalOverlayPreviousOverflow === null) {
-    journalOverlayPreviousOverflow = document.body.style.overflow;
-  }
   lockBodyScroll("journal");
   document.removeEventListener("keydown", handleJournalOverlayEscape);
   document.addEventListener("keydown", handleJournalOverlayEscape);
@@ -6086,15 +6327,13 @@ function bindJournalOverlayCardActions(container) {
     if (!(button instanceof HTMLElement) || button.dataset.boundDeleteJournalOverlay === "true") return;
     button.dataset.boundDeleteJournalOverlay = "true";
     button.addEventListener("click", () => {
-      const deleteResult = softDeleteStateRecord("journal", button.dataset.deleteJournalOverlay, "journal");
-      if (!deleteResult) return;
-      if (!persist()) {
-        rollbackSoftDeleteResult(deleteResult);
-        return;
-      }
-      render();
-      showUndoDeleteToast("Zápis zmazaný");
-      openJournalOverlayList(String(container.dataset.journalActiveTagKey || "").trim(), { historyMode: "preserve" });
+      deleteJournalEntryAction(button.dataset.deleteJournalOverlay, {
+        render: () => {
+          render();
+          openJournalOverlayList(String(container.dataset.journalActiveTagKey || "").trim(), { historyMode: "preserve" });
+        },
+        persistContext: "delete journal overlay"
+      });
     });
   });
 
@@ -6340,19 +6579,17 @@ function openJournalOverlayEntry(entryId = "", returnTagKey = "", options = {}) 
     });
   });
   root.querySelector("#journal-overlay-delete-entry")?.addEventListener("click", () => {
-    const deleteResult = softDeleteStateRecord("journal", normalizedEntryId, "journal");
-    if (!deleteResult) return;
-    if (!persist()) {
-      rollbackSoftDeleteResult(deleteResult);
-      return;
-    }
-    render();
-    showUndoDeleteToast("Zápis zmazaný");
-    if (activeOverlayHistoryKind === "journal-entry" && typeof window !== "undefined" && window.history?.back) {
-      window.history.back();
-      return;
-    }
-    openJournalOverlayList(normalizedReturnTagKey, { historyMode: "preserve" });
+    deleteJournalEntryAction(normalizedEntryId, {
+      render: () => {
+        render();
+        if (activeOverlayHistoryKind === "journal-entry" && typeof window !== "undefined" && window.history?.back) {
+          window.history.back();
+          return;
+        }
+        openJournalOverlayList(normalizedReturnTagKey, { historyMode: "preserve" });
+      },
+      persistContext: "delete journal entry overlay"
+    });
   });
   root.querySelectorAll("[data-journal-filter-tag]").forEach((button) => {
     button.addEventListener("click", (event) => {
@@ -7975,22 +8212,16 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
         videoMimeType
       };
 
-      if (editingEntry) {
-        const previousJournal = [...state.journal];
-        state.journal = state.journal.map((entry) => (String(entry?.id || "") === editingEntry.id ? nextEntry : entry));
-        clearPendingUrls();
-        if (!persist()) {
-          state.journal = previousJournal;
-          return;
-        }
-      } else {
-        state.journal.unshift(nextEntry);
-        clearPendingUrls();
-        if (!persist()) {
-          state.journal = state.journal.filter((entry) => entry.id !== nextEntry.id);
-          return;
-        }
-      }
+      const journalEntryAction = editingEntry ? saveJournalEntryAction : addJournalEntryAction;
+      clearPendingUrls();
+      if (!journalEntryAction(nextEntry, {
+        entryId: editingEntry?.id || "",
+        persistContext: editingEntry ? "save journal entry" : "add journal entry"
+      })) return;
+      rememberLastUsedJournalEntryType(selectedEntryType);
+      clearDraft(journalDraftFormType);
+      stopWalkGpsTracking({ silent: true });
+      openJournalReturnView();
 
       if (videoPath || video) {
         setVideoUploadStatus({
@@ -8002,12 +8233,6 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
           tone: "good"
         });
       }
-
-      rememberLastUsedJournalEntryType(selectedEntryType);
-      clearDraft(journalDraftFormType);
-      stopWalkGpsTracking({ silent: true });
-      render();
-      openJournalReturnView();
       showAppToast(editingEntry ? "Zápis uložený" : "Zápis pridaný", {
         tone: "success",
         detail: "Zmena je uložená a podľa potreby sa prenesie aj do cloudu."
@@ -8117,7 +8342,7 @@ function renderFocusedCategoryNavigation() {
   ensureActiveCategory();
   closeUtilityDrawers();
   updateMenuVisibility();
-  renderCatalog();
+  scheduleCatalogRenderSafe();
   reconcileBodyScrollState();
   syncMainMenuTouchScrollState();
   scheduleEmbeddedMobilePreviewMetricsPush();
@@ -8483,7 +8708,7 @@ function wireStaticEvents() {
       activeFilter = button.dataset.filter;
       syncFilterButtons();
       if (filterDisclosureEl) filterDisclosureEl.open = false;
-      renderCatalog();
+      scheduleCatalogRenderSafe();
     });
   });
 
@@ -9002,6 +9227,9 @@ function endImageLightboxTouch(event) {
 function render() {
   if (!state) {
     lastRenderSignature = null;
+    lastRenderSnapshot.journal = null;
+    lastRenderSnapshot.tasks = null;
+    lastRenderSnapshot.categories = null;
   }
 
   const nextRenderSignature = state ? createRenderSignature(state) : null;
@@ -9018,6 +9246,7 @@ function render() {
   };
 
   try {
+    scheduledRenderBypassDepth += 1;
     const shouldKeepToolbarAddMenuOpen = Boolean(toolbarAddMenuEl?.open);
     ensureActiveCategory();
     syncMobilePreviewClass();
@@ -9039,10 +9268,10 @@ function render() {
     refreshMainMenuWeatherMini().catch(() => {});
     if (!homeWeatherOverview) loadHomeWeatherOverview().catch(() => {});
     safeStep("prehľad práce", renderProgressOverview);
-    safeStep("katalóg", renderCatalog);
+    safeStep("katalóg", scheduleCatalogRenderSafe);
     safeStep("bočný prehľad", renderOverview);
-    safeStep("úlohy", renderTasks);
-    safeStep("denník", renderJournal);
+    safeStep("úlohy", scheduleTasksRenderSafe);
+    safeStep("denník", scheduleJournalRenderSafe);
     safeStep("spomienky", renderMemories);
     safeStep("insighty", renderInsights);
     safeStep("zvýraznenia", syncOverviewHighlights);
@@ -9062,6 +9291,9 @@ function render() {
     syncAppNavigationHistoryState({ mode: "replace" });
     lastRenderSignature = nextRenderSignature;
   } finally {
+    if (scheduledRenderBypassDepth > 0) {
+      scheduledRenderBypassDepth -= 1;
+    }
     markAppBootReady();
   }
 }
@@ -10889,13 +11121,10 @@ async function openQuickPhotoEntryFlow(photoFiles) {
       weather: weatherSnapshot
     }, state.varieties);
 
-    state.journal.unshift(entry);
-    if (!persist()) {
-      state.journal = state.journal.filter((item) => item.id !== entry.id);
-      return;
-    }
+    if (!addJournalEntryAction(entry, {
+      persistContext: "add journal entry"
+    })) return;
     rememberLastUsedJournalEntryType(selectedEntryType);
-    render();
     if (detailModal?.open && typeof detailModal.close === "function") {
       detailModal.close();
     }
@@ -13305,14 +13534,6 @@ function loadMobileWeatherThemeTemperatureOverride() {
   }
 }
 
-function loadMobileWeatherSceneOnlyPreference() {
-  try {
-    return localStorage.getItem(MOBILE_WEATHER_SCENE_ONLY_KEY) === "1";
-  } catch (error) {
-    return false;
-  }
-}
-
 function saveMobileWeatherThemeDebugOverride(nextId = "auto") {
   const match = MOBILE_WEATHER_THEME_DEBUG_OPTIONS.find((item) => item.id === String(nextId || "").trim()) || MOBILE_WEATHER_THEME_DEBUG_OPTIONS[0];
   try {
@@ -13429,18 +13650,6 @@ function saveMobileWeatherThemeSeasonOverride(nextValue = "") {
     localStorage.setItem(MOBILE_WEATHER_THEME_SEASON_KEY, value);
   } catch (error) {
     // Dočasný prepínač sezóny nech appku neblokuje.
-  }
-}
-
-function saveMobileWeatherSceneOnlyPreference(enabled = false) {
-  try {
-    if (!enabled) {
-      localStorage.removeItem(MOBILE_WEATHER_SCENE_ONLY_KEY);
-      return;
-    }
-    localStorage.setItem(MOBILE_WEATHER_SCENE_ONLY_KEY, "1");
-  } catch (error) {
-    // Dočasný prepínač čistého pozadia nech appku neblokuje.
   }
 }
 
@@ -15344,15 +15553,13 @@ function bindJournalManagerListActions(journalList, rerender) {
     if (!(button instanceof HTMLElement) || button.dataset.boundDeleteWorklogJournal === "true") return;
     button.dataset.boundDeleteWorklogJournal = "true";
     button.addEventListener("click", () => {
-      const deleteResult = softDeleteStateRecord("journal", button.dataset.deleteWorklogJournal, "journal");
-      if (!deleteResult) return;
-      if (!persist()) {
-        rollbackSoftDeleteResult(deleteResult);
-        return;
-      }
-      render();
-      rerender();
-      showUndoDeleteToast("Zápis zmazaný");
+      if (!deleteJournalEntryAction(button.dataset.deleteWorklogJournal, {
+        render: () => {
+          render();
+          rerender();
+        },
+        persistContext: "delete journal manager"
+      })) return;
     });
   });
 
@@ -15435,14 +15642,10 @@ function renderJournal() {
     journalListEl.querySelectorAll("[data-delete-journal]").forEach((button) => {
       button.addEventListener("click", () => {
         const entryId = button.dataset.deleteJournal;
-        const deleteResult = softDeleteStateRecord("journal", entryId, "journal");
-        if (!deleteResult) return;
-        if (!persist()) {
-          rollbackSoftDeleteResult(deleteResult);
-          return;
-        }
-        renderJournal();
-        showUndoDeleteToast("Zápis zmazaný");
+        deleteJournalEntryAction(entryId, {
+          render: () => scheduleJournalRenderSafe(),
+          persistContext: "delete journal list"
+        });
       });
     });
   }
@@ -16641,35 +16844,20 @@ function renderTaskManagerList(taskList, taskCount, rerender) {
     });
   bindThingLinks(taskList);
 
-  taskList.querySelectorAll("[data-toggle-task]").forEach((checkbox) => {
-    checkbox.addEventListener("change", () => {
-      const task = state.customTasks.find((item) => item.id === checkbox.dataset.toggleTask);
-      if (!task) return;
-      const previousDone = task.done;
-      task.done = checkbox.checked;
-      if (!persist()) {
-        task.done = previousDone;
-        checkbox.checked = previousDone;
-        return;
+  const bindTaskManagerItem = (scope) => {
+    bindTaskActions(scope, {
+      onTaskUpdated: (taskId) => {
+        if (!patchRenderedTaskCollection(taskList, taskId, { bindItem: bindTaskManagerItem })) {
+          rerender();
+        }
+      },
+      onTaskDeleted: () => {
+        rerender();
       }
-      render();
-      rerender();
     });
-  });
+  };
 
-  taskList.querySelectorAll("[data-delete-task]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const deleteResult = softDeleteStateRecord("customTasks", button.dataset.deleteTask, "task");
-      if (!deleteResult) return;
-      if (!persist()) {
-        rollbackSoftDeleteResult(deleteResult);
-        return;
-      }
-      render();
-      rerender();
-      showUndoDeleteToast("Úloha zmazaná");
-    });
-  });
+  bindTaskManagerItem(taskList);
 
   bindSwipeRows(taskList);
 }
@@ -16858,7 +17046,7 @@ function openTaskManager() {
       const inferredCategoryId = state.varieties.find((item) => item.id === linkedVarietyId)?.categoryId || "";
       if (inferredCategoryId) linkedCategoryIds.push(inferredCategoryId);
     }
-    state.customTasks.unshift(normalizeTaskRecord({
+    addTaskAction({
       id: makeId("task"),
       text,
       date: String(form.get("date") || ""),
@@ -16866,14 +17054,13 @@ function openTaskManager() {
       linkedCategoryIds,
       linkedCategoryId: linkedCategoryIds[0] || "",
       linkedVarietyId
-    }, state.varieties));
-    if (!persist()) return;
-    render();
-    rerenderTaskManager();
-    setTaskEditorOpen(false);
-    showAppToast("Úloha pridaná", {
-      tone: "success",
-      detail: "Úloha je uložená."
+    }, {
+      render: () => {
+        render();
+        rerenderTaskManager();
+        setTaskEditorOpen(false);
+      },
+      persistContext: "add task"
     });
   });
 
@@ -17272,26 +17459,16 @@ function openAddEntryFlow(editingEntryId = "") {
       })
     }, state.varieties);
 
-    if (editingEntry) {
-      const entryIndex = state.journal.findIndex((item) => item.id === editingEntry.id);
-      if (entryIndex === -1) return;
-      const previousEntry = state.journal[entryIndex];
-      state.journal[entryIndex] = entry;
-      clearPendingUrls();
-      if (!persist()) {
-        state.journal[entryIndex] = previousEntry;
-        return;
-      }
-    } else {
-      state.journal.unshift(entry);
-      clearPendingUrls();
-      if (!persist()) {
-        state.journal = state.journal.filter((item) => item.id !== entry.id);
-        return;
-      }
-    }
-    render();
-    detailModal.close();
+    const journalEntryAction = editingEntry ? saveJournalEntryAction : addJournalEntryAction;
+    clearPendingUrls();
+    if (!journalEntryAction(entry, {
+      entryId: editingEntry?.id || "",
+      render: () => {
+        render();
+        detailModal.close();
+      },
+      persistContext: editingEntry ? "save journal entry" : "add journal entry"
+    })) return;
   });
 
   openDetailModalDialog();
@@ -18309,7 +18486,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     }
 
     activeCategoryId = currentViewCategoryId;
-    if (!persist()) return;
+    clearAppCache();
     rememberLastUsedCardType(CARD_TYPES.VARIETY);
     if (isCategoryCompatibleWithCardType(CARD_TYPES.VARIETY, payload.categoryId)) {
       rememberLastUsedCategory(payload.categoryId, CARD_TYPES.VARIETY);
@@ -18319,6 +18496,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     showAppToast(existing ? "Karta uložená" : "Karta pridaná", {
       tone: "success"
     });
+    persistInBackground(existing ? "save card" : "add card");
   });
 
   if (existing) {
@@ -18333,13 +18511,11 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
         restoreUndoStateSnapshot(previousUndoState);
         return;
       }
-      if (!persist()) {
-        rollbackSoftDeleteResult(deleteResult);
-        return;
-      }
+      clearAppCache();
       render();
       detailModal.close();
       showUndoDeleteToast("Karta zmazaná");
+      persistInBackground("delete card");
     });
   }
 
@@ -18767,6 +18943,87 @@ function combinedTasks() {
   return activeSyncItems(state.customTasks);
 }
 
+function resolveTaskRenderListRoot(container) {
+  if (!(container instanceof Element)) return null;
+  if (container.classList.contains("task-stack")) return container;
+  return container.querySelector(".task-stack");
+}
+
+function buildTaskListDomOrder(listRoot) {
+  if (!(listRoot instanceof Element)) return [];
+  return [...listRoot.querySelectorAll(".task-item[data-task-id]")]
+    .map((itemEl) => String(itemEl.getAttribute("data-task-id") || "").trim())
+    .filter(Boolean);
+}
+
+function patchRenderedTaskCollection(container, taskId, { bindItem } = {}) {
+  const normalizedTaskId = String(taskId || "").trim();
+  if (!normalizedTaskId) return false;
+  const listRoot = resolveTaskRenderListRoot(container);
+  if (!(listRoot instanceof HTMLElement)) return false;
+
+  const sortedTasks = sortTasks(combinedTasks());
+  const task = sortedTasks.find((item) => item.id === normalizedTaskId);
+  if (!task) return false;
+
+  const nextOrder = sortedTasks.map((item) => String(item.id || "").trim()).filter(Boolean);
+  const currentOrder = buildTaskListDomOrder(listRoot);
+  if (!currentOrder.length || currentOrder.length !== nextOrder.length) return false;
+  if (!nextOrder.every((id) => currentOrder.includes(id))) return false;
+
+  const selectorValue = escapeSwipeSelectorValue(normalizedTaskId);
+  if (!selectorValue) return false;
+  const currentItem = listRoot.querySelector(`.task-item[data-task-id="${selectorValue}"]`);
+  if (!(currentItem instanceof HTMLElement)) return false;
+
+  const template = document.createElement("template");
+  template.innerHTML = renderTaskItem(task).trim();
+  const nextItem = template.content.firstElementChild;
+  if (!(nextItem instanceof HTMLElement)) return false;
+
+  const currentRow = currentItem.closest(".swipe-row");
+  const movableNode = currentRow instanceof HTMLElement && currentRow.parentElement === listRoot
+    ? currentRow
+    : nextItem;
+
+  currentItem.replaceWith(nextItem);
+
+  const targetIndex = nextOrder.indexOf(normalizedTaskId);
+  const nextTaskId = targetIndex >= 0 ? nextOrder[targetIndex + 1] || "" : "";
+  if (nextTaskId) {
+    const nextSelectorValue = escapeSwipeSelectorValue(nextTaskId);
+    const nextSiblingItem = nextSelectorValue
+      ? listRoot.querySelector(`.task-item[data-task-id="${nextSelectorValue}"]`)
+      : null;
+    const referenceNode = nextSiblingItem instanceof HTMLElement
+      ? (nextSiblingItem.closest(".swipe-row") || nextSiblingItem)
+      : null;
+    if (referenceNode instanceof Node && referenceNode !== movableNode) {
+      listRoot.insertBefore(movableNode, referenceNode);
+    }
+  } else if (movableNode.parentElement === listRoot) {
+    listRoot.appendChild(movableNode);
+  }
+
+  const bindScope = movableNode instanceof HTMLElement ? movableNode : nextItem;
+  if (typeof bindItem === "function") {
+    bindItem(bindScope);
+  }
+  bindThingLinks(bindScope);
+  bindTaskSwipeRows(bindScope);
+  return true;
+}
+
+function patchCustomTaskListItem(taskId) {
+  const patched = patchRenderedTaskCollection(customTaskListEl, taskId, {
+    bindItem: (scope) => bindTaskActions(scope)
+  });
+  if (patched) {
+    lastRenderSnapshot.tasks = createTasksRenderSnapshot(state);
+  }
+  return patched;
+}
+
 function refreshAutoTasks() {
   state.autoTasks = [];
 }
@@ -18775,34 +19032,39 @@ function buildAutoTasks(varieties) {
   return [];
 }
 
-function bindTaskActions(container) {
+function bindTaskActions(container, { onTaskUpdated = null, onTaskDeleted = null } = {}) {
   container.querySelectorAll("[data-toggle-task]").forEach((checkbox) => {
+    if (!(checkbox instanceof HTMLElement) || checkbox.dataset.boundTaskToggle === "true") return;
+    checkbox.dataset.boundTaskToggle = "true";
     checkbox.addEventListener("change", () => {
       const taskId = checkbox.dataset.toggleTask;
-      const task = state.customTasks.find((item) => item.id === taskId);
-      if (!task) return;
-      const previousDone = task.done;
-      task.done = checkbox.checked;
-      if (!persist()) {
-        task.done = previousDone;
-        checkbox.checked = previousDone;
-        return;
-      }
-      render();
+      toggleTaskAction(taskId, checkbox.checked, {
+        render: () => {
+          patchCustomTaskListItem(taskId);
+          render();
+          if (typeof onTaskUpdated === "function") {
+            onTaskUpdated(taskId);
+          }
+        },
+        persistContext: "toggle task"
+      });
     });
   });
 
   container.querySelectorAll("[data-delete-task]").forEach((button) => {
+    if (!(button instanceof HTMLElement) || button.dataset.boundTaskDelete === "true") return;
+    button.dataset.boundTaskDelete = "true";
     button.addEventListener("click", () => {
       const taskId = button.dataset.deleteTask;
-      const deleteResult = softDeleteStateRecord("customTasks", taskId, "task");
-      if (!deleteResult) return;
-      if (!persist()) {
-        rollbackSoftDeleteResult(deleteResult);
-        return;
-      }
-      render();
-      showUndoDeleteToast("Úloha zmazaná");
+      deleteTaskAction(taskId, {
+        render: () => {
+          render();
+          if (typeof onTaskDeleted === "function") {
+            onTaskDeleted(taskId);
+          }
+        },
+        persistContext: "delete task"
+      });
     });
   });
 }
@@ -18817,7 +19079,7 @@ function renderTaskItem(task, { showDelete = true, labelClickable = true } = {})
   `;
   if (isMobileShell) {
     return `
-      <article class="task-item task-item--mobile-list ${task.done ? "task-item--done" : ""} ${isOverdue ? "task-item--overdue" : ""}">
+      <article class="task-item task-item--mobile-list ${task.done ? "task-item--done" : ""} ${isOverdue ? "task-item--overdue" : ""}" data-task-id="${escapeAttribute(task.id)}">
         <div class="task-item__row task-item__row--primary">
           ${labelClickable ? `<label class="checkbox-row task-item__main task-item__main--mobile">${checkboxContent}</label>` : `<div class="checkbox-row task-item__main task-item__main--mobile">${checkboxContent}</div>`}
           ${showDelete ? `<div class="task-item__side task-item__actions task-item__actions--mobile">
@@ -18836,7 +19098,7 @@ function renderTaskItem(task, { showDelete = true, labelClickable = true } = {})
     `;
   }
   return `
-    <article class="task-item ${task.done ? "task-item--done" : ""} ${isOverdue ? "task-item--overdue" : ""}">
+    <article class="task-item ${task.done ? "task-item--done" : ""} ${isOverdue ? "task-item--overdue" : ""}" data-task-id="${escapeAttribute(task.id)}">
       <div class="task-item__header">
         ${labelClickable ? `<label class="checkbox-row task-item__main">${checkboxContent}</label>` : `<div class="checkbox-row task-item__main">${checkboxContent}</div>`}
         <div class="task-item__status">
@@ -20815,7 +21077,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
         state.varieties.unshift(payload);
       }
 
-      if (!persist()) return;
+      clearAppCache();
       rememberLastUsedCardType(selectedType);
       if (isCategoryCompatibleWithCardType(selectedType, normalizedCategoryId)) {
         rememberLastUsedCategory(normalizedCategoryId, selectedType);
@@ -20825,6 +21087,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       showAppToast(existing ? "Karta uložená" : "Karta pridaná", {
         tone: "success"
       });
+      persistInBackground(existing ? "save card" : "add card");
     });
 
     previewPickerButton?.addEventListener("click", (event) => {
@@ -20844,13 +21107,11 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
         restoreUndoStateSnapshot(previousUndoState);
         return;
       }
-      if (!persist()) {
-        rollbackSoftDeleteResult(deleteResult);
-        return;
-      }
+      clearAppCache();
       render();
       detailModal.close();
       showUndoDeleteToast("Karta zmazaná");
+      persistInBackground("delete card");
     });
 
     const shouldSuppressPreviewClick = attachCardTypePreviewSwipe(preview, detailContent);
@@ -20969,36 +21230,6 @@ function breedingTypeLabel(value) {
     open: "nehybridná"
   };
   return labels[value] || "";
-}
-
-function serializeStateSnapshot() {
-  return {
-    categories: state.categories,
-    varieties: state.varieties,
-    customTasks: state.customTasks,
-    journal: state.journal,
-    autoTasks: state.autoTasks
-  };
-}
-
-function exportFileTimestamp(value = new Date()) {
-  const date = value instanceof Date ? value : new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
-}
-
-function exportStateEnvelope() {
-  return {
-    app: "Moja záhrada",
-    schema: STORAGE_KEY,
-    exportedAt: new Date().toISOString(),
-    state: serializeStateSnapshot()
-  };
 }
 
 function clearAutoCloudSyncSchedules() {
@@ -23805,22 +24036,6 @@ function loadUndoState() {
   }
 }
 
-function saveResetBackup() {
-  const snapshot = arguments.length > 0 ? arguments[0] : serializeStateSnapshot();
-  const reason = String(arguments.length > 1 ? arguments[1] : "manual").trim() || "manual";
-  try {
-    localStorage.setItem(RESET_BACKUP_KEY, JSON.stringify({
-      savedAt: new Date().toISOString(),
-      reason,
-      state: snapshot
-    }));
-    updateRestoreResetButton();
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
 function loadResetBackup() {
   try {
     const raw = localStorage.getItem(RESET_BACKUP_KEY);
@@ -24045,47 +24260,6 @@ function closeUtilityDrawers() {
   }
 }
 
-function normalizeLocalAuthProfile(profile = {}) {
-  if (!profile || typeof profile !== "object") return null;
-  const email = String(profile.email || "").trim().toLowerCase();
-  const passwordHash = String(profile.passwordHash || "").trim();
-  const passwordSalt = String(profile.passwordSalt || "").trim();
-  if (!email || !passwordHash || !passwordSalt) return null;
-  return {
-    userId: String(profile.userId || makeId("user")).trim() || makeId("user"),
-    provider: "local",
-    enabled: profile.enabled !== false,
-    displayName: String(profile.displayName || "").trim(),
-    email,
-    passwordHash,
-    passwordSalt,
-    createdAt: String(profile.createdAt || new Date().toISOString()).trim() || new Date().toISOString(),
-    updatedAt: String(profile.updatedAt || profile.createdAt || new Date().toISOString()).trim() || new Date().toISOString(),
-    lastLoginAt: String(profile.lastLoginAt || "").trim()
-  };
-}
-
-function loadLocalAuthProfile() {
-  try {
-    const raw = localStorage.getItem(LOCAL_AUTH_PROFILE_KEY);
-    if (!raw) return null;
-    return normalizeLocalAuthProfile(JSON.parse(raw));
-  } catch (error) {
-    return null;
-  }
-}
-
-function saveLocalAuthProfile(profile) {
-  const normalized = normalizeLocalAuthProfile(profile);
-  if (!normalized) return false;
-  try {
-    localStorage.setItem(LOCAL_AUTH_PROFILE_KEY, JSON.stringify(normalized));
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
 function normalizeSupabasePreferences(value = {}) {
   if (!value || typeof value !== "object") {
     return {
@@ -24135,14 +24309,6 @@ function loadSupabasePreferences() {
     return raw ? storedPreferences : bootstrapPreferences;
   } catch (error) {
     return bootstrapPreferences;
-  }
-}
-
-function clearLocalAuthProfile() {
-  try {
-    localStorage.removeItem(LOCAL_AUTH_PROFILE_KEY);
-  } catch (error) {
-    return;
   }
 }
 
@@ -25807,203 +25973,6 @@ async function fetchSupabaseStateSummary() {
     imageFiles,
     accountEmail: String(user?.email || "").trim().toLowerCase(),
     journalPreview
-  };
-}
-
-function loadLocalAuthSession() {
-  try {
-    const raw = localStorage.getItem(LOCAL_AUTH_SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    return {
-      userId: String(parsed.userId || "").trim(),
-      email: String(parsed.email || "").trim().toLowerCase(),
-      displayName: String(parsed.displayName || "").trim(),
-      signedInAt: String(parsed.signedInAt || "").trim()
-    };
-  } catch (error) {
-    return null;
-  }
-}
-
-function saveLocalAuthSession(session = {}) {
-  try {
-    localStorage.setItem(LOCAL_AUTH_SESSION_KEY, JSON.stringify({
-      userId: String(session.userId || "").trim(),
-      email: String(session.email || "").trim().toLowerCase(),
-      displayName: String(session.displayName || "").trim(),
-      signedInAt: String(session.signedInAt || new Date().toISOString()).trim() || new Date().toISOString()
-    }));
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-function clearLocalAuthSession() {
-  try {
-    localStorage.removeItem(LOCAL_AUTH_SESSION_KEY);
-  } catch (error) {
-    return;
-  }
-}
-
-function localAuthDisplayName(profile = loadLocalAuthProfile()) {
-  const normalized = normalizeLocalAuthProfile(profile || {});
-  if (!normalized) return "";
-  return String(normalized.displayName || normalized.email || "").trim();
-}
-
-function isLocalAuthSessionValid(profile = loadLocalAuthProfile(), session = loadLocalAuthSession()) {
-  const normalizedProfile = normalizeLocalAuthProfile(profile || {});
-  if (!normalizedProfile?.enabled) return false;
-  if (!session || typeof session !== "object") return false;
-  const sessionEmail = String(session.email || "").trim().toLowerCase();
-  const sessionUserId = String(session.userId || "").trim();
-  return Boolean(sessionEmail && sessionEmail === normalizedProfile.email && sessionUserId && sessionUserId === normalizedProfile.userId);
-}
-
-async function sha256Hex(value = "") {
-  if (!window.crypto?.subtle || typeof TextEncoder === "undefined") {
-    throw new Error("Tento prehliadač zatiaľ nepodporuje bezpečné lokálne prihlasovanie.");
-  }
-  const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value || "")));
-  return [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
-}
-
-function makeLocalAuthSalt() {
-  if (!window.crypto?.getRandomValues) {
-    throw new Error("Tento prehliadač zatiaľ nevie pripraviť bezpečný lokálny účet.");
-  }
-  const bytes = new Uint8Array(16);
-  window.crypto.getRandomValues(bytes);
-  return [...bytes].map((item) => item.toString(16).padStart(2, "0")).join("");
-}
-
-async function hashLocalAuthPassword(password = "", salt = "") {
-  return sha256Hex(`${String(salt || "").trim()}::${String(password || "")}`);
-}
-
-async function buildLocalAuthProfile({ displayName = "", email = "", password = "" } = {}) {
-  const safeEmail = String(email || "").trim().toLowerCase();
-  const safeName = String(displayName || "").trim();
-  const salt = makeLocalAuthSalt();
-  return {
-    userId: makeId("user"),
-    provider: "local",
-    enabled: true,
-    displayName: safeName,
-    email: safeEmail,
-    passwordSalt: salt,
-    passwordHash: await hashLocalAuthPassword(password, salt),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    lastLoginAt: ""
-  };
-}
-
-async function verifyLocalAuthPassword(password = "", profile = loadLocalAuthProfile()) {
-  const normalizedProfile = normalizeLocalAuthProfile(profile || {});
-  if (!normalizedProfile) return false;
-  const candidateHash = await hashLocalAuthPassword(password, normalizedProfile.passwordSalt);
-  return candidateHash === normalizedProfile.passwordHash;
-}
-
-function authGateRoot() {
-  return document.getElementById("auth-gate-root");
-}
-
-function removeAuthGate() {
-  const root = authGateRoot();
-  if (root) root.remove();
-  document.body.classList.remove("app-auth-locked");
-  unlockBodyScroll("auth");
-  authGatePreviousOverflow = null;
-  syncWeatherBackgroundLoopVisibility();
-}
-
-function ensureAuthGateRoot() {
-  let root = authGateRoot();
-  if (root) return root;
-  root = document.createElement("div");
-  root.id = "auth-gate-root";
-  document.body.appendChild(root);
-  syncWeatherBackgroundLoopVisibility();
-  return root;
-}
-
-function closeSecondaryOverlaysForAuthLock() {
-  closeToolbarAddMenu();
-  closeJournalOverlay();
-  closeImageLightbox();
-  if (detailModal?.open) {
-    detailModal.close();
-  }
-}
-
-function lockAppToAuth() {
-  clearLocalAuthSession();
-  closeSecondaryOverlaysForAuthLock();
-  syncAuthGate("Appka je zamknutá. Prihlás sa znova.", "success");
-}
-
-function syncAuthGate(statusMessage = "", tone = "") {
-  clearLocalAuthSession();
-  clearLocalAuthProfile();
-  removeAuthGate();
-}
-
-function loadWeatherPreferences() {
-  try {
-    const raw = localStorage.getItem(WEATHER_PREFERENCES_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    const placeLabel = String(parsed.placeLabel || "").trim();
-    const latitude = Number(parsed.latitude);
-    const longitude = Number(parsed.longitude);
-    if (!placeLabel || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-    return {
-      latitude,
-      longitude,
-      placeLabel,
-      source: String(parsed.source || "").trim()
-    };
-  } catch (error) {
-    return null;
-  }
-}
-
-function saveWeatherPreferences(preferences) {
-  if (!preferences || !Number.isFinite(preferences.latitude) || !Number.isFinite(preferences.longitude)) return;
-  try {
-    localStorage.setItem(WEATHER_PREFERENCES_KEY, JSON.stringify({
-      latitude: preferences.latitude,
-      longitude: preferences.longitude,
-      placeLabel: preferences.placeLabel || "",
-      source: preferences.source || ""
-    }));
-  } catch (error) {
-    return;
-  }
-}
-
-async function geocodePlace(placeText) {
-  const query = String(placeText || "").trim();
-  if (!query) throw new Error("Najprv doplň miesto pre počasie.");
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=sk&format=json`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Nepodarilo sa nájsť miesto pre počasie.");
-  const data = await response.json();
-  const result = data?.results?.[0];
-  if (!result) throw new Error("Miesto sa nepodarilo nájsť.");
-  const parts = [result.name, result.admin1, result.country].filter(Boolean);
-  return {
-    latitude: Number(result.latitude),
-    longitude: Number(result.longitude),
-    placeLabel: parts.join(", "),
-    source: "manual"
   };
 }
 

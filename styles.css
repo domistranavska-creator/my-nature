@@ -195,7 +195,8 @@ body.app-mobile-shell .swipe-row--open .swipe-row__content {
 }
 
 body.app-mobile-shell .swipe-row--journal-card {
-  overflow: visible;
+  overflow: hidden;
+  border-radius: 16px;
 }
 
 body.app-mobile-shell .swipe-row--journal-card > .swipe-row__content {
@@ -203,11 +204,12 @@ body.app-mobile-shell .swipe-row--journal-card > .swipe-row__content {
 }
 
 body.app-mobile-shell .swipe-row--journal-card > .swipe-row__actions {
-  top: auto;
-  right: 10px;
-  bottom: 10px;
-  align-items: flex-end;
-  justify-content: flex-end;
+  top: 0;
+  right: 4px;
+  bottom: 0;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
   z-index: 4;
   pointer-events: none;
 }
@@ -218,9 +220,8 @@ body.app-mobile-shell .swipe-row--journal-card > .swipe-row__actions .swipe-row_
   height: 44px;
   padding: 0;
   border-radius: 999px;
-  box-shadow:
-    0 12px 24px rgba(28, 37, 20, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 170, 194, 0.32);
+  box-shadow: none;
   opacity: 0;
   transform: translate3d(8px, 0, 0) scale(0.96);
   transition: opacity 180ms ease, transform 180ms ease;
@@ -237,13 +238,14 @@ body.app-mobile-shell .swipe-row--journal-card.swipe-row--open > .swipe-row__act
 }
 
 body.app-mobile-shell .swipe-row--journal-card.swipe-row--open > .swipe-row__content {
-  transform: translateX(-52px) !important;
+  transform: translateX(-46px) !important;
 }
 
 body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card,
 body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card {
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
+  border-radius: 16px;
 }
 
 body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card > .swipe-row__content,
@@ -254,11 +256,12 @@ body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card > .swi
 
 body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card > .swipe-row__actions,
 body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__actions {
-  top: auto;
-  right: 10px;
-  bottom: 10px;
-  align-items: flex-end;
-  justify-content: flex-end;
+  top: 0;
+  right: 4px;
+  bottom: 0;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
   z-index: 4;
   pointer-events: none;
 }
@@ -270,9 +273,8 @@ body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card > .swi
   height: 44px;
   padding: 0;
   border-radius: 999px;
-  box-shadow:
-    0 12px 24px rgba(28, 37, 20, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 170, 194, 0.32);
+  box-shadow: none;
   opacity: 0;
   transform: translate3d(8px, 0, 0) scale(0.96);
   transition: opacity 180ms ease, transform 180ms ease;
@@ -292,7 +294,7 @@ body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card.swipe-
 
 body.app-mobile-shell .catalog-grid > .swipe-row--catalog-card.swipe-row--open > .swipe-row__content,
 body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card.swipe-row--open > .swipe-row__content {
-  transform: translateX(-52px) !important;
+  transform: translateX(-46px) !important;
 }
 
 .swipe-delete-confirm {
@@ -41317,6 +41319,342 @@ body.app-mobile-shell .detail-modal--editor .entry-mode-switch--cards .entry-mod
   white-space: nowrap !important;
 }
 
+/* Final mobile swipe + catalog hardening v2:
+   musi byt uplne na konci, aby nebol prepisany starsimi mobile override blokmi. */
+body.app-mobile-shell .swipe-row__content,
+body.app-mobile-shell .swipe-row__content img {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+body.app-mobile-shell .swipe-row__content img {
+  -webkit-user-drag: none !important;
+  user-drag: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories,
+body.app-mobile-shell .catalog-grid--main-menu,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties {
+  grid-auto-rows: 1fr !important;
+  align-items: stretch !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories > .swipe-row--catalog-card,
+body.app-mobile-shell .catalog-grid--subcategories > .catalog-card,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card,
+body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .catalog-card--preview {
+  display: flex !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell .catalog-card--main-menu-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell .catalog-card--main-menu-card {
+  min-height: 156px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview {
+  min-height: 176px !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__main-hit,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__main-hit,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__body,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  grid-template-rows: minmax(calc(2 * 1.02em + 2px), auto) auto !important;
+  align-content: start !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__head--category,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--category,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__head--preview {
+  width: 100% !important;
+  min-height: calc(2 * 1.02em + 6px) !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__title,
+body.app-mobile-shell .catalog-card--child .catalog-card__title--body,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__title--body {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+  min-height: calc(2 * 1.02em) !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__count,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
+  min-height: 18px !important;
+  align-self: center !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__foot--preview {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  align-content: end !important;
+  justify-items: center !important;
+  min-height: 34px !important;
+  margin-top: auto !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview {
+  min-height: 18px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__meta-support {
+  min-height: 16px !important;
+}
+
+/* Final mobile swipe + catalog hardening v2:
+   musi byt uplne na konci, aby nebol prepisany starsimi mobile override blokmi. */
+body.app-mobile-shell .swipe-row__content,
+body.app-mobile-shell .swipe-row__content img {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+body.app-mobile-shell .swipe-row__content img {
+  -webkit-user-drag: none !important;
+  user-drag: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories,
+body.app-mobile-shell .catalog-grid--main-menu,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties {
+  grid-auto-rows: 1fr !important;
+  align-items: stretch !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories > .swipe-row--catalog-card,
+body.app-mobile-shell .catalog-grid--subcategories > .catalog-card,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card,
+body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .catalog-card--preview {
+  display: flex !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell .catalog-card--main-menu-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell .catalog-card--main-menu-card {
+  min-height: 156px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview {
+  min-height: 176px !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__main-hit,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__main-hit,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__body,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  grid-template-rows: minmax(calc(2 * 1.02em + 2px), auto) auto !important;
+  align-content: start !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__head--category,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--category,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__head--preview {
+  width: 100% !important;
+  min-height: calc(2 * 1.02em + 6px) !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__title,
+body.app-mobile-shell .catalog-card--child .catalog-card__title--body,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__title--body {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+  min-height: calc(2 * 1.02em) !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__count,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
+  min-height: 18px !important;
+  align-self: center !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__foot--preview {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  align-content: end !important;
+  justify-items: center !important;
+  min-height: 34px !important;
+  margin-top: auto !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview {
+  min-height: 18px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__meta-support {
+  min-height: 16px !important;
+}
+
+/* Final mobile swipe + catalog hardening:
+   - potlacit nativny touch callout vo swipe radoch
+   - zjednotit vysku kategorii a preview kariet, aby sa nelamali podla obsahu */
+body.app-mobile-shell .swipe-row__content,
+body.app-mobile-shell .swipe-row__content img {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+body.app-mobile-shell .swipe-row__content img {
+  -webkit-user-drag: none !important;
+  user-drag: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories,
+body.app-mobile-shell .catalog-grid--main-menu,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties {
+  grid-auto-rows: 1fr !important;
+  align-items: stretch !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories > .swipe-row--catalog-card,
+body.app-mobile-shell .catalog-grid--subcategories > .catalog-card,
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card,
+body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .catalog-card--preview {
+  display: flex !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell .catalog-card--main-menu-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell .catalog-card--child,
+body.app-mobile-shell .catalog-card--main-menu-card {
+  min-height: 156px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview {
+  min-height: 176px !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__main-hit,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__main-hit,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__body,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  grid-template-rows: minmax(calc(2 * 1.02em + 2px), auto) auto !important;
+  align-content: start !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__head--category,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--category,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__head--preview {
+  width: 100% !important;
+  min-height: calc(2 * 1.02em + 6px) !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__title,
+body.app-mobile-shell .catalog-card--child .catalog-card__title--body,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__title--body {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+  min-height: calc(2 * 1.02em) !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__count,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
+  min-height: 18px !important;
+  align-self: center !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__foot--preview {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  align-content: end !important;
+  justify-items: center !important;
+  min-height: 34px !important;
+  margin-top: auto !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview {
+  min-height: 18px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__meta-support {
+  min-height: 16px !important;
+}
+
+/* Mobile right-edge seam guard:
+   jemne pretiahni shell aj jeho pocasiove vrstvy za viewport,
+   aby na pravom kraji nepresvital bledy zvisly sev. */
+body.app-mobile-shell .page-shell {
+  width: calc(100% + 2px) !important;
+  max-width: calc(100% + 2px) !important;
+  margin-right: -2px !important;
+}
+
+body.app-mobile-shell .page-shell::before,
+body.app-mobile-shell .page-shell::after {
+  inset: 0 -2px 0 0 !important;
+}
+
 /* Mobile bottom nav polish:
    keep the same actions, but let the bar sit naturally in the system bottom area
    instead of floating as a separate capsule above the content. */
@@ -41898,7 +42236,10 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > * {
 }
 
 body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child {
-  min-height: auto !important;
+  min-height: 156px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
 }
 
 body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__image {
@@ -41910,6 +42251,10 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-car
 }
 
 body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__body {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  grid-template-rows: minmax(calc(2 * 1.02em + 2px), auto) auto !important;
+  align-content: start !important;
   padding: 10px 10px 12px !important;
   gap: 4px !important;
 }
@@ -41934,7 +42279,7 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-car
 
 body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__count {
   margin-top: 2px !important;
-  min-height: 0 !important;
+  min-height: 18px !important;
   align-self: center !important;
   padding: 3px 8px !important;
   font-size: 0.58rem !important;
@@ -41944,7 +42289,10 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-car
 body.app-mobile-shell .catalog-card--child,
 body.app-mobile-shell.app-focused-mode .catalog-card--child {
   border-radius: 16px !important;
-  min-height: auto !important;
+  min-height: 156px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
 }
 
 body.app-mobile-shell .catalog-card--child .catalog-card__image,
@@ -41958,6 +42306,10 @@ body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image
 
 body.app-mobile-shell .catalog-card--child .catalog-card__body,
 body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__body {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  grid-template-rows: minmax(calc(2 * 1.02em + 2px), auto) auto !important;
+  align-content: start !important;
   padding: 5px 6px 7px !important;
   gap: 2px !important;
 }
@@ -41966,6 +42318,11 @@ body.app-mobile-shell .catalog-card--child .catalog-card__title,
 body.app-mobile-shell .catalog-card--child .catalog-card__title--body,
 body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__title,
 body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__title--body {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+  min-height: calc(2 * 1.02em) !important;
   font-size: 0.82rem !important;
   line-height: 1.02 !important;
   font-weight: 650 !important;
@@ -41973,6 +42330,7 @@ body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__title
 
 body.app-mobile-shell .catalog-card--child .catalog-card__count,
 body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__count {
+  min-height: 18px !important;
   font-size: 0.66rem !important;
 }
 
@@ -44281,7 +44639,7 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--p
   height: 100% !important;
   align-self: stretch !important;
   border-radius: 16px !important;
-  min-height: auto !important;
+  min-height: 176px !important;
 }
 
 body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
@@ -44289,6 +44647,7 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--p
   flex: 1 1 auto !important;
   flex-direction: column !important;
   height: 100% !important;
+  min-height: 176px !important;
   gap: 0 !important;
   padding: 0 !important;
 }
@@ -44317,7 +44676,7 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--p
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
-  min-height: 0 !important;
+  min-height: calc(2 * 1.02em + 6px) !important;
   padding: 10px 10px 2px !important;
 }
 
@@ -44325,9 +44684,12 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--p
   order: 3 !important;
   display: grid !important;
   justify-items: center !important;
-  align-content: start !important;
+  align-content: end !important;
+  flex: 1 1 auto !important;
   width: 100% !important;
   gap: 6px !important;
+  min-height: 34px !important;
+  margin-top: auto !important;
   padding: 0 10px 12px !important;
 }
 
@@ -44335,8 +44697,12 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--p
   font-size: 0.82rem !important;
   line-height: 1.02 !important;
   font-weight: 650 !important;
-  min-height: 0 !important;
+  min-height: calc(2 * 1.02em) !important;
   max-height: none !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
   padding: 0 !important;
 }
 
@@ -44364,6 +44730,7 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--p
   align-content: start !important;
   gap: 6px !important;
   width: 100% !important;
+  min-height: 16px !important;
   margin-top: 0 !important;
 }
 
@@ -45683,30 +46050,6 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
   -webkit-backdrop-filter: none !important;
 }
 
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar {
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-  pointer-events: auto !important;
-}
-
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__left,
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .utility-bar__settings,
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--settings,
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > .toolbar-add-menu,
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-worklog-panel,
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-journal-panel,
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #toggle-mobile-preview,
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary > #open-main-menu {
-  display: none !important;
-}
-
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__center {
-  flex: 1 1 auto !important;
-  width: 100% !important;
-  min-width: 0 !important;
-}
-
 body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .menu-toolbar__group--primary {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto auto !important;
@@ -45738,40 +46081,6 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
   box-shadow: 0 8px 18px rgba(8, 16, 30, 0.12) !important;
   backdrop-filter: blur(6px) saturate(125%) !important;
   -webkit-backdrop-filter: blur(6px) saturate(125%) !important;
-}
-
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon {
-  width: 18px !important;
-  height: 18px !important;
-}
-
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon svg {
-  display: block !important;
-  width: 18px !important;
-  height: 18px !important;
-  stroke: rgba(247, 252, 255, 0.96) !important;
-  fill: none !important;
-  stroke-width: 2 !important;
-}
-
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__icon::before {
-  content: none !important;
-}
-
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field input {
-  font-size: 0.92rem !important;
-  font-weight: 600 !important;
-  color: rgba(245, 251, 255, 0.98) !important;
-  caret-color: rgba(255, 255, 255, 0.96) !important;
-}
-
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field input::placeholder {
-  color: rgba(239, 246, 251, 0.76) !important;
-}
-
-body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__clear {
-  color: rgba(246, 251, 255, 0.88) !important;
-  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Final shared mobile top bar lock:
@@ -46526,7 +46835,10 @@ body.app-mobile-shell .catalog-card--main-menu-card:focus-within {
   backdrop-filter: blur(8px) saturate(118%) !important;
   -webkit-backdrop-filter: blur(8px) saturate(118%) !important;
   border-radius: 16px !important;
-  min-height: 0 !important;
+  min-height: 156px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
   max-width: none !important;
 }
 
@@ -46546,6 +46858,8 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
   display: grid !important;
+  flex: 1 1 auto !important;
+  grid-template-rows: minmax(calc(2 * 1.02em + 2px), auto) auto !important;
   justify-items: center !important;
   align-content: start !important;
   gap: 4px !important;
@@ -46556,6 +46870,7 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--category {
   width: 100% !important;
   justify-content: center !important;
+  min-height: calc(2 * 1.02em + 6px) !important;
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
@@ -46564,11 +46879,17 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__title--body {
   font-size: 0.82rem !important;
   line-height: 1.02 !important;
   text-align: center !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+  min-height: calc(2 * 1.02em) !important;
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
   font-size: 0.58rem !important;
   line-height: 1.04 !important;
+  min-height: 18px !important;
 }
 
 /* Final mobile type strips:
