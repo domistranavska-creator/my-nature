@@ -44493,29 +44493,32 @@ body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-c
 
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview {
   display: grid !important;
-  place-items: center !important;
-  min-height: 72px !important;
+  place-items: stretch !important;
+  min-height: 92px !important;
   height: auto !important;
   max-height: none !important;
-  width: 84% !important;
-  padding: 3px 5px !important;
-  margin-top: -1px !important;
-  justify-self: center !important;
-  border-radius: 11px !important;
-  overflow: visible !important;
+  width: auto !important;
+  padding: 6px !important;
+  margin: 10px 10px 0 !important;
+  justify-self: stretch !important;
+  border-radius: 14px !important;
+  align-self: stretch !important;
+  aspect-ratio: 1 / 0.84 !important;
+  overflow: hidden !important;
   background: linear-gradient(180deg, rgba(248, 245, 237, 0.96), rgba(239, 244, 236, 0.9)) !important;
 }
 
 body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img {
   display: block !important;
-  width: auto !important;
-  height: auto !important;
-  max-width: 100% !important;
-  max-height: 84px !important;
-  object-fit: contain !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  object-fit: cover !important;
   object-position: center center !important;
-  justify-self: center !important;
-  margin: 0 auto !important;
+  justify-self: stretch !important;
   transform: none !important;
   transition: none !important;
   animation: none !important;
@@ -44669,6 +44672,54 @@ body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--p
 
 body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img {
   max-height: 100% !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  transform: none !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape {
+  min-height: 92px !important;
+  height: auto !important;
+  max-height: none !important;
+  aspect-ratio: 1 / 0.84 !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  transform: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape {
+  min-height: 92px !important;
+  height: auto !important;
+  max-height: none !important;
+  aspect-ratio: 1 / 0.84 !important;
 }
 
 body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__head--preview {
@@ -46267,9 +46318,15 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
    pevný rozmer a plné vyplnenie obrázkom ako hero karta. */
 body.app-mobile-shell .memory-strip__hero,
 body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
+  aspect-ratio: 4 / 4.6 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
   overflow: hidden !important;
-  background: #111923 !important;
   border: 0 !important;
+  border-radius: 24px !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 body.app-mobile-shell .memory-strip__backdrop,
@@ -46279,7 +46336,8 @@ body.app-mobile-shell .workspace-layout--menu .memory-strip__backdrop {
 
 body.app-mobile-shell .memory-frame,
 body.app-mobile-shell .workspace-layout--menu .memory-frame {
-  inset: -1px !important;
+  inset: 0 !important;
+  background: transparent !important;
 }
 
 body.app-mobile-shell .memory-strip__hero img,
@@ -46289,37 +46347,31 @@ body.app-mobile-shell .workspace-layout--menu .memory-strip__hero img {
   padding: 0 !important;
   object-fit: cover !important;
   object-position: center !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
 }
 
 body.app-mobile-shell .memory-photo,
 body.app-mobile-shell .workspace-layout--menu .memory-photo {
-  left: -3% !important;
-  top: -3% !important;
-  width: 106% !important;
-  height: 106% !important;
-  max-width: none !important;
-  max-height: none !important;
-  transform: translate3d(2.5%, 0, 0) scale(1.01) !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+  transition: opacity 280ms ease !important;
 }
 
 body.app-mobile-shell .memory-frame[data-memory-direction="prev"] .memory-photo,
-body.app-mobile-shell .workspace-layout--menu .memory-frame[data-memory-direction="prev"] .memory-photo {
-  transform: translate3d(-2.5%, 0, 0) scale(1.01) !important;
-}
-
+body.app-mobile-shell .workspace-layout--menu .memory-frame[data-memory-direction="prev"] .memory-photo,
 body.app-mobile-shell .memory-photo.active,
-body.app-mobile-shell .workspace-layout--menu .memory-photo.active {
-  transform: translate3d(0, 0, 0) scale(1) !important;
-}
-
+body.app-mobile-shell .workspace-layout--menu .memory-photo.active,
 body.app-mobile-shell .memory-photo.exit,
-body.app-mobile-shell .workspace-layout--menu .memory-photo.exit {
-  transform: translate3d(-2.5%, 0, 0) scale(1.01) !important;
-}
-
+body.app-mobile-shell .workspace-layout--menu .memory-photo.exit,
 body.app-mobile-shell .memory-frame[data-memory-direction="prev"] .memory-photo.exit,
 body.app-mobile-shell .workspace-layout--menu .memory-frame[data-memory-direction="prev"] .memory-photo.exit {
-  transform: translate3d(2.5%, 0, 0) scale(1.01) !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
 }
 
 body.app-mobile-shell .memory-strip__hero[role="button"],

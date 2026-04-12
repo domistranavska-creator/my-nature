@@ -2101,6 +2101,37 @@ function startMobileFocusedCategoryTransition() {
   return mobileFocusedCategoryTransitionToken;
 }
 
+function mobileFocusedCatalogPreviewCandidates(root = catalogEl) {
+  if (!(root instanceof HTMLElement)) return [];
+  const selector = [
+    ".catalog-grid--subcategories .catalog-card__image img",
+    ".catalog-grid--varieties .catalog-card__image img"
+  ].join(", ");
+  const limit = isRealMobileRuntimeMode() ? 4 : 3;
+  return [...root.querySelectorAll(selector)]
+    .filter((node) => node instanceof HTMLImageElement)
+    .slice(0, limit);
+}
+
+function isMobileFocusedCatalogPreviewReady(img) {
+  if (!(img instanceof HTMLImageElement) || !img.isConnected) return true;
+  if (img.dataset.deferredCardActivationPending === "true" || img.dataset.deferredCardActivationQueued === "true") {
+    return false;
+  }
+  if (img.hasAttribute("data-lazy-category-image") || img.hasAttribute("data-lazy-variety-image")) {
+    return false;
+  }
+  const source = String(img.currentSrc || img.src || "").trim();
+  if (!source) return false;
+  return Boolean(img.complete);
+}
+
+function areMobileFocusedCatalogPreviewsReady(root = catalogEl) {
+  const candidates = mobileFocusedCatalogPreviewCandidates(root);
+  if (!candidates.length) return true;
+  return candidates.every((img) => isMobileFocusedCatalogPreviewReady(img));
+}
+
 function finishMobileFocusedCategoryTransition(token = 0) {
   if (!mobileFocusedCategoryTransitionPending) {
     syncMobileFocusedCategoryTransitionState();
@@ -2112,17 +2143,32 @@ function finishMobileFocusedCategoryTransition(token = 0) {
     mobileFocusedCategoryTransitionPending = false;
     syncMobileFocusedCategoryTransitionState();
   };
-  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(reveal);
-    });
+  if (
+    typeof window !== "undefined"
+    && typeof window.requestAnimationFrame === "function"
+    && isMobileFocusedCategoryTransitionContext()
+  ) {
+    let frameCount = 0;
+    const minFrames = 2;
+    const maxFrames = isRealMobileRuntimeMode() ? 18 : 10;
+    const waitForStablePreview = () => {
+      if (expectedToken !== mobileFocusedCategoryTransitionToken) return;
+      frameCount += 1;
+      const previewsReady = areMobileFocusedCatalogPreviewsReady(catalogEl);
+      if ((frameCount >= minFrames && previewsReady) || frameCount >= maxFrames) {
+        window.requestAnimationFrame(reveal);
+        return;
+      }
+      window.requestAnimationFrame(waitForStablePreview);
+    };
+    window.requestAnimationFrame(waitForStablePreview);
     return;
   }
   window.setTimeout(reveal, 34);
 }
 
 function shouldUseQuietCatalogPreviewPlaceholder() {
-  return mobileFocusedCategoryTransitionPending && isMobileFocusedCategoryTransitionContext();
+  return isMobileFocusedCategoryTransitionContext();
 }
 
 function requestScheduledRenderFrame(callback) {
