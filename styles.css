@@ -78,12 +78,12 @@ html.app-startup-stable.app-startup-mobile-shell body::before {
 
 .instant-feedback-target {
   touch-action: manipulation;
-  transition: transform 100ms ease, opacity 100ms ease;
-  will-change: transform, opacity;
+  scale: 1;
+  transition: scale 100ms ease, opacity 100ms ease;
 }
 
 .tap-active {
-  transform: scale(0.97);
+  scale: 0.97;
   opacity: 0.85;
 }
 
@@ -136,7 +136,12 @@ body.app-mobile-shell .swipe-row {
 body.app-mobile-shell .swipe-row__content {
   position: relative;
   z-index: 2;
-  transition: transform 180ms ease;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: auto;
+}
+
+body.app-mobile-shell .swipe-row--dragging > .swipe-row__content,
+body.app-mobile-shell .swipe-row--open > .swipe-row__content {
   will-change: transform;
 }
 
@@ -224,7 +229,7 @@ body.app-mobile-shell .swipe-row--journal-card > .swipe-row__actions .swipe-row_
   box-shadow: none;
   opacity: 0;
   transform: translate3d(8px, 0, 0) scale(0.96);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: auto;
 }
 
@@ -277,7 +282,7 @@ body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card > .swi
   box-shadow: none;
   opacity: 0;
   transform: translate3d(8px, 0, 0) scale(0.96);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: auto;
 }
 
@@ -18146,23 +18151,6 @@ body.app-mobile-shell .memory-strip__frame {
   box-shadow: none !important;
 }
 
-body.app-mobile-shell .memory-strip__hero,
-body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
-  aspect-ratio: 4 / 4.6 !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  margin: 0 !important;
-  border-radius: 24px !important;
-  border: 1px solid rgba(214, 203, 186, 0.72) !important;
-  background: rgba(255, 255, 255, 0.74) !important;
-  box-shadow: none !important;
-}
-
-body.app-mobile-shell .memory-strip__hero img,
-body.app-mobile-shell .workspace-layout--menu .memory-strip__hero img {
-  padding: 10px !important;
-}
-
 body.app-mobile-shell .memory-strip__count {
   top: 10px;
   right: 10px;
@@ -19849,12 +19837,6 @@ body.app-mobile-shell .worklog-manager .task-item {
   box-shadow: var(--mobile-app-shadow-soft) !important;
 }
 
-body.app-mobile-shell .memory-strip__hero,
-body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
-  border: 1px solid rgba(143, 129, 101, 0.08) !important;
-  background: rgba(255, 255, 255, 0.8) !important;
-}
-
 body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__phase,
 body.app-mobile-shell .home-weather-box .main-menu-weather-mini__phase,
 body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__detail,
@@ -19975,8 +19957,6 @@ body.app-mobile-shell .home-weather-box .main-menu-weather-mini__card {
 }
 
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
-body.app-mobile-shell .memory-strip__hero,
-body.app-mobile-shell .workspace-layout--menu .memory-strip__hero,
 body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__detail,
 body.app-mobile-shell .home-weather-box .main-menu-weather-mini__detail,
 body.app-mobile-shell .main-menu-weather-mini--hero .main-menu-weather-mini__phase,
@@ -19989,9 +19969,7 @@ body.app-mobile-shell .journal-weather__pill {
   box-shadow: none !important;
 }
 
-body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
-body.app-mobile-shell .memory-strip__hero,
-body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
   background: rgba(255, 255, 255, 0.72) !important;
 }
 
@@ -20007,17 +19985,10 @@ body.app-mobile-shell .insight-strip__slide {
   box-shadow: 0 6px 18px rgba(56, 46, 28, 0.028) !important;
 }
 
-body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
-body.app-mobile-shell .memory-strip__hero,
-body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-}
-
-body.app-mobile-shell .memory-strip__hero img,
-body.app-mobile-shell .workspace-layout--menu .memory-strip__hero img {
-  padding: 0 !important;
 }
 
 body.app-mobile-shell .insight-strip__slide,
@@ -36819,12 +36790,12 @@ body.app-mobile-shell {
   --mobile-modal-surface: #ffffff;
   --mobile-modal-surface-soft: #f7f9fc;
   --mobile-modal-surface-muted: #eef2f6;
-  --mobile-modal-border: rgba(15, 23, 42, 0.08);
+  --mobile-modal-border: rgba(15, 23, 42, 0.06);
   --mobile-modal-text: #182233;
   --mobile-modal-muted: #66758a;
   --mobile-modal-primary: #172338;
   --mobile-modal-primary-text: #ffffff;
-  --mobile-modal-shadow: 0 24px 56px rgba(15, 23, 42, 0.18);
+  --mobile-modal-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
 }
 
 body.app-mobile-shell .detail-modal[open] {
@@ -36851,11 +36822,11 @@ body.app-mobile-shell .image-lightbox::backdrop {
 
 body.app-mobile-shell .image-lightbox {
   border: 0 !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  background: transparent !important;
 }
 
 body.app-mobile-shell .image-lightbox::backdrop {
-  background: linear-gradient(180deg, rgba(238, 244, 251, 0.96) 0%, rgba(233, 240, 247, 0.96) 100%) !important;
+  background: rgba(15, 23, 42, 0.42) !important;
 }
 
 body.app-mobile-shell .journal-overlay-root {
@@ -37104,8 +37075,8 @@ body.app-mobile-shell .image-lightbox__close,
 body.app-mobile-shell .image-lightbox__back,
 body.app-mobile-shell .image-lightbox__nav {
   border: 1px solid var(--mobile-modal-border) !important;
-  background: rgba(255, 255, 255, 0.96) !important;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08) !important;
   color: #4c5c70 !important;
 }
 
@@ -37130,6 +37101,58 @@ body.app-mobile-shell .image-lightbox__image {
    keep the diary in the same simple sheet language as the media picker. */
 body.app-mobile-shell .journal-overlay-root {
   background: rgba(15, 23, 42, 0.36) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible {
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+  border-radius: 18px !important;
+  background: var(--mobile-modal-surface-soft, #f7f9fc) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible .settings-panel__head {
+  border-radius: 18px !important;
+  background: var(--mobile-modal-surface-soft, #f7f9fc) !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible .settings-form {
+  padding: 10px 14px 14px !important;
+  background: transparent !important;
+}
+
+body.app-mobile-shell .journal-tag-filter,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .journal-overlay-card__compact-shell {
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+  border-radius: 18px !important;
+  background: var(--mobile-modal-surface-soft, #f7f9fc) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .journal-overlay-card .journal-item__date-badge,
+body.app-mobile-shell .journal-overlay-card .journal-weather__pill,
+body.app-mobile-shell .journal-overlay-card__place,
+body.app-mobile-shell .journal-overlay-card__mood,
+body.app-mobile-shell .journal-overlay-card .journal-item__action,
+body.app-mobile-shell .journal-overlay-card__chips .tag,
+body.app-mobile-shell .journal-tag-filter__chip,
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary {
+  background: #ffffff !important;
+  background-image: none !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -40165,9 +40188,9 @@ body.app-mobile-shell .detail-modal--worklog .detail-modal__content,
 body.app-mobile-shell .detail-modal--card-view .detail-modal__content,
 body.app-mobile-shell .detail-modal--photo-quick .detail-modal__content {
   border-radius: 30px !important;
-  border: 1px solid rgba(226, 235, 245, 0.98) !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
-  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.16) !important;
+  border: 1px solid var(--mobile-modal-border) !important;
+  background: var(--mobile-modal-surface) !important;
+  box-shadow: var(--mobile-modal-shadow) !important;
   color: #243246 !important;
 }
 
@@ -40206,7 +40229,7 @@ body.app-mobile-shell .detail-modal--editor-topline .detail-modal__content {
   max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
   margin: 0 auto !important;
   border-radius: 28px !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  background: var(--mobile-modal-surface) !important;
   padding: 16px 16px calc(156px + env(safe-area-inset-bottom)) !important;
 }
 
@@ -40562,7 +40585,7 @@ body.app-mobile-shell .detail-modal--batch .detail-modal__content {
   max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
   margin: 0 auto !important;
   border-radius: 28px !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  background: var(--mobile-modal-surface) !important;
   padding: 16px 16px 0 !important;
 }
 
@@ -40689,7 +40712,7 @@ body.app-mobile-shell .detail-modal--worklog-manager .detail-modal__content {
   max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
   margin: 0 auto !important;
   border-radius: 28px !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  background: var(--mobile-modal-surface) !important;
   padding: 16px 16px 0 !important;
 }
 
@@ -40803,7 +40826,7 @@ body.app-mobile-shell .detail-modal--settings .detail-modal__content {
   max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
   margin: 0 auto !important;
   border-radius: 28px !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  background: var(--mobile-modal-surface) !important;
   padding: 16px 16px 0 !important;
 }
 
@@ -40961,7 +40984,7 @@ body.app-mobile-shell .detail-modal--photo-quick .detail-modal__content {
   max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
   margin: 0 auto !important;
   border-radius: 28px !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  background: var(--mobile-modal-surface) !important;
   padding: 16px 16px 0 !important;
 }
 
@@ -41119,7 +41142,7 @@ body.app-mobile-shell .detail-modal--weather .detail-modal__content {
   max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
   margin: 0 auto !important;
   border-radius: 28px !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  background: var(--mobile-modal-surface) !important;
   padding: 16px 16px 0 !important;
 }
 
@@ -41318,6 +41341,617 @@ body.app-mobile-shell .detail-modal--editor .entry-mode-switch--cards .entry-mod
   min-width: 118px !important;
   padding-inline: 14px !important;
   white-space: nowrap !important;
+}
+
+
+/* Final EOF mobile main menu preview hard lock:
+   hlavne kategorie musia mat rovnaky prvy paint ako finalny stav,
+   bez content-visibility odhadu a bez swipe-wrapper medzistavu. */
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .menu-group,
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview [data-main-menu-categories-section],
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu {
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: auto !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu > .swipe-row--catalog-card,
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu > .catalog-card--main-menu-card {
+  display: flex !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: 0 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__content {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--main-menu-card {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  min-height: 156px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--main-menu-card .catalog-card__main-hit {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--main-menu-card .catalog-card__image {
+  margin: 10px 10px 0 !important;
+  padding: 0 !important;
+  min-height: 92px !important;
+  height: auto !important;
+  max-height: none !important;
+  aspect-ratio: 1 / 0.84 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--main-menu-card .catalog-card__image img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
+/* Final stable catalog media:
+   first paint ma uz drzat finalny frame, nie cakat na rozmery obrazka. */
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
+body.app-mobile-shell .catalog-grid--subcategories .catalog-card--child .catalog-card__image,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__image,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--child .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape {
+  aspect-ratio: 1 / 0.84 !important;
+  min-height: 92px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--preview .catalog-card__image--preview img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
+/* Final EOF editor preview cleanup:
+   posledne slovo pre upload CTA, preview shell a mini galeriu editora. */
+body.app-mobile-shell .detail-modal--editor .detail-image--editor,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--soft-fit,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--portrait,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--landscape {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image--editor::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--soft-fit::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--portrait::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--landscape::before {
+  display: none !important;
+  content: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta,
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta:hover,
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta:focus-visible {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta-icon {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini.is-primary,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini.is-active,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__select {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__thumb {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__main-badge {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__remove {
+  top: 4px !important;
+  right: 4px !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Final EOF editor preview cleanup:
+   posledne slovo pre upload CTA, preview shell a mini galeriu editora. */
+body.app-mobile-shell .detail-modal--editor .detail-image--editor,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--soft-fit,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--portrait,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--landscape {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image--editor::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--soft-fit::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--portrait::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--landscape::before {
+  display: none !important;
+  content: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta,
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta:hover,
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta:focus-visible {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta-icon {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini.is-primary,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini.is-active,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__select {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__thumb {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__main-badge {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__remove {
+  top: 4px !important;
+  right: 4px !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Final editor preview cleanup:
+   bez tienov, spodnej ciary a useknuteho X v mini galerii. */
+body.app-mobile-shell .detail-modal--editor .detail-image--editor,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--soft-fit,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--portrait,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--landscape {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image--editor::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--soft-fit::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--portrait::before,
+body.app-mobile-shell .detail-modal--editor .detail-image--editor.detail-image--landscape::before {
+  display: none !important;
+  content: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta,
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta:hover,
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta:focus-visible {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta-icon {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini.is-primary,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__mini.is-active,
+body.app-mobile-shell .detail-modal--editor .editor-gallery__select {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__thumb {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__main-badge {
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .editor-gallery__remove {
+  top: 4px !important;
+  right: 4px !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Final clean image surfaces:
+   zjednotenie bieleho pozadia v kartach aj kategoriách bez beige/mliecnych ramov. */
+.catalog-card--child .catalog-card__image,
+.catalog-card--main-menu-card .catalog-card__image,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+.catalog-grid--varieties .catalog-card--variety .catalog-card__image,
+.catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image,
+.catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image,
+.menu-pill__thumb,
+.category-panel__thumb,
+.category-preview {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.catalog-card--child .catalog-card__image::before,
+.catalog-card--child .catalog-card__image::after,
+.catalog-card--main-menu-card .catalog-card__image::before,
+.catalog-card--main-menu-card .catalog-card__image::after,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::before,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::after,
+.catalog-grid--varieties .catalog-card--variety .catalog-card__image::before,
+.catalog-grid--varieties .catalog-card--variety .catalog-card__image::after,
+.catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image::before,
+.catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image::after,
+.catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image::before,
+.catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.catalog-card--child .catalog-card__image img,
+.catalog-card--main-menu-card .catalog-card__image img,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img,
+.catalog-grid--varieties .catalog-card--variety .catalog-card__image img,
+.catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image img,
+.catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image img,
+.menu-pill__thumb img,
+.category-panel__thumb img,
+.category-preview img {
+  background: #ffffff !important;
+  border-radius: inherit !important;
+  box-shadow: none !important;
+}
+
+/* Search / text clipping guard:
+   nech sa nepodrezavaju pismena v searchi a kompaktnejsich textoch. */
+body.app-mobile-shell .toolbar-search__field input,
+body.app-mobile-shell .toolbar-search__field input::placeholder,
+body.app-mobile-shell .insight-strip__slide p,
+body.app-mobile-shell .main-menu-weather-mini__trend-meta {
+  line-height: 1.35 !important;
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .weather-alert__content,
+body.app-mobile-shell .weather-alert h4,
+body.app-mobile-shell .weather-alert p {
+  overflow: visible !important;
+}
+
+body.app-mobile-shell .weather-alert p {
+  line-height: 1.48 !important;
+  padding-block: 1px 2px !important;
+}
+
+body.app-mobile-shell .toolbar-search__field input,
+body.app-mobile-shell.app-main-menu-mode .toolbar-search__field input,
+body.app-mobile-shell.app-focused-mode .toolbar-search__field input,
+body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--floating-home .toolbar-search__field input {
+  display: block !important;
+  height: auto !important;
+  padding-top: 1px !important;
+  padding-bottom: 1px !important;
+}
+
+/* Editor gallery clean pass:
+   bez zbytocneho ramu, tiena a useknuteho X pri hlavnej fotke. */
+.detail-modal--editor .editor-gallery {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.detail-modal--editor .editor-gallery__mini,
+.detail-modal--editor .editor-gallery__mini.is-primary,
+.detail-modal--editor .editor-gallery__mini.is-active,
+.detail-modal--editor .editor-gallery__mini:hover {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  border-radius: 0 !important;
+}
+
+.detail-modal--editor .editor-gallery__select {
+  overflow: hidden !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+
+.detail-modal--editor .editor-gallery__thumb {
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.detail-modal--editor .editor-gallery__main-badge {
+  left: 6px !important;
+  bottom: 6px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: #667351 !important;
+  box-shadow: none !important;
+}
+
+.detail-modal--editor .editor-gallery__remove {
+  top: 2px !important;
+  right: 2px !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 6px !important;
+  background: rgba(51, 61, 38, 0.84) !important;
+  box-shadow: none !important;
+}
+
+/* Manual thumbnail crop:
+   editor drzi len transform pre preview karty, bez zmeny originalu. */
+.catalog-card__image img[data-thumb-crop="custom"],
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img[data-thumb-crop="custom"] {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  transform: translate3d(var(--thumb-crop-translate-x, 0px), var(--thumb-crop-translate-y, 0px), 0) scale(var(--thumb-crop-scale, 1)) !important;
+  transform-origin: center center !important;
+}
+
+.thumb-crop-editor {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: rgba(255, 251, 244, 0.82);
+  border: 1px solid rgba(216, 203, 180, 0.44);
+}
+
+.thumb-crop-editor__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.thumb-crop-editor__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.thumb-crop-editor__copy h4 {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.15;
+  color: #314125;
+}
+
+.thumb-crop-editor__copy p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #647359;
+}
+
+.thumb-crop-editor__toggle {
+  flex: 0 0 auto;
+}
+
+.thumb-crop-editor__panel {
+  display: grid;
+  gap: 12px;
+}
+
+.thumb-crop-editor__viewport {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 320px);
+  aspect-ratio: 1 / 0.84;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(216, 222, 226, 0.82);
+  touch-action: none;
+  cursor: grab;
+}
+
+.thumb-crop-editor__viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.thumb-crop-editor__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  transform: translate3d(var(--thumb-crop-translate-x, 0px), var(--thumb-crop-translate-y, 0px), 0) scale(var(--thumb-crop-scale, 1));
+  transform-origin: center center;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.thumb-crop-editor__tools {
+  display: grid;
+  gap: 10px;
+}
+
+.thumb-crop-editor__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #6a765e;
+}
+
+.thumb-crop-editor__zoom-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.thumb-crop-editor__range {
+  width: 100%;
+}
+
+.thumb-crop-editor__zoom-value {
+  min-width: 56px;
+  text-align: right;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #43533a;
+}
+
+.thumb-crop-editor__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.thumb-crop-editor.is-empty {
+  opacity: 0.86;
+}
+
+body.app-mobile-shell .thumb-crop-editor {
+  padding: 12px 13px;
+  border-radius: 18px;
+}
+
+body.app-mobile-shell .thumb-crop-editor__head {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+body.app-mobile-shell .thumb-crop-editor__toggle {
+  align-self: flex-start;
+}
+
+body.app-mobile-shell .thumb-crop-editor__viewport {
+  width: 100%;
+  border-radius: 14px;
+}
+
+body.app-mobile-shell .thumb-crop-editor__zoom-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+body.app-mobile-shell .thumb-crop-editor__zoom-value {
+  grid-column: 1 / -1;
+  text-align: left;
 }
 
 /* Final mobile swipe + catalog hardening v2:
@@ -41725,10 +42359,14 @@ body.app-mobile-shell .detail-modal--editor .editor-gallery__remove {
 }
 
 body.app-mobile-shell .detail-modal--editor .editor-gallery__remove {
-  width: 32px !important;
-  height: 32px !important;
-  top: -8px !important;
-  right: -8px !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  top: 4px !important;
+  right: 4px !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   font-size: 1rem !important;
 }
 
@@ -41908,6 +42546,9 @@ body.app-mobile-shell .detail-image__upload-cta {
   min-height: 44px !important;
   padding: 10px 14px !important;
   font-size: 0.92rem !important;
+  border: 0 !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
 }
 
 body.app-mobile-shell .detail-image__upload-cta--icon-only {
@@ -41916,6 +42557,16 @@ body.app-mobile-shell .detail-image__upload-cta--icon-only {
   height: 44px !important;
   min-height: 44px !important;
   padding: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta:hover,
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta:focus-visible {
+  transform: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-image__upload-cta-icon {
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* Walk detail uplift:
@@ -44913,7 +45564,7 @@ body.app-mobile-shell .detail-modal--card-view .detail-modal__content {
   max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
   margin: 0 auto !important;
   border-radius: 28px !important;
-  background: linear-gradient(180deg, #eef4fb 0%, #e9f0f7 100%) !important;
+  background: var(--mobile-modal-surface) !important;
   padding: 16px 16px 0 !important;
 }
 
@@ -46327,16 +46978,21 @@ body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
   border-radius: 24px !important;
   background: transparent !important;
   box-shadow: none !important;
+  isolation: isolate !important;
 }
 
 body.app-mobile-shell .memory-strip__backdrop,
 body.app-mobile-shell .workspace-layout--menu .memory-strip__backdrop {
   display: none !important;
+  border-radius: inherit !important;
+  background: transparent !important;
 }
 
 body.app-mobile-shell .memory-frame,
 body.app-mobile-shell .workspace-layout--menu .memory-frame {
   inset: 0 !important;
+  overflow: hidden !important;
+  border-radius: inherit !important;
   background: transparent !important;
 }
 
@@ -46345,6 +47001,8 @@ body.app-mobile-shell .workspace-layout--menu .memory-strip__hero img {
   width: 100% !important;
   height: 100% !important;
   padding: 0 !important;
+  border-radius: inherit !important;
+  background: transparent !important;
   object-fit: cover !important;
   object-position: center !important;
   -webkit-mask-image: none !important;
@@ -46359,6 +47017,9 @@ body.app-mobile-shell .workspace-layout--menu .memory-photo {
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
+  overflow: hidden !important;
+  border-radius: inherit !important;
+  background: transparent !important;
   transform: translate3d(0, 0, 0) scale(1) !important;
   transition: opacity 280ms ease !important;
 }
@@ -46906,6 +47567,108 @@ body.app-mobile-shell.app-focused-mode #catalog[data-mobile-nav-pending="true"] 
   pointer-events: none !important;
 }
 
+/* Mobile focused catalog paint lock:
+   in focused categories we prefer one stable paint over content-visibility placeholder sizing. */
+body.app-mobile-shell.app-focused-mode #catalog > .category-shell,
+body.app-mobile-shell.app-focused-mode #catalog > .category-shell > .subcatalog,
+body.app-mobile-shell.app-focused-mode #catalog > .category-shell > .subcatalog--overview,
+body.app-mobile-shell.app-focused-mode #catalog > .category-shell > .category-panel--summary,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .catalog-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .catalog-card--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card {
+  contain: none !important;
+  content-visibility: visible !important;
+  contain-intrinsic-size: auto !important;
+}
+
+/* Mobile focused catalog final size lock:
+   direct cards and swipe-wrapped cards must share identical geometry from the first visible frame. */
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card {
+  display: flex !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card > .swipe-row__content,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--child,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--preview {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--child {
+  min-height: 156px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__image,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--child .catalog-card__image {
+  margin: 10px 10px 0 !important;
+  padding: 6px !important;
+  min-height: 92px !important;
+  height: auto !important;
+  max-height: none !important;
+  aspect-ratio: 1 / 0.84 !important;
+  border-radius: 14px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__body,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--child .catalog-card__body {
+  display: grid !important;
+  flex: 1 1 auto !important;
+  grid-template-rows: minmax(calc(2 * 1.02em + 2px), auto) auto !important;
+  align-content: start !important;
+  padding: 10px 10px 12px !important;
+  gap: 4px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--preview {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  align-self: stretch !important;
+  min-height: 176px !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--preview .catalog-card__main-hit--preview {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 176px !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--preview .catalog-card__image--preview {
+  margin: 10px 10px 0 !important;
+  padding: 6px !important;
+  min-height: 92px !important;
+  height: auto !important;
+  max-height: none !important;
+  aspect-ratio: 1 / 0.84 !important;
+  border-radius: 14px !important;
+  align-self: stretch !important;
+  overflow: hidden !important;
+}
+
 body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card {
   contain: none !important;
   content-visibility: visible !important;
@@ -46956,6 +47719,88 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__body {
   text-align: center !important;
 }
 
+/* Clean image surfaces:
+   zruÅˇenie mlieÄŤnych wrapperov okolo nÃˇhÄľadov v kategÃłriÃˇch a kartÃˇch. */
+.catalog-card__image,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+.menu-pill__thumb,
+.category-panel__thumb,
+.category-preview {
+  background: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.catalog-card__image::before,
+.catalog-card__image::after,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::before,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.catalog-card__image img,
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img,
+.menu-pill__thumb img,
+.category-panel__thumb img,
+.category-preview img {
+  display: block !important;
+  padding: 0 !important;
+  background: #ffffff !important;
+  border-radius: inherit !important;
+  box-shadow: none !important;
+}
+
+.catalog-card img {
+  display: block !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
+body.app-mobile-shell .catalog-grid--subcategories .catalog-card--child .catalog-card__image,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape {
+  padding: 0 !important;
+  aspect-ratio: 1 / 0.84 !important;
+  min-height: 92px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .catalog-grid--subcategories .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell.app-focused-mode .catalog-grid--subcategories .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
 body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__head--category {
   width: 100% !important;
   justify-content: center !important;
@@ -46979,6 +47824,79 @@ body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__count {
   font-size: 0.58rem !important;
   line-height: 1.04 !important;
   min-height: 18px !important;
+}
+
+/* Final true EOF mobile modal performance cleanup:
+   mobile overlaye drzia cisty surface bez dalsich gradientov a blur vrstiev. */
+body.app-mobile-shell .detail-modal::backdrop,
+body.app-mobile-shell .journal-overlay-root,
+body.app-mobile-shell .mobile-camera-picker__scrim,
+body.app-mobile-shell .image-lightbox::backdrop {
+  background: rgba(15, 23, 42, 0.32) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal__content,
+body.app-mobile-shell .journal-overlay-shell,
+body.app-mobile-shell .mobile-camera-picker__sheet,
+body.app-mobile-shell .image-lightbox__figure {
+  background: #ffffff !important;
+  background-image: none !important;
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.1) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .detail-modal__close,
+body.app-mobile-shell .journal-overlay-shell__close,
+body.app-mobile-shell .detail-modal__back,
+body.app-mobile-shell .journal-overlay-shell__back,
+body.app-mobile-shell .image-lightbox__close,
+body.app-mobile-shell .image-lightbox__back,
+body.app-mobile-shell .image-lightbox__nav {
+  background: rgba(255, 255, 255, 0.96) !important;
+  background-image: none !important;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.07) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .settings-hero,
+body.app-mobile-shell .settings-panel,
+body.app-mobile-shell .settings-panel__storage-meta,
+body.app-mobile-shell .settings-panel__status,
+body.app-mobile-shell .settings-panel__account-grid > *,
+body.app-mobile-shell .detail-copy__headline,
+body.app-mobile-shell .worklog-section,
+body.app-mobile-shell .overview-group,
+body.app-mobile-shell .journal-overlay-frame__head,
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .journal-overlay-card,
+body.app-mobile-shell .photo-quick-sheet__headline,
+body.app-mobile-shell .weather-overview__hero,
+body.app-mobile-shell .weather-overview__external,
+body.app-mobile-shell .weather-alert,
+body.app-mobile-shell .card-view-panel,
+body.app-mobile-shell .card-view-panel--note {
+  background: var(--mobile-modal-surface-soft, #f7f9fc) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Final EOF mobile duplicate submit cleanup:
+   na mobile nech ostane len spodne sticky ulozit/pridat, nie horne duplikaty. */
+body.app-mobile-shell .mobile-compact-modal-topbar__submit,
+body.app-mobile-shell .photo-quick-sheet__save {
+  display: none !important;
+}
+
+body.app-mobile-shell .mobile-compact-modal-topbar__actions:has(> .mobile-compact-modal-topbar__submit),
+body.app-mobile-shell .photo-quick-sheet__topbar-actions {
+  display: none !important;
 }
 
 /* Final mobile type strips:
@@ -47026,4 +47944,137 @@ body.app-mobile-shell .detail-modal--editor .entry-mode-switch--cards .entry-mod
   min-width: 118px !important;
   padding-inline: 14px !important;
   white-space: nowrap !important;
+}
+
+/* Final true EOF catalog image consistency:
+   zrus dalsi medziram a drz rovnaky cisty biely image surface pre kategorie aj karty. */
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
+body.app-mobile-shell .catalog-card--child .catalog-card__image,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell .menu-pill__thumb,
+body.app-mobile-shell .category-panel__thumb,
+body.app-mobile-shell .category-preview {
+  padding: 0 !important;
+  border: 0 !important;
+  background: #ffffff !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image::before,
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image::after,
+body.app-mobile-shell .catalog-card--child .catalog-card__image::before,
+body.app-mobile-shell .catalog-card--child .catalog-card__image::after,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image::before,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image::after,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image::before,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image::after,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image::before,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image::after,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image::before,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image::after,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::before,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::after,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::before,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image img,
+body.app-mobile-shell .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image img,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img,
+body.app-mobile-shell .menu-pill__thumb img,
+body.app-mobile-shell .category-panel__thumb img,
+body.app-mobile-shell .category-preview img {
+  display: block !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: inherit !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image,
+body.app-mobile-shell .catalog-card--child .catalog-card__image,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image,
+body.app-mobile-shell .menu-pill__thumb,
+body.app-mobile-shell .category-panel__thumb,
+body.app-mobile-shell .category-preview {
+  background: #ffffff !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--variety .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--quick-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--gallery-entry .catalog-card__image,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview {
+  background: transparent !important;
+}
+
+body.app-mobile-shell .catalog-card--child .catalog-card__image img,
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image img {
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
+/* Final true EOF journal photo-first compact copy:
+   pri pridavani momentu nech je media intro zjednodusene na kompaktny dvojriadkovy wrapper. */
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero {
+  gap: 8px !important;
+  padding: 12px 14px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(210, 221, 232, 0.88) !important;
+  background: var(--mobile-modal-surface-soft, #f7f9fc) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero .upload-field__hero {
+  gap: 6px !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero .upload-field__hero-head {
+  gap: 10px !important;
+  align-items: center !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero .upload-field__hero-icon {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero .upload-field__hero-copy {
+  gap: 2px !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero .upload-field__hero-title {
+  font-size: 0.98rem !important;
+  line-height: 1.16 !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero .upload-field__hero-hint {
+  font-size: 0.84rem !important;
+  line-height: 1.2 !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 1 !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero .upload-field__mobile-actions {
+  gap: 8px !important;
 }

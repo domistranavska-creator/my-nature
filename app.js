@@ -1155,26 +1155,134 @@ function journalHeaderWeather(entry = {}) {
   });
 }
 
-function markAppBootReady() {
-  if (typeof document === "undefined") return;
-  const root = document.documentElement;
-  const hadStartupMask = root.classList.contains("app-startup-stable")
-    || root.classList.contains("app-startup-mobile-shell");
-  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-    window.requestAnimationFrame(() => {
-      root.classList.remove("app-startup-stable");
-      root.classList.remove("app-startup-mobile-shell");
-      if (hadStartupMask) {
-        syncMobileTopStripVisibility();
-      }
-    });
-    return;
+const APP_STARTUP_MIN_HOLD_MS = 450;
+const APP_STARTUP_FAILSAFE_MS = 2200;
+let appStartupRevealScheduled = false;
+let appStartupRevealComplete = false;
+let appStartupRevealDelayTimer = 0;
+let appStartupRevealFailsafeTimer = 0;
+
+function clearAppStartupRevealTimers() {
+  if (typeof window === "undefined") return;
+  if (appStartupRevealDelayTimer) {
+    window.clearTimeout(appStartupRevealDelayTimer);
+    appStartupRevealDelayTimer = 0;
   }
+  if (appStartupRevealFailsafeTimer) {
+    window.clearTimeout(appStartupRevealFailsafeTimer);
+    appStartupRevealFailsafeTimer = 0;
+  }
+}
+
+function startupMaskActive(root = document.documentElement) {
+  return Boolean(
+    root?.classList?.contains("app-startup-stable")
+    || root?.classList?.contains("app-startup-mobile-shell")
+  );
+}
+
+function appStartupRevealStartTime(root = document.documentElement) {
+  const rawValue = Number(root?.dataset?.appStartupStartedAt || 0);
+  if (Number.isFinite(rawValue) && rawValue > 0) return rawValue;
+  return Date.now();
+}
+
+function isAppStartupVisualReady() {
+  if (typeof document === "undefined") return true;
+  if (!(pageShellEl instanceof HTMLElement)) return false;
+  if (!(mainMenuEl instanceof HTMLElement)) return false;
+  if (!(catalogEl instanceof HTMLElement)) return false;
+  const shellRect = pageShellEl.getBoundingClientRect();
+  return shellRect.width > 0 && shellRect.height > 0;
+}
+
+function revealAppStartupMask(root = document.documentElement, { hadStartupMask = startupMaskActive(root) } = {}) {
+  if (appStartupRevealComplete) return;
+  appStartupRevealComplete = true;
+  appStartupRevealScheduled = false;
+  clearAppStartupRevealTimers();
   root.classList.remove("app-startup-stable");
   root.classList.remove("app-startup-mobile-shell");
+  delete root.dataset.appStartupStartedAt;
   if (hadStartupMask) {
     syncMobileTopStripVisibility();
   }
+}
+
+function scheduleAppStartupReveal(root = document.documentElement) {
+  if (appStartupRevealScheduled || appStartupRevealComplete) return;
+  appStartupRevealScheduled = true;
+
+  const waitForStableFrame = () => {
+    if (appStartupRevealComplete) {
+      appStartupRevealScheduled = false;
+      return;
+    }
+    if (!startupMaskActive(root)) {
+      revealAppStartupMask(root, { hadStartupMask: false });
+      return;
+    }
+    if (!isAppStartupVisualReady()) {
+      if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(waitForStableFrame);
+        return;
+      }
+      revealAppStartupMask(root, { hadStartupMask: true });
+      return;
+    }
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          appStartupRevealScheduled = false;
+          revealAppStartupMask(root, { hadStartupMask: true });
+        });
+      });
+      return;
+    }
+    appStartupRevealScheduled = false;
+    revealAppStartupMask(root, { hadStartupMask: true });
+  };
+
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(waitForStableFrame);
+    return;
+  }
+
+  appStartupRevealScheduled = false;
+  revealAppStartupMask(root, { hadStartupMask: true });
+}
+
+function markAppBootReady() {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const hadStartupMask = startupMaskActive(root);
+  if (!hadStartupMask) {
+    appStartupRevealComplete = true;
+    clearAppStartupRevealTimers();
+    return;
+  }
+
+  const elapsedMs = Math.max(0, Date.now() - appStartupRevealStartTime(root));
+  const remainingHoldMs = Math.max(0, APP_STARTUP_MIN_HOLD_MS - elapsedMs);
+  const remainingFailsafeMs = Math.max(0, APP_STARTUP_FAILSAFE_MS - elapsedMs);
+
+  if (!appStartupRevealFailsafeTimer && typeof window !== "undefined") {
+    appStartupRevealFailsafeTimer = window.setTimeout(() => {
+      revealAppStartupMask(root, { hadStartupMask: startupMaskActive(root) });
+    }, remainingFailsafeMs);
+  }
+
+  if (appStartupRevealComplete || appStartupRevealScheduled || appStartupRevealDelayTimer) return;
+
+  if (remainingHoldMs > 0 && typeof window !== "undefined") {
+    appStartupRevealDelayTimer = window.setTimeout(() => {
+      appStartupRevealDelayTimer = 0;
+      scheduleAppStartupReveal(root);
+    }, remainingHoldMs);
+    return;
+  }
+
+  scheduleAppStartupReveal(root);
 }
 
 function isCloudSignedInForHomeExperience() {
@@ -2067,9 +2175,36 @@ function renderJournalSafe() {
   renderJournal();
 }
 
+function resolveMobileFocusedCategoryTransitionAfterCatalogSkip() {
+  if (!mobileFocusedCategoryTransitionPending) return;
+  if (!catalogEl || !isMobileFocusedCategoryTransitionContext()) {
+    mobileFocusedCategoryTransitionPending = false;
+    syncMobileFocusedCategoryTransitionState();
+    return;
+  }
+
+  const category = currentCategory();
+  if (!category) {
+    mobileFocusedCategoryTransitionPending = false;
+    syncMobileFocusedCategoryTransitionState();
+    return;
+  }
+
+  const hasFocusedCatalogDom = Boolean(catalogEl.querySelector(".category-shell"));
+  if (!hasFocusedCatalogDom) {
+    renderCatalog();
+    return;
+  }
+
+  finishMobileFocusedCategoryTransition(mobileFocusedCategoryTransitionToken);
+}
+
 function renderCatalogSafe() {
   const current = createCategoriesRenderSnapshot(state);
-  if (lastRenderSnapshot.categories === current) return;
+  if (lastRenderSnapshot.categories === current) {
+    resolveMobileFocusedCategoryTransitionAfterCatalogSkip();
+    return;
+  }
   lastRenderSnapshot.categories = current;
   renderCatalog();
 }
@@ -2107,7 +2242,7 @@ function mobileFocusedCatalogPreviewCandidates(root = catalogEl) {
     ".catalog-grid--subcategories .catalog-card__image img",
     ".catalog-grid--varieties .catalog-card__image img"
   ].join(", ");
-  const limit = isRealMobileRuntimeMode() ? 4 : 3;
+  const limit = isRealMobileRuntimeMode() ? 6 : 3;
   return [...root.querySelectorAll(selector)]
     .filter((node) => node instanceof HTMLImageElement)
     .slice(0, limit);
@@ -2149,14 +2284,22 @@ function finishMobileFocusedCategoryTransition(token = 0) {
     && isMobileFocusedCategoryTransitionContext()
   ) {
     let frameCount = 0;
-    const minFrames = 2;
-    const maxFrames = isRealMobileRuntimeMode() ? 18 : 10;
+    const minFrames = isRealMobileRuntimeMode() ? 3 : 2;
+    const maxFrames = isRealMobileRuntimeMode() ? 72 : 10;
+    const startedAt = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+    const maxWaitMs = isRealMobileRuntimeMode() ? 1400 : 420;
     const waitForStablePreview = () => {
       if (expectedToken !== mobileFocusedCategoryTransitionToken) return;
       frameCount += 1;
       const previewsReady = areMobileFocusedCatalogPreviewsReady(catalogEl);
-      if ((frameCount >= minFrames && previewsReady) || frameCount >= maxFrames) {
-        window.requestAnimationFrame(reveal);
+      const now = typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+      const timedOut = (now - startedAt) >= maxWaitMs;
+      if ((frameCount >= minFrames && previewsReady) || frameCount >= maxFrames || timedOut) {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(reveal));
         return;
       }
       window.requestAnimationFrame(waitForStablePreview);
@@ -2168,6 +2311,10 @@ function finishMobileFocusedCategoryTransition(token = 0) {
 }
 
 function shouldUseQuietCatalogPreviewPlaceholder() {
+  return mobileFocusedCategoryTransitionPending && isMobileFocusedCategoryTransitionContext();
+}
+
+function shouldForceImmediateFocusedCatalogImages() {
   return isMobileFocusedCategoryTransitionContext();
 }
 
@@ -4219,6 +4366,10 @@ function clearGlobalGestureBodyPreview() {
   gestureState.bodyPreviewActive = false;
 }
 
+function shouldPreviewGlobalGestureBody() {
+  return !isAnyOverlayOpen();
+}
+
 function openQuickAdd() {
   if (typeof toggleToolbarAddMenuFromMobileNav !== "function") return false;
   toggleToolbarAddMenuFromMobileNav();
@@ -4546,15 +4697,24 @@ function applyAppNavigationHistoryState(historyState = null, { scrollToTop = tru
   const nextView = String(nextState.__mzView || "menu").trim() === "category" ? "category" : "menu";
   const nextCategoryId = String(nextState.__mzCategoryId || "").trim();
   const hasValidCategory = Boolean(nextCategoryId && state.categories.some((item) => item.id === nextCategoryId));
+  const previousCategoryId = String(activeCategoryId || "").trim();
+  const wasFocusedView = isFocusedView;
 
   if (nextView === "category" && hasValidCategory) {
     activeCategoryId = nextCategoryId;
     mainMenuCategoriesPreviewVisible = false;
     isFocusedView = true;
+    if (!wasFocusedView || previousCategoryId !== nextCategoryId) {
+      startMobileFocusedCategoryTransition();
+    } else {
+      mobileFocusedCategoryTransitionPending = false;
+      syncMobileFocusedCategoryTransitionState();
+    }
     renderFocusedCategoryNavigation();
   } else {
     mainMenuCategoriesPreviewVisible = Boolean(nextState.__mzMenuCategories);
     isFocusedView = false;
+    updateMenuVisibility();
     renderMainMenu();
     renderMainMenuNavigation();
   }
@@ -5006,6 +5166,7 @@ document.addEventListener("touchmove", (event) => {
     && deltaX > 0
     && Math.abs(deltaX) > 20
     && absX > absY
+    && shouldPreviewGlobalGestureBody()
   ) {
     document.body.style.transform = `translateX(${Math.min(deltaX, 20)}px)`;
     gestureState.bodyPreviewActive = true;
@@ -5262,6 +5423,10 @@ function attachCardTypePreviewSwipe(preview, root = document) {
   if (!(preview instanceof HTMLElement)) return () => false;
   if (typeof document === "undefined" || typeof window === "undefined") return () => false;
   if (!document.body?.classList.contains("app-mobile-shell")) return () => false;
+  const motionTarget = preview.closest(".detail-image--editor") || preview;
+  const gestureSurface = motionTarget instanceof HTMLElement ? motionTarget : preview;
+  const swipeSettleTransition = "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease";
+  const swipeCommitTransition = "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease";
 
   let startX = 0;
   let startY = 0;
@@ -5287,36 +5452,52 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     resetTransitionTimer = 0;
   };
 
+  const isIgnoredSwipeTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest([
+      "button",
+      "input",
+      "textarea",
+      "select",
+      "label",
+      "a",
+      "[contenteditable=\"true\"]",
+      ".editor-gallery"
+    ].join(", ")));
+  };
+
   const resetPreviewStyles = () => {
-    if (!preview.isConnected) return;
-    preview.style.transition = "";
-    preview.style.transform = "";
-    preview.style.opacity = "";
-    preview.style.willChange = "";
+    if (!motionTarget.isConnected) return;
+    motionTarget.style.transition = "";
+    motionTarget.style.transform = "";
+    motionTarget.style.opacity = "";
+    motionTarget.style.willChange = "";
   };
 
   const animatePreviewBack = () => {
     clearResetTransitionTimer();
     clearSwitchTransitionTimer();
-    preview.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
-    preview.style.transform = "translate3d(0, 0, 0)";
-    preview.style.opacity = "";
+    motionTarget.style.willChange = "transform, opacity";
+    motionTarget.style.transition = swipeSettleTransition;
+    motionTarget.style.transform = "translate3d(0, 0, 0)";
+    motionTarget.style.opacity = "";
     resetTransitionTimer = window.setTimeout(() => {
       resetTransitionTimer = 0;
       resetPreviewStyles();
-    }, 240);
+    }, 200);
   };
 
   const animatePreviewSwitchOut = (step, onComplete) => {
     clearResetTransitionTimer();
     clearSwitchTransitionTimer();
-    preview.style.transition = "transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease";
-    preview.style.transform = `translate3d(${step > 0 ? -14 : 14}px, 0, 0)`;
-    preview.style.opacity = "0.92";
+    motionTarget.style.willChange = "transform, opacity";
+    motionTarget.style.transition = swipeCommitTransition;
+    motionTarget.style.transform = `translate3d(${step > 0 ? -14 : 14}px, 0, 0)`;
+    motionTarget.style.opacity = "0.92";
     switchTransitionTimer = window.setTimeout(() => {
       switchTransitionTimer = 0;
       onComplete?.();
-    }, 120);
+    }, 160);
   };
 
   const reset = () => {
@@ -5324,9 +5505,10 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     direction = null;
   };
 
-  preview.addEventListener("touchstart", (event) => {
+  gestureSurface.addEventListener("touchstart", (event) => {
     if (event.touches.length !== 1) return;
     if (cardTypeButtons(root).length < 2) return;
+    if (isIgnoredSwipeTarget(event.target)) return;
     const touch = event.touches[0];
     startX = touch.clientX;
     startY = touch.clientY;
@@ -5334,12 +5516,11 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     direction = null;
     clearResetTransitionTimer();
     clearSwitchTransitionTimer();
-    preview.style.transition = "";
-    preview.style.willChange = "transform";
-    preview.style.opacity = "";
+    motionTarget.style.transition = "";
+    motionTarget.style.opacity = "";
   }, { passive: true });
 
-  preview.addEventListener("touchmove", (event) => {
+  gestureSurface.addEventListener("touchmove", (event) => {
     if (!tracking || event.touches.length !== 1) return;
     const touch = event.touches[0];
     const deltaX = touch.clientX - startX;
@@ -5348,12 +5529,13 @@ function attachCardTypePreviewSwipe(preview, root = document) {
       direction = Math.abs(deltaX) > Math.abs(deltaY) ? "x" : "y";
     }
     if (direction === "x") {
+      motionTarget.style.willChange = "transform, opacity";
       const limitedOffset = Math.max(-dragVisualLimit, Math.min(dragVisualLimit, deltaX * dragVisualFactor));
-      preview.style.transform = `translate3d(${limitedOffset}px, 0, 0)`;
+      motionTarget.style.transform = `translate3d(${limitedOffset}px, 0, 0)`;
     }
   }, { passive: true });
 
-  preview.addEventListener("touchend", (event) => {
+  gestureSurface.addEventListener("touchend", (event) => {
     if (!tracking) {
       animatePreviewBack();
       reset();
@@ -5390,7 +5572,7 @@ function attachCardTypePreviewSwipe(preview, root = document) {
     reset();
   }, { passive: true });
 
-  preview.addEventListener("touchcancel", () => {
+  gestureSurface.addEventListener("touchcancel", () => {
     animatePreviewBack();
     reset();
   }, { passive: true });
@@ -5429,9 +5611,15 @@ function swipeRowOpenWidth(rowEl) {
   return actionCount * SWIPE_ROW_ACTION_BUTTON_WIDTH;
 }
 
+function setSwipeRowDragging(rowEl, isDragging = false) {
+  if (!(rowEl instanceof HTMLElement)) return;
+  rowEl.classList.toggle("swipe-row--dragging", Boolean(isDragging));
+}
+
 function closeSwipeRow(rowEl) {
   if (!(rowEl instanceof HTMLElement)) return;
   const content = swipeRowContentEl(rowEl);
+  setSwipeRowDragging(rowEl, false);
   rowEl.classList.remove("swipe-row--open");
   if (content instanceof HTMLElement) {
     content.style.transition = "";
@@ -5455,6 +5643,7 @@ function openSwipeRow(rowEl) {
     closeSwipeRow(activeSwipeRow);
   }
   rowEl.style.setProperty("--swipe-row-open-width", `${swipeRowOpenWidth(rowEl)}px`);
+  setSwipeRowDragging(rowEl, false);
   rowEl.classList.add("swipe-row--open");
   content.style.transition = "";
   content.style.transform = "";
@@ -5703,6 +5892,7 @@ function attachSwipeRow(rowEl) {
   let startOffset = 0;
 
   const resetTracking = () => {
+    setSwipeRowDragging(rowEl, false);
     tracking = false;
     direction = "";
     startTime = 0;
@@ -5761,6 +5951,7 @@ function attachSwipeRow(rowEl) {
     if (!rowAlreadyOpen && typeof rowEl._swipeHandlers?.delete === "function") {
       pressTimer = window.setTimeout(() => {
         clearLongPressTimer();
+        setSwipeRowDragging(rowEl, false);
         tracking = false;
         direction = "";
         suppressClickUntil = Date.now() + 420;
@@ -5789,6 +5980,7 @@ function attachSwipeRow(rowEl) {
     }
 
     if (direction !== "x") return;
+    setSwipeRowDragging(rowEl, true);
     const maxOffset = swipeRowOpenWidth(rowEl);
     const translatedOffset = Math.max(-maxOffset, Math.min(0, startOffset + dx));
     content.style.transform = `translateX(${translatedOffset}px)`;
@@ -6088,8 +6280,9 @@ function toggleToolbarAddMenuFromMobileNav() {
 function openMainMenuView(options = {}) {
   const revealCategories = Boolean(options && options.revealCategories);
   mainMenuCategoriesPreviewVisible = revealCategories;
-  renderMainMenu();
   isFocusedView = false;
+  updateMenuVisibility();
+  renderMainMenu();
   renderMainMenuNavigation();
   syncAppNavigationHistoryState({ mode: "push" });
   const isMobileShell = Boolean(document.body?.classList.contains("app-mobile-shell"));
@@ -15226,7 +15419,7 @@ function renderMainMenuCategoryCard(category) {
     <article class="catalog-card catalog-card--child catalog-card--main-menu-card catalog-card--${category.nodeType || NODE_TYPES.KIND}" style="--category-accent:${escapeAttribute(category.color || "#7e9f4b")}">
       <button class="catalog-card__main-hit" type="button" data-open-main-category="${category.id}" aria-label="Otvoriť kategóriu ${escapeHtml(category.name)}">
         <div class="catalog-card__image">
-          ${renderCategoryCardImageTag(category, category.name)}
+          ${renderCategoryCardImageTag(category, category.name, { preferQuietPlaceholder: true })}
         </div>
         <div class="catalog-card__body catalog-card__body--category">
           <div class="catalog-card__head catalog-card__head--category">
@@ -15249,8 +15442,17 @@ function syncCatalogCardImagePresentation(root = document) {
       const height = img.naturalHeight || img.height || 0;
       const source = img.currentSrc || img.src || "";
       const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+      const customThumbCrop = readCardThumbCropStateFromImage(img);
       frame.classList.remove("catalog-card__image--soft-fit", "catalog-card__image--landscape", "catalog-card__image--portrait");
+      clearCardThumbCropImagePresentation(img);
       if (!source) return;
+
+      if (customThumbCrop.hasCustom) {
+        frame.style.removeProperty("--card-image");
+        frame.style.removeProperty("--card-image-ratio");
+        applyCardThumbCropPresentation(frame, img, customThumbCrop);
+        return;
+      }
 
       if (isMobileShell) {
         frame.style.removeProperty("--card-image");
@@ -15288,11 +15490,14 @@ function syncDetailEditorImagePresentation(previewEl) {
     const width = img.naturalWidth || img.width || 0;
     const height = img.naturalHeight || img.height || 0;
     const source = img.currentSrc || img.src || "";
-    if (source) {
-      frame.style.setProperty("--detail-image", `url(${JSON.stringify(source)})`);
-    }
-    frame.style.setProperty("--detail-image-ratio", width && height ? `${width} / ${height}` : "1 / 1");
     frame.classList.remove("detail-image--soft-fit", "detail-image--landscape", "detail-image--portrait");
+    if (!source || source === TRANSPARENT_IMAGE_PLACEHOLDER || isPlaceholderImage(source)) {
+      frame.style.removeProperty("--detail-image");
+      frame.style.setProperty("--detail-image-ratio", "1 / 1");
+      return;
+    }
+    frame.style.setProperty("--detail-image", `url(${JSON.stringify(source)})`);
+    frame.style.setProperty("--detail-image-ratio", width && height ? `${width} / ${height}` : "1 / 1");
     if (!width || !height) return;
 
     const ratio = width / height;
@@ -15307,6 +15512,406 @@ function syncDetailEditorImagePresentation(previewEl) {
   } else {
     img.addEventListener("load", syncFrame, { once: true });
   }
+}
+
+function editorPreviewDisplaySource(images = []) {
+  const firstImage = Array.isArray(images)
+    ? String(images.find((value) => String(value || "").trim()) || "").trim()
+    : "";
+  return firstImage || TRANSPARENT_IMAGE_PLACEHOLDER;
+}
+
+const CARD_THUMB_CROP_MIN_SCALE = 1;
+const CARD_THUMB_CROP_MAX_SCALE = 3;
+const CARD_THUMB_CROP_SCALE_STEP = 0.05;
+
+function roundCardThumbCropValue(value, digits = 3) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  const precision = 10 ** digits;
+  return Math.round(numericValue * precision) / precision;
+}
+
+function normalizeCardThumbCropOffset(value) {
+  if (value === "" || typeof value === "undefined" || value === null) return "";
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "";
+  return roundCardThumbCropValue(Math.max(-100, Math.min(100, numericValue)), 2);
+}
+
+function normalizeCardThumbCropScale(value) {
+  if (value === "" || typeof value === "undefined" || value === null) return "";
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "";
+  return roundCardThumbCropValue(Math.max(CARD_THUMB_CROP_MIN_SCALE, Math.min(CARD_THUMB_CROP_MAX_SCALE, numericValue)), 3);
+}
+
+function resolveCardThumbCropState(value = {}) {
+  const normalizedOffsetX = normalizeCardThumbCropOffset(value?.thumbOffsetX);
+  const normalizedOffsetY = normalizeCardThumbCropOffset(value?.thumbOffsetY);
+  const normalizedScale = normalizeCardThumbCropScale(value?.thumbScale);
+  const hasCustom = normalizedOffsetX !== "" || normalizedOffsetY !== "" || normalizedScale !== "";
+
+  return {
+    thumbOffsetX: normalizedOffsetX === "" ? 0 : normalizedOffsetX,
+    thumbOffsetY: normalizedOffsetY === "" ? 0 : normalizedOffsetY,
+    thumbScale: normalizedScale === "" ? 1 : normalizedScale,
+    hasCustom
+  };
+}
+
+function serializeCardThumbCropState(value = {}) {
+  const resolved = resolveCardThumbCropState(value);
+  const isNeutral = Math.abs(resolved.thumbOffsetX) < 0.01
+    && Math.abs(resolved.thumbOffsetY) < 0.01
+    && Math.abs(resolved.thumbScale - 1) < 0.01;
+
+  if (!resolved.hasCustom || isNeutral) {
+    return {
+      thumbOffsetX: "",
+      thumbOffsetY: "",
+      thumbScale: ""
+    };
+  }
+
+  return {
+    thumbOffsetX: resolved.thumbOffsetX,
+    thumbOffsetY: resolved.thumbOffsetY,
+    thumbScale: resolved.thumbScale
+  };
+}
+
+function primaryCardThumbCropSource(images = []) {
+  if (!Array.isArray(images)) return "";
+  return String(images.find((value) => String(value || "").trim()) || "").trim();
+}
+
+function readCardThumbCropStateFromImage(img) {
+  if (!(img instanceof HTMLImageElement)) return resolveCardThumbCropState();
+  return resolveCardThumbCropState({
+    thumbOffsetX: img.getAttribute("data-thumb-offset-x"),
+    thumbOffsetY: img.getAttribute("data-thumb-offset-y"),
+    thumbScale: img.getAttribute("data-thumb-scale")
+  });
+}
+
+function syncCardThumbCropImageDataset(img, cropValue = {}) {
+  if (!(img instanceof HTMLImageElement)) return;
+  const serialized = serializeCardThumbCropState(cropValue);
+  const hasCustom = serialized.thumbOffsetX !== ""
+    || serialized.thumbOffsetY !== ""
+    || serialized.thumbScale !== "";
+
+  if (!hasCustom) {
+    img.removeAttribute("data-thumb-crop");
+    img.removeAttribute("data-thumb-offset-x");
+    img.removeAttribute("data-thumb-offset-y");
+    img.removeAttribute("data-thumb-scale");
+    return;
+  }
+
+  img.setAttribute("data-thumb-crop", "custom");
+  img.setAttribute("data-thumb-offset-x", String(serialized.thumbOffsetX));
+  img.setAttribute("data-thumb-offset-y", String(serialized.thumbOffsetY));
+  img.setAttribute("data-thumb-scale", String(serialized.thumbScale));
+}
+
+function clearCardThumbCropImagePresentation(img) {
+  if (!(img instanceof HTMLImageElement)) return;
+  img.style.removeProperty("--thumb-crop-translate-x");
+  img.style.removeProperty("--thumb-crop-translate-y");
+  img.style.removeProperty("--thumb-crop-scale");
+}
+
+function measureCardThumbCropMotion(frame, img, scale = 1) {
+  if (!(frame instanceof HTMLElement) || !(img instanceof HTMLImageElement)) {
+    return {
+      ready: false,
+      maxTranslateX: 0,
+      maxTranslateY: 0
+    };
+  }
+
+  const frameWidth = frame.clientWidth || frame.offsetWidth || 0;
+  const frameHeight = frame.clientHeight || frame.offsetHeight || 0;
+  const naturalWidth = img.naturalWidth || 0;
+  const naturalHeight = img.naturalHeight || 0;
+  if (!frameWidth || !frameHeight || !naturalWidth || !naturalHeight) {
+    return {
+      ready: false,
+      maxTranslateX: 0,
+      maxTranslateY: 0
+    };
+  }
+
+  const safeScale = Math.max(CARD_THUMB_CROP_MIN_SCALE, Number(scale) || CARD_THUMB_CROP_MIN_SCALE);
+  const imageRatio = naturalWidth / naturalHeight;
+  const frameRatio = frameWidth / frameHeight;
+  let baseWidth = frameWidth;
+  let baseHeight = frameHeight;
+
+  if (imageRatio > frameRatio) {
+    baseHeight = frameHeight;
+    baseWidth = frameHeight * imageRatio;
+  } else {
+    baseWidth = frameWidth;
+    baseHeight = frameWidth / imageRatio;
+  }
+
+  const renderedWidth = baseWidth * safeScale;
+  const renderedHeight = baseHeight * safeScale;
+
+  return {
+    ready: true,
+    maxTranslateX: Math.max(0, (renderedWidth - frameWidth) / 2),
+    maxTranslateY: Math.max(0, (renderedHeight - frameHeight) / 2)
+  };
+}
+
+function clampCardThumbCropStateForFrame(frame, img, cropValue = {}) {
+  const resolved = resolveCardThumbCropState(cropValue);
+  const metrics = measureCardThumbCropMotion(frame, img, resolved.thumbScale);
+  if (!metrics.ready) return resolved;
+
+  return {
+    thumbOffsetX: metrics.maxTranslateX > 0 ? resolved.thumbOffsetX : 0,
+    thumbOffsetY: metrics.maxTranslateY > 0 ? resolved.thumbOffsetY : 0,
+    thumbScale: resolved.thumbScale,
+    hasCustom: resolved.hasCustom
+  };
+}
+
+function applyCardThumbCropPresentation(frame, img, cropValue = null) {
+  if (!(frame instanceof HTMLElement) || !(img instanceof HTMLImageElement)) return false;
+  const resolved = cropValue ? resolveCardThumbCropState(cropValue) : readCardThumbCropStateFromImage(img);
+  clearCardThumbCropImagePresentation(img);
+  if (!resolved.hasCustom) return false;
+
+  const apply = () => {
+    if (!frame.isConnected || !img.isConnected) return;
+    const clamped = clampCardThumbCropStateForFrame(frame, img, resolved);
+    const metrics = measureCardThumbCropMotion(frame, img, clamped.thumbScale);
+    if (!metrics.ready) return;
+    img.style.setProperty("--thumb-crop-translate-x", `${roundCardThumbCropValue((metrics.maxTranslateX * clamped.thumbOffsetX) / 100, 2)}px`);
+    img.style.setProperty("--thumb-crop-translate-y", `${roundCardThumbCropValue((metrics.maxTranslateY * clamped.thumbOffsetY) / 100, 2)}px`);
+    img.style.setProperty("--thumb-crop-scale", String(clamped.thumbScale));
+  };
+
+  if ((img.complete && img.naturalWidth) || isPlaceholderImage(img.currentSrc || img.src || "")) {
+    apply();
+  } else {
+    img.addEventListener("load", apply, { once: true });
+  }
+
+  return true;
+}
+
+function renderCardThumbCropEditorMarkup(source = "", cropValue = {}, { open = false } = {}) {
+  const hasImage = Boolean(String(source || "").trim());
+  const resolved = resolveCardThumbCropState(cropValue);
+  const toggleLabel = !hasImage
+    ? "Najprv pridaj hlavnú fotku"
+    : open ? "Skryť úpravu" : "Upraviť náhľad";
+
+  return `
+    <section class="thumb-crop-editor${hasImage ? "" : " is-empty"}" data-thumb-crop-editor>
+      <div class="thumb-crop-editor__head">
+        <div class="thumb-crop-editor__copy">
+          <h4>Nastaviť výrez náhľadu</h4>
+          <p>Upravuješ len náhľad hlavnej fotky na karte. Originál ostane bez zmeny.</p>
+        </div>
+        <button class="button button--ghost button--small thumb-crop-editor__toggle" type="button" data-thumb-crop-toggle ${hasImage ? "" : "disabled"}>${toggleLabel}</button>
+      </div>
+      <div class="thumb-crop-editor__panel" data-thumb-crop-panel ${hasImage && open ? "" : "hidden"}>
+        <div class="thumb-crop-editor__viewport" data-thumb-crop-viewport>
+          <img
+            class="thumb-crop-editor__image"
+            data-thumb-crop-preview
+            src="${escapeAttribute(hasImage ? source : TRANSPARENT_IMAGE_PLACEHOLDER)}"
+            alt="Preview náhľadu karty"
+            loading="lazy"
+            decoding="async"
+          >
+        </div>
+        <div class="thumb-crop-editor__tools">
+          <p class="thumb-crop-editor__hint">Potiahni fotku prstom. Priblíženie meníš posuvníkom.</p>
+          <div class="thumb-crop-editor__zoom-row">
+            <button class="button button--ghost button--small" type="button" data-thumb-crop-zoom-step="-1" aria-label="Oddialiť náhľad">−</button>
+            <input
+              class="thumb-crop-editor__range"
+              data-thumb-crop-range
+              type="range"
+              min="${CARD_THUMB_CROP_MIN_SCALE}"
+              max="${CARD_THUMB_CROP_MAX_SCALE}"
+              step="${CARD_THUMB_CROP_SCALE_STEP}"
+              value="${escapeAttribute(String(resolved.thumbScale))}"
+            >
+            <button class="button button--ghost button--small" type="button" data-thumb-crop-zoom-step="1" aria-label="Priblížiť náhľad">+</button>
+            <span class="thumb-crop-editor__zoom-value" data-thumb-crop-zoom-value>${Math.round(resolved.thumbScale * 100)} %</span>
+          </div>
+          <div class="thumb-crop-editor__actions">
+            <button class="button button--ghost button--small" type="button" data-thumb-crop-reset>Automatický výrez</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function bindCardThumbCropEditor(root, {
+  getSource,
+  getCropState,
+  setCropState,
+  getOpen,
+  setOpen
+} = {}) {
+  const section = root?.querySelector?.("[data-thumb-crop-editor]");
+  if (!(section instanceof HTMLElement)) {
+    return { sync() {} };
+  }
+
+  const toggleButton = section.querySelector("[data-thumb-crop-toggle]");
+  const panel = section.querySelector("[data-thumb-crop-panel]");
+  const viewport = section.querySelector("[data-thumb-crop-viewport]");
+  const previewImg = section.querySelector("[data-thumb-crop-preview]");
+  const zoomRange = section.querySelector("[data-thumb-crop-range]");
+  const zoomValue = section.querySelector("[data-thumb-crop-zoom-value]");
+  const resetButton = section.querySelector("[data-thumb-crop-reset]");
+  const zoomStepButtons = [...section.querySelectorAll("[data-thumb-crop-zoom-step]")];
+
+  if (!(toggleButton instanceof HTMLButtonElement)
+    || !(panel instanceof HTMLElement)
+    || !(viewport instanceof HTMLElement)
+    || !(previewImg instanceof HTMLImageElement)
+    || !(zoomRange instanceof HTMLInputElement)
+    || !(zoomValue instanceof HTMLElement)
+    || !(resetButton instanceof HTMLButtonElement)) {
+    return { sync() {} };
+  }
+
+  let dragPointerId = null;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragStartCrop = resolveCardThumbCropState();
+
+  const hasImage = () => Boolean(String(getSource?.() || "").trim());
+
+  const updateZoomLabel = (cropValue = {}) => {
+    const resolved = resolveCardThumbCropState(cropValue);
+    zoomRange.value = String(resolved.thumbScale);
+    zoomValue.textContent = `${Math.round(resolved.thumbScale * 100)} %`;
+  };
+
+  const applyPreviewCrop = (cropValue = {}) => {
+    syncCardThumbCropImageDataset(previewImg, cropValue);
+    applyCardThumbCropPresentation(viewport, previewImg, cropValue);
+    updateZoomLabel(cropValue);
+  };
+
+  const sync = () => {
+    const source = String(getSource?.() || "").trim();
+    const isOpen = Boolean(getOpen?.());
+    const available = Boolean(source);
+
+    section.classList.toggle("is-empty", !available);
+    toggleButton.disabled = !available;
+    toggleButton.textContent = !available
+      ? "Najprv pridaj hlavnú fotku"
+      : isOpen ? "Skryť úpravu" : "Upraviť náhľad";
+    panel.hidden = !available || !isOpen;
+
+    const desiredSource = available ? source : TRANSPARENT_IMAGE_PLACEHOLDER;
+    if ((previewImg.getAttribute("src") || "") !== desiredSource) {
+      previewImg.setAttribute("src", desiredSource);
+    }
+
+    applyPreviewCrop(getCropState?.() || {});
+  };
+
+  const commitCrop = (nextValue = {}) => {
+    const resolved = resolveCardThumbCropState(nextValue);
+    const serialized = serializeCardThumbCropState(clampCardThumbCropStateForFrame(viewport, previewImg, resolved));
+    setCropState?.(serialized);
+    applyPreviewCrop(serialized);
+  };
+
+  toggleButton.addEventListener("click", () => {
+    if (!hasImage()) return;
+    setOpen?.(!Boolean(getOpen?.()));
+    sync();
+  });
+
+  zoomRange.addEventListener("input", () => {
+    commitCrop({
+      ...getCropState?.(),
+      thumbScale: zoomRange.value
+    });
+  });
+
+  zoomStepButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const stepDirection = Number(button.getAttribute("data-thumb-crop-zoom-step") || 0);
+      if (!stepDirection) return;
+      const currentCrop = resolveCardThumbCropState(getCropState?.() || {});
+      commitCrop({
+        ...currentCrop,
+        thumbScale: roundCardThumbCropValue(currentCrop.thumbScale + stepDirection * CARD_THUMB_CROP_SCALE_STEP, 3)
+      });
+    });
+  });
+
+  resetButton.addEventListener("click", () => {
+    setCropState?.(serializeCardThumbCropState());
+    applyPreviewCrop({});
+  });
+
+  previewImg.addEventListener("load", () => {
+    applyPreviewCrop(getCropState?.() || {});
+  });
+
+  viewport.addEventListener("pointerdown", (event) => {
+    if (!hasImage() || panel.hidden) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    dragPointerId = event.pointerId;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    dragStartCrop = resolveCardThumbCropState(getCropState?.() || {});
+    viewport.classList.add("is-dragging");
+    viewport.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  });
+
+  viewport.addEventListener("pointermove", (event) => {
+    if (dragPointerId !== event.pointerId) return;
+    const metrics = measureCardThumbCropMotion(viewport, previewImg, dragStartCrop.thumbScale);
+    if (!metrics.ready) return;
+    const nextOffsetX = metrics.maxTranslateX > 0
+      ? dragStartCrop.thumbOffsetX + ((event.clientX - dragStartX) / metrics.maxTranslateX) * 100
+      : 0;
+    const nextOffsetY = metrics.maxTranslateY > 0
+      ? dragStartCrop.thumbOffsetY + ((event.clientY - dragStartY) / metrics.maxTranslateY) * 100
+      : 0;
+
+    commitCrop({
+      ...dragStartCrop,
+      thumbOffsetX: nextOffsetX,
+      thumbOffsetY: nextOffsetY
+    });
+  });
+
+  const finishPointerDrag = (event) => {
+    if (dragPointerId !== event.pointerId) return;
+    viewport.classList.remove("is-dragging");
+    viewport.releasePointerCapture?.(event.pointerId);
+    dragPointerId = null;
+  };
+
+  viewport.addEventListener("pointerup", finishPointerDrag);
+  viewport.addEventListener("pointercancel", finishPointerDrag);
+
+  sync();
+
+  return { sync, applyPreviewCrop };
 }
 
 function previewCardBadgeMarkup(label, tone = "neutral") {
@@ -15998,17 +16603,22 @@ function memoryBackdropStyleAttribute(source = "") {
   return ` style="${escapeAttribute(`background-image:url(${JSON.stringify(normalizedSource)})`)}"`;
 }
 
-function createMemoryPhotoElement(item, { active = false } = {}) {
-  const markup = renderJournalImageTag(
+function renderMemoryPhotoTag(item, { active = false } = {}) {
+  return renderJournalImageTag(
     item?.image,
     item?.entryTitle || "Spomienka",
     {
       entryId: item?.entryId || "",
       index: item?.index || 0,
       className: `memory-photo${active ? " active" : ""}`,
-      forceDeferred: true
+      forceDeferred: true,
+      placeholderSrc: TRANSPARENT_IMAGE_PLACEHOLDER
     }
   );
+}
+
+function createMemoryPhotoElement(item, { active = false } = {}) {
+  const markup = renderMemoryPhotoTag(item, { active });
   if (!markup) return null;
   const template = document.createElement("template");
   template.innerHTML = markup.trim();
@@ -16073,7 +16683,7 @@ async function prepareMemoryPhotoElementForSwap(imageEl) {
           imageEl.removeAttribute("data-lazy-journal-image-index");
         }
       } catch (error) {
-        // Pri memory prechode radšej ticho padneme späť na existujúci placeholder, než aby sa rozbil slider.
+        // Pri memory prechode radšej ticho padneme späť na transparentný fallback, než aby sa rozbil slider.
       }
     }
   }
@@ -16236,16 +16846,7 @@ function renderMemoryHeroMarkup(item) {
       >
         <span class="memory-strip__backdrop"${memoryBackdropStyleAttribute(item.image)}></span>
         <div class="memory-frame">
-          ${renderJournalImageTag(
-            item.image,
-            item.entryTitle,
-            {
-              entryId: item.entryId,
-              index: item.index,
-              className: "memory-photo active",
-              forceDeferred: true
-            }
-          )}
+          ${renderMemoryPhotoTag(item, { active: true })}
         </div>
         <span class="memory-strip__subtitle">${escapeHtml(formatRelativeTime(item.entryDate))}</span>
         ${noteText ? `<span class="memory-strip__note memory-tip">${escapeHtml(noteText)}</span>` : ""}
@@ -18279,6 +18880,9 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   ).trim() || FALLBACK_CATEGORY_ID;
   const selectedStatuses = varietyStatusValues(existing);
   let draftImages = normalizeVarietyImages(existing);
+  let draftThumbCrop = serializeCardThumbCropState(existing || {});
+  let thumbCropPanelOpen = resolveCardThumbCropState(existing || {}).hasCustom;
+  let thumbCropSource = primaryCardThumbCropSource(draftImages);
   let activeImageIndex = 0;
   let draggedImageIndex = null;
 
@@ -18287,7 +18891,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     <div class="detail-layout detail-layout--editor">
       <div class="detail-image detail-image--editor">
         <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
-        <img id="variety-preview" src="${escapeAttribute(primaryVarietyImage(existing || { cardType: "variety" }))}" alt="${escapeAttribute(entryDisplayName(existing) || "Nový záznam")}">
+        <img id="variety-preview" src="${escapeAttribute(editorPreviewDisplaySource(draftImages))}" alt="${escapeAttribute(entryDisplayName(existing) || "Nový záznam")}">
         <button class="gallery-nav gallery-nav--next" id="gallery-next" type="button" aria-label="Ďalšia fotka">&#8250;</button>
         <div class="detail-image__count" id="gallery-count"></div>
         <div class="detail-image__upload-cta-shell">
@@ -18396,6 +19000,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
             <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="${currentEntryKind === "detail" ? "Poznámky: chuť, rodivosť, čo jej sadlo, či ju chceš znova..." : currentEntryKind === "quick" ? "Krátky popis, kde rastie alebo čo si chceš zapamätať..." : "Voliteľný popis galérie..."}">${escapeHtml(existing?.notes || "")}</textarea>
           </label>
           ${renderEditorImageUploadField({ multiple: true, visual: false })}
+          ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, { open: thumbCropPanelOpen })}
           <div class="editor-gallery" id="variety-gallery-editor"></div>
           ${existing ? `
             <div class="danger-zone">
@@ -18417,6 +19022,8 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   const galleryCount = document.getElementById("gallery-count");
   const formEl = document.getElementById("variety-form");
   const notesInput = formEl?.querySelector('textarea[name="notes"]');
+  const thumbCropViewport = detailContent.querySelector("[data-thumb-crop-viewport]");
+  const thumbCropPreview = detailContent.querySelector("[data-thumb-crop-preview]");
   const statusInputs = [...document.querySelectorAll('#variety-form input[name="statusValues"]')];
   const statusDateFields = {
     sown: document.getElementById("status-date-field-sown"),
@@ -18447,6 +19054,16 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     });
   };
 
+  const syncThumbCropSource = () => {
+    const nextSource = primaryCardThumbCropSource(draftImages);
+    if (nextSource === thumbCropSource) return;
+    thumbCropSource = nextSource;
+    draftThumbCrop = serializeCardThumbCropState();
+    if (!thumbCropSource) {
+      thumbCropPanelOpen = false;
+    }
+  };
+
   const syncPreview = () => {
     const hasImages = draftImages.length > 0;
     if (previewPickerLabel) {
@@ -18456,7 +19073,8 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     previewPickerButton?.setAttribute("aria-label", hasImages ? "Pridať ďalšie fotky" : "Pridať prvú fotku");
     if (!draftImages.length) {
       activeImageIndex = 0;
-      preview.src = cardPlaceholderImage("variety");
+      preview.src = editorPreviewDisplaySource(draftImages);
+      preview.alt = entryDisplayName(existing) || "Nový záznam";
       previousImageButton.hidden = true;
       nextImageButton.hidden = true;
       galleryCount.hidden = true;
@@ -18496,10 +19114,12 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   };
 
   const renderVarietyGalleryEditor = () => {
+    syncThumbCropSource();
     syncPreview();
     if (!draftImages.length) {
       gallery.hidden = true;
       gallery.innerHTML = "";
+      thumbCropEditor.sync();
       return;
     }
 
@@ -18555,16 +19175,30 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
         item.classList.remove("is-drop-target");
       });
 
-      item.addEventListener("drop", (event) => {
-        event.preventDefault();
-        item.classList.remove("is-drop-target");
-        const dropIndex = Number(item.dataset.dropImage);
-        if (draggedImageIndex === null) return;
-        moveDraftImage(draggedImageIndex, dropIndex);
-        renderVarietyGalleryEditor();
+        item.addEventListener("drop", (event) => {
+          event.preventDefault();
+          item.classList.remove("is-drop-target");
+          const dropIndex = Number(item.dataset.dropImage);
+          if (draggedImageIndex === null) return;
+          moveDraftImage(draggedImageIndex, dropIndex);
+          renderVarietyGalleryEditor();
+        });
       });
-    });
+
+    thumbCropEditor.sync();
   };
+
+  const thumbCropEditor = bindCardThumbCropEditor(detailContent, {
+    getSource: () => thumbCropSource,
+    getCropState: () => draftThumbCrop,
+    setCropState: (nextValue) => {
+      draftThumbCrop = serializeCardThumbCropState(nextValue);
+    },
+    getOpen: () => thumbCropPanelOpen,
+    setOpen: (nextValue) => {
+      thumbCropPanelOpen = Boolean(nextValue);
+    }
+  });
 
   renderVarietyGalleryEditor();
   scheduleThumbSaveBarSync();
@@ -18660,7 +19294,10 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
       notes: String(form.get("notes") || "").trim(),
       images: draftImages.slice(),
       image: draftImages[0] || cardPlaceholderImage("variety"),
-      sowedAt
+      sowedAt,
+      ...(thumbCropViewport instanceof HTMLElement && thumbCropPreview instanceof HTMLImageElement
+        ? serializeCardThumbCropState(clampCardThumbCropStateForFrame(thumbCropViewport, thumbCropPreview, draftThumbCrop))
+        : serializeCardThumbCropState(draftThumbCrop))
     };
     const payload = {
       ...basePayload,
@@ -19469,7 +20106,9 @@ function preloadCardEditorPlaceholder(cardTypeValue = "variety") {
 function warmCardEditorTypeSwitch(cardTypeValue = "variety", preferredCategoryId = "") {
   const resolvedType = String(cardTypeValue || "").trim() || "variety";
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
-  preloadCardEditorPlaceholder(resolvedType);
+  if (!isMobileShell) {
+    preloadCardEditorPlaceholder(resolvedType);
+  }
 
   if (resolvedType === "variety") {
     const resolvedCategoryId = String(preferredCategoryId || resolveDefaultVarietyCategoryId() || FALLBACK_CATEGORY_ID).trim() || FALLBACK_CATEGORY_ID;
@@ -20703,11 +21342,24 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
   ).trim() || FALLBACK_CATEGORY_ID;
   let categoryTouched = Boolean(existing?.categoryId || forcedCategoryId);
   let draftImages = normalizeVarietyImages(existing);
+  let draftThumbCrop = serializeCardThumbCropState(existing || {});
+  let thumbCropPanelOpen = resolveCardThumbCropState(existing || {}).hasCustom;
+  let thumbCropSource = primaryCardThumbCropSource(draftImages);
   let activeImageIndex = 0;
   let draggedImageIndex = null;
   let birdEbirdTaxonomy = [];
   let birdEbirdPickerOpen = false;
   let birdEbirdPickerQuery = "";
+
+  const syncThumbCropSource = () => {
+    const nextSource = primaryCardThumbCropSource(draftImages);
+    if (nextSource === thumbCropSource) return;
+    thumbCropSource = nextSource;
+    draftThumbCrop = serializeCardThumbCropState();
+    if (!thumbCropSource) {
+      thumbCropPanelOpen = false;
+    }
+  };
 
   const renderEditor = () => {
     if (selectedType === "bird") {
@@ -20728,7 +21380,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       <div class="detail-layout detail-layout--editor">
         <div class="detail-image detail-image--editor">
           <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
-          <img id="variety-preview" src="${escapeAttribute(draftImages[0] || cardPlaceholderImage(selectedType))}" alt="${escapeAttribute(existing?.name || "Nová karta")}">
+          <img id="variety-preview" src="${escapeAttribute(editorPreviewDisplaySource(draftImages))}" alt="${escapeAttribute(existing?.name || "Nová karta")}">
           <button class="gallery-nav gallery-nav--next" id="gallery-next" type="button" aria-label="Ďalšia fotka">&#8250;</button>
           <div class="detail-image__count" id="gallery-count"></div>
           <div class="detail-image__upload-cta-shell">
@@ -20812,6 +21464,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="Krátka poznámka, čo si chceš zapamätať...">${escapeHtml(existing?.notes || "")}</textarea>
             </label>
             ${renderEditorImageUploadField({ multiple: true, visual: false })}
+            ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, { open: thumbCropPanelOpen })}
             <div class="editor-gallery" id="variety-gallery-editor"></div>
             ${existing ? `
               <div class="danger-zone">
@@ -20834,6 +21487,8 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     const formEl = document.getElementById("universal-card-form");
     const categorySelectEl = formEl?.elements.categoryId;
     const notesInput = formEl?.querySelector('textarea[name="notes"]');
+    const thumbCropViewport = detailContent.querySelector("[data-thumb-crop-viewport]");
+    const thumbCropPreview = detailContent.querySelector("[data-thumb-crop-preview]");
 
     enableMobileMediaPickerForInput(imageInput, { multiple: true });
     bindEditorImageUploadShortcuts(detailContent);
@@ -20848,7 +21503,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       previewPickerButton?.setAttribute("aria-label", hasImages ? "Pridať ďalšie fotky" : "Pridať prvú fotku");
       if (!draftImages.length) {
         activeImageIndex = 0;
-        preview.src = cardPlaceholderImage(selectedType);
+        preview.src = editorPreviewDisplaySource(draftImages);
         preview.alt = existing?.name || "Nová karta";
         previousImageButton.hidden = true;
         nextImageButton.hidden = true;
@@ -20864,6 +21519,18 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       }
       syncDetailEditorImagePresentation(preview);
     };
+
+    const thumbCropEditor = bindCardThumbCropEditor(detailContent, {
+      getSource: () => thumbCropSource,
+      getCropState: () => draftThumbCrop,
+      setCropState: (nextValue) => {
+        draftThumbCrop = serializeCardThumbCropState(nextValue);
+      },
+      getOpen: () => thumbCropPanelOpen,
+      setOpen: (nextValue) => {
+        thumbCropPanelOpen = Boolean(nextValue);
+      }
+    });
 
     const openEditorImagePicker = () => {
       if (!(imageInput instanceof HTMLInputElement)) return;
@@ -20887,10 +21554,12 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
     };
 
     const renderUniversalGalleryEditor = () => {
+      syncThumbCropSource();
       syncPreview();
       if (!draftImages.length) {
         gallery.hidden = true;
         gallery.innerHTML = "";
+        thumbCropEditor.sync();
         return;
       }
 
@@ -20955,6 +21624,8 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
           renderUniversalGalleryEditor();
         });
       });
+
+      thumbCropEditor.sync();
     };
 
     imageInput?.addEventListener("change", async () => {
@@ -21238,6 +21909,9 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
         notes: String(form.get("notes") || "").trim(),
         images: draftImages.slice(),
         image: draftImages[0] || cardPlaceholderImage(selectedType),
+        ...(thumbCropViewport instanceof HTMLElement && thumbCropPreview instanceof HTMLImageElement
+          ? serializeCardThumbCropState(clampCardThumbCropStateForFrame(thumbCropViewport, thumbCropPreview, draftThumbCrop))
+          : serializeCardThumbCropState(draftThumbCrop)),
         recordedAt: String(form.get("recordedAt") || ""),
         mushroomEdibilityValues,
         mushroomEdibility: mushroomEdibilityValues[0] || "",
@@ -23048,6 +23722,7 @@ function deferredCardImageRootMargin() {
 function shouldDeferVarietyCardImageSource(source = "") {
   const normalized = String(source || "").trim();
   if (!shouldUseMobileDeferredVarietyImages() || !normalized || isPlaceholderImage(normalized)) return false;
+  if (shouldForceImmediateFocusedCatalogImages()) return false;
   if (isRealMobileRuntimeMode()) return true;
   return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
 }
@@ -23056,16 +23731,22 @@ function renderVarietyCardImageTag(item, altText) {
   const source = primaryVarietyImage(item);
   const requiresResolution = !isDirectRenderableImageSource(source);
   const cachedPreviewSource = getCachedPreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  const thumbCrop = serializeCardThumbCropState(item);
+  const thumbCropAttributes = thumbCrop.thumbOffsetX !== ""
+    || thumbCrop.thumbOffsetY !== ""
+    || thumbCrop.thumbScale !== ""
+    ? ` data-thumb-crop="custom" data-thumb-offset-x="${escapeAttribute(String(thumbCrop.thumbOffsetX))}" data-thumb-offset-y="${escapeAttribute(String(thumbCrop.thumbOffsetY))}" data-thumb-scale="${escapeAttribute(String(thumbCrop.thumbScale))}"`
+    : "";
   if (!requiresResolution && cachedPreviewSource && cachedPreviewSource !== source) {
-    return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+    return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${thumbCropAttributes}>`;
   }
   if (!requiresResolution && !shouldDeferVarietyCardImageSource(source)) {
-    return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+    return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${thumbCropAttributes}>`;
   }
   const placeholderSource = shouldUseQuietCatalogPreviewPlaceholder()
     ? TRANSPARENT_IMAGE_PLACEHOLDER
     : cardPlaceholderImage(cardType(item));
-  return `<img src="${escapeAttribute(placeholderSource)}" data-lazy-variety-image="${escapeAttribute(item.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+  return `<img src="${escapeAttribute(placeholderSource)}" data-lazy-variety-image="${escapeAttribute(item.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${thumbCropAttributes}>`;
 }
 
 function resolveDeferredVarietyCardImageSource(varietyId = "") {
@@ -23090,6 +23771,10 @@ async function activateDeferredVarietyCardImage(img) {
     if (!img.isConnected) return;
     img.src = previewSource || renderableSource;
     img.removeAttribute("data-lazy-variety-image");
+    const frame = img.closest(".catalog-card__image");
+    if (frame instanceof HTMLElement && readCardThumbCropStateFromImage(img).hasCustom) {
+      applyCardThumbCropPresentation(frame, img);
+    }
     if (deferredVarietyCardImageObserver) {
       try {
         deferredVarietyCardImageObserver.unobserve(img);
@@ -23172,6 +23857,7 @@ function normalizeVarietyRecord(item) {
   const affectedCategoryIds = normalizeIdList(item?.affectedCategoryIds?.length ? item.affectedCategoryIds : item?.affectedCategoryId);
   const relatedCategoryIds = normalizeIdList(item?.relatedCategoryIds?.length ? item.relatedCategoryIds : item?.relatedCategoryId);
   const seasonYear = inferRecordSeasonYear(item, [item?.recordedAt, item?.harvestedAt, item?.transplantedAt, item?.sowedAt]);
+  const thumbCropState = serializeCardThumbCropState(item);
   return normalizeEntitySyncMeta({
     entryKind: "detail",
     cardType: "variety",
@@ -23197,15 +23883,18 @@ function normalizeVarietyRecord(item) {
     affectedCategoryIds: [],
     affectedVarietyId: "",
     relatedCategoryId: "",
-      relatedCategoryIds: [],
-      relatedVarietyId: "",
-      ...item,
-      statusValues,
-      status: primaryStatusValue(statusValues) || String(item?.status || "").trim(),
-      place: "",
-      places: [],
-      birdPlace: "",
-      sowedAt: String(item?.sowedAt || "").trim(),
+    relatedCategoryIds: [],
+    relatedVarietyId: "",
+    thumbOffsetX: "",
+    thumbOffsetY: "",
+    thumbScale: "",
+    ...item,
+    statusValues,
+    status: primaryStatusValue(statusValues) || String(item?.status || "").trim(),
+    place: "",
+    places: [],
+    birdPlace: "",
+    sowedAt: String(item?.sowedAt || "").trim(),
     transplantedAt: String(item?.transplantedAt || "").trim(),
     harvestedAt: String(item?.harvestedAt || "").trim(),
     mushroomEdibilityValues,
@@ -23218,6 +23907,7 @@ function normalizeVarietyRecord(item) {
     relatedCategoryId: relatedCategoryIds[0] || String(item?.relatedCategoryId || "").trim(),
     images,
     image: images[0] || cardPlaceholderImage(item?.cardType || "variety"),
+    ...thumbCropState,
     seasonYear
   }, "card");
 }
@@ -23460,11 +24150,12 @@ function categoryCardImage(category) {
 function shouldDeferCategoryCardImageSource(source = "") {
   const normalized = String(source || "").trim();
   if (!shouldUseMobileDeferredVarietyImages() || !normalized || isPlaceholderImage(normalized)) return false;
+  if (shouldForceImmediateFocusedCatalogImages()) return false;
   if (isRealMobileRuntimeMode()) return true;
   return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
 }
 
-function renderCategoryCardImageTag(category, altText) {
+function renderCategoryCardImageTag(category, altText, { preferQuietPlaceholder = false } = {}) {
   const source = categoryCardImage(category);
   const hasDirectSource = isDirectRenderableImageSource(source);
   const hasResolvableStoragePath = Boolean(extractSupabaseStoragePath(source));
@@ -23477,7 +24168,7 @@ function renderCategoryCardImageTag(category, altText) {
   if (!needsResolvedSource && cachedPreviewSource && cachedPreviewSource !== source) {
     return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
-  const placeholderSource = shouldUseQuietCatalogPreviewPlaceholder()
+  const placeholderSource = shouldUseQuietCatalogPreviewPlaceholder() || preferQuietPlaceholder
     ? TRANSPARENT_IMAGE_PLACEHOLDER
     : categoryPlaceholderImage(category);
   const optimisticSource = hasDirectSource && !shouldDeferSource
@@ -23574,7 +24265,7 @@ function deferredJournalImageRootMargin() {
   return deferredCardImageRootMargin();
 }
 
-function renderJournalImageTag(source, altText, { entryId = "", index = 0, className = "", style = "", previewVariant = "", forceDeferred = false } = {}) {
+function renderJournalImageTag(source, altText, { entryId = "", index = 0, className = "", style = "", previewVariant = "", forceDeferred = false, placeholderSrc = "" } = {}) {
   const normalizedSource = String(source || "").trim();
   if (!normalizedSource) return "";
   const classAttribute = className ? ` class="${escapeAttribute(className)}"` : "";
@@ -23587,7 +24278,8 @@ function renderJournalImageTag(source, altText, { entryId = "", index = 0, class
   if (!shouldDefer) {
     return `<img src="${escapeAttribute(normalizedSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${previewVariantAttribute}${classAttribute}${styleAttribute}>`;
   }
-  return `<img src="${escapeAttribute(placeholderImage())}" data-lazy-journal-image-entry="${escapeAttribute(entryId)}" data-lazy-journal-image-index="${escapeAttribute(String(index))}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${previewVariantAttribute}${classAttribute}${styleAttribute}>`;
+  const deferredPlaceholderSource = String(placeholderSrc || "").trim() || placeholderImage();
+  return `<img src="${escapeAttribute(deferredPlaceholderSource)}" data-lazy-journal-image-entry="${escapeAttribute(entryId)}" data-lazy-journal-image-index="${escapeAttribute(String(index))}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${previewVariantAttribute}${classAttribute}${styleAttribute}>`;
 }
 
 function resolveDeferredJournalImageSource(entryId = "", imageIndex = 0) {
