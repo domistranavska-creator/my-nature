@@ -106,24 +106,36 @@
         return 0;
       }
 
+      function syncInstantFeedbackTargetClass(target) {
+        if (!(target instanceof HTMLElement)) return;
+        const state = getInstantFeedbackState(target);
+        const shouldKeepClass = Boolean(
+          state.tapTimerId
+          || state.loadingTimerId
+          || state.processingUntil > Date.now()
+        );
+        target.classList.toggle("instant-feedback-target", shouldKeepClass);
+      }
+
       function pulseInstantFeedback(target) {
         if (!(target instanceof HTMLElement)) return;
-        target.classList.add("instant-feedback-target");
         const state = getInstantFeedbackState(target);
+        syncInstantFeedbackTargetClass(target);
         state.tapTimerId = clearInstantFeedbackTimer(state.tapTimerId);
         target.classList.add("tap-active");
         state.tapTimerId = window.setTimeout(() => {
           target.classList.remove("tap-active");
           state.tapTimerId = 0;
+          syncInstantFeedbackTargetClass(target);
         }, TAP_ACTIVE_DURATION_MS);
       }
 
       function setInstantLoading(target) {
         if (!(target instanceof HTMLElement)) return;
-        target.classList.add("instant-feedback-target");
         const state = getInstantFeedbackState(target);
         state.loadingTimerId = clearInstantFeedbackTimer(state.loadingTimerId);
         state.processingUntil = Date.now() + PROCESSING_GUARD_DURATION_MS;
+        syncInstantFeedbackTargetClass(target);
         target.classList.add("is-loading");
         state.loadingTimerId = window.setTimeout(() => {
           target.classList.remove("is-loading");
@@ -131,6 +143,7 @@
           if (state.processingUntil <= Date.now()) {
             state.processingUntil = 0;
           }
+          syncInstantFeedbackTargetClass(target);
         }, PROCESSING_GUARD_DURATION_MS);
       }
 
