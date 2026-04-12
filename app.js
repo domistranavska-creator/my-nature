@@ -6100,7 +6100,7 @@ function bindJournalSwipeRows(root = document) {
       || ""
     ).trim();
     if (!itemId) return;
-    const item = normalizedJournalList().find((entry) => entry.id === itemId);
+    const item = normalizedJournalList().find((entry) => String(entry?.id || "").trim() === itemId);
     if (!item) return;
     const rowEl = ensureSwipeRowStructure(itemEl, "journal", itemId);
     if (!(rowEl instanceof HTMLElement)) return;
@@ -9802,6 +9802,9 @@ function renderMainMenu() {
 
   syncDeferredCategoryCardImages(mainMenuEl);
   bindSwipeRows(mainMenuEl);
+  if (journalSidebarEl) {
+    bindJournalSwipeRows(journalSidebarEl);
+  }
 
   const hasMobileWeatherDebugControls = Boolean(
     mainMenuEl.querySelector("[data-mobile-weather-debug], [data-mobile-weather-cloud], [data-mobile-weather-phase], [data-mobile-weather-season], [data-mobile-weather-wind-range], [data-mobile-weather-precip-range], [data-mobile-weather-temp-range], [data-mobile-weather-scene-toggle], [data-mobile-weather-audio-panel], [data-mobile-weather-audio-inline]")
@@ -15433,7 +15436,7 @@ function renderMainMenuCategoryCard(category) {
 }
 
 function syncCatalogCardImagePresentation(root = document) {
-  root.querySelectorAll(".catalog-grid--varieties .catalog-card__image").forEach((frame) => {
+  root.querySelectorAll(".catalog-grid--varieties .catalog-card__image, .catalog-card--child .catalog-card__image, .catalog-card--main-menu-card .catalog-card__image").forEach((frame) => {
     const img = frame.querySelector("img");
     if (!img) return;
 
@@ -15442,6 +15445,7 @@ function syncCatalogCardImagePresentation(root = document) {
       const height = img.naturalHeight || img.height || 0;
       const source = img.currentSrc || img.src || "";
       const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
+      const isVarietyFrame = Boolean(frame.closest(".catalog-grid--varieties"));
       const customThumbCrop = readCardThumbCropStateFromImage(img);
       frame.classList.remove("catalog-card__image--soft-fit", "catalog-card__image--landscape", "catalog-card__image--portrait");
       clearCardThumbCropImagePresentation(img);
@@ -15454,7 +15458,7 @@ function syncCatalogCardImagePresentation(root = document) {
         return;
       }
 
-      if (isMobileShell) {
+      if (isMobileShell || !isVarietyFrame) {
         frame.style.removeProperty("--card-image");
         frame.style.removeProperty("--card-image-ratio");
         return;
@@ -15519,6 +15523,46 @@ function editorPreviewDisplaySource(images = []) {
     ? String(images.find((value) => String(value || "").trim()) || "").trim()
     : "";
   return firstImage || TRANSPARENT_IMAGE_PLACEHOLDER;
+}
+
+function syncRenderableImageElementSource(imageEl, rawSource = "", {
+  fallbackSource = TRANSPARENT_IMAGE_PLACEHOLDER,
+  requestKey = "_renderableImageRequestToken",
+  onResolved = null
+} = {}) {
+  if (!(imageEl instanceof HTMLImageElement)) return;
+  const normalizedSource = String(rawSource || "").trim();
+  const safeFallback = String(fallbackSource || "").trim() || TRANSPARENT_IMAGE_PLACEHOLDER;
+  const nextToken = (Number(imageEl[requestKey]) || 0) + 1;
+  imageEl[requestKey] = nextToken;
+
+  const commit = (nextSource = "") => {
+    if (!imageEl.isConnected || imageEl[requestKey] !== nextToken) return;
+    const safeSource = String(nextSource || "").trim() || safeFallback;
+    if ((imageEl.getAttribute("src") || "") !== safeSource) {
+      imageEl.setAttribute("src", safeSource);
+    }
+    if (typeof onResolved === "function") {
+      onResolved(safeSource);
+    }
+  };
+
+  if (!normalizedSource) {
+    commit(safeFallback);
+    return;
+  }
+
+  if (isDirectRenderableImageSource(normalizedSource)) {
+    commit(normalizedSource);
+    return;
+  }
+
+  commit(safeFallback);
+  void (async () => {
+    const renderableSource = await resolveRenderableSupabaseImageSource(normalizedSource);
+    if (!isDirectRenderableImageSource(renderableSource)) return;
+    commit(renderableSource);
+  })();
 }
 
 const CARD_THUMB_CROP_MIN_SCALE = 1;
@@ -15706,19 +15750,26 @@ function applyCardThumbCropPresentation(frame, img, cropValue = null) {
   return true;
 }
 
-function renderCardThumbCropEditorMarkup(source = "", cropValue = {}, { open = false } = {}) {
+function renderCardThumbCropEditorMarkup(source = "", cropValue = {}, {
+  open = false,
+  title = "Nastaviť výrez náhľadu",
+  description = "Upravuješ len náhľad hlavnej fotky na karte. Originál ostane bez zmeny.",
+  emptyLabel = "Najprv pridaj hlavnú fotku",
+  altText = "Preview náhľadu karty",
+  hint = "Potiahni fotku prstom. Priblíženie meníš posuvníkom."
+} = {}) {
   const hasImage = Boolean(String(source || "").trim());
   const resolved = resolveCardThumbCropState(cropValue);
   const toggleLabel = !hasImage
-    ? "Najprv pridaj hlavnú fotku"
+    ? emptyLabel
     : open ? "Skryť úpravu" : "Upraviť náhľad";
 
   return `
-    <section class="thumb-crop-editor${hasImage ? "" : " is-empty"}" data-thumb-crop-editor>
+    <section class="thumb-crop-editor${hasImage ? "" : " is-empty"}${hasImage && !open ? " is-collapsed" : ""}" data-thumb-crop-editor>
       <div class="thumb-crop-editor__head">
         <div class="thumb-crop-editor__copy">
-          <h4>Nastaviť výrez náhľadu</h4>
-          <p>Upravuješ len náhľad hlavnej fotky na karte. Originál ostane bez zmeny.</p>
+          <h4>${escapeHtml(title)}</h4>
+          <p>${escapeHtml(description)}</p>
         </div>
         <button class="button button--ghost button--small thumb-crop-editor__toggle" type="button" data-thumb-crop-toggle ${hasImage ? "" : "disabled"}>${toggleLabel}</button>
       </div>
@@ -15728,13 +15779,13 @@ function renderCardThumbCropEditorMarkup(source = "", cropValue = {}, { open = f
             class="thumb-crop-editor__image"
             data-thumb-crop-preview
             src="${escapeAttribute(hasImage ? source : TRANSPARENT_IMAGE_PLACEHOLDER)}"
-            alt="Preview náhľadu karty"
+            alt="${escapeAttribute(altText)}"
             loading="lazy"
             decoding="async"
           >
         </div>
         <div class="thumb-crop-editor__tools">
-          <p class="thumb-crop-editor__hint">Potiahni fotku prstom. Priblíženie meníš posuvníkom.</p>
+          <p class="thumb-crop-editor__hint">${escapeHtml(hint)}</p>
           <div class="thumb-crop-editor__zoom-row">
             <button class="button button--ghost button--small" type="button" data-thumb-crop-zoom-step="-1" aria-label="Oddialiť náhľad">−</button>
             <input
@@ -15821,10 +15872,10 @@ function bindCardThumbCropEditor(root, {
     panel.hidden = !available || !isOpen;
 
     const desiredSource = available ? source : TRANSPARENT_IMAGE_PLACEHOLDER;
-    if ((previewImg.getAttribute("src") || "") !== desiredSource) {
-      previewImg.setAttribute("src", desiredSource);
-    }
-
+    syncRenderableImageElementSource(previewImg, desiredSource, {
+      requestKey: "_thumbCropPreviewRequestToken",
+      onResolved: () => applyPreviewCrop(getCropState?.() || {})
+    });
     applyPreviewCrop(getCropState?.() || {});
   };
 
@@ -16508,23 +16559,116 @@ function renderTaskSidebarCard(task) {
   `;
 }
 
-function latestJournalImages() {
-  const mapEntriesToImages = (entries = []) => entries.flatMap((entry) => {
+const MEMORY_ITEMS_MAX = 12;
+
+function memoryEligibleJournalEntries(entries = []) {
+  const sourceEntries = Array.isArray(entries) ? entries : [];
+  return sourceEntries
+    .map((entry) => normalizeJournalEntry(entry, state.varieties))
+    .filter((entry) => !Boolean(entry?.deleted))
+    .filter((entry) => journalImages(entry).length > 0)
+    .filter((entry) => Boolean(parseAppDate(entry.date)));
+}
+
+function buildMemoryItemsFromEntries(entries = [], { firstImageOnly = false, relativeLabel = "" } = {}) {
+  return entries.flatMap((entry) => {
     const normalizedEntry = normalizeJournalEntry(entry, state.varieties);
     const images = journalImages(normalizedEntry);
-    return images.map((image, index) => ({
+    const scopedImages = firstImageOnly ? images.slice(0, 1) : images;
+    return scopedImages.map((image, index) => ({
       entryId: normalizedEntry.id,
       entryTitle: journalDisplayTitle(normalizedEntry) || "Záhradný zápis",
       entryDate: normalizedEntry.date,
       entryText: String(normalizedEntry.text || "").trim(),
       image,
-      index
+      index,
+      relativeLabel: relativeLabel || ""
     }));
   });
-  const activeSeasonItems = mapEntriesToImages(activeSeasonJournalEntries({ fallbackToAll: false }));
-  const sourceItems = activeSeasonItems.length ? activeSeasonItems : mapEntriesToImages(normalizedJournalList());
-  return sourceItems
-    .slice(0, 12);
+}
+
+function memorySpecialRelativeLabel(type = "", diffYears = 0) {
+  if (type === "yearly") {
+    return diffYears <= 1 ? "Pred rokom" : `Pred ${diffYears} rokmi`;
+  }
+  if (type === "monthly") return "Pred mesiacom";
+  return "";
+}
+
+function selectSupplementalMemoryItem(entries = [], excludedEntryIds = new Set()) {
+  const today = parseAppDate(todayISO());
+  if (!today) return null;
+
+  const todayDay = today.getDate();
+  const todayMonth = today.getMonth();
+  const todayYear = today.getFullYear();
+  const previousMonthYear = todayMonth === 0 ? todayYear - 1 : todayYear;
+  const previousMonth = todayMonth === 0 ? 11 : todayMonth - 1;
+
+  const availableEntries = memoryEligibleJournalEntries(entries)
+    .filter((entry) => !excludedEntryIds.has(String(entry?.id || "").trim()))
+    .map((entry) => ({
+      entry,
+      date: parseAppDate(entry.date)
+    }))
+    .filter((item) => item.date instanceof Date);
+
+  const yearlyCandidate = availableEntries
+    .filter(({ date }) => (
+      date.getDate() === todayDay
+      && date.getMonth() === todayMonth
+      && date.getFullYear() < todayYear
+    ))
+    .sort((a, b) => {
+      const diffA = todayYear - a.date.getFullYear();
+      const diffB = todayYear - b.date.getFullYear();
+      if (diffA !== diffB) return diffA - diffB;
+      return b.date.getTime() - a.date.getTime();
+    })[0];
+
+  if (yearlyCandidate) {
+    const diffYears = Math.max(1, todayYear - yearlyCandidate.date.getFullYear());
+    return buildMemoryItemsFromEntries([yearlyCandidate.entry], {
+      firstImageOnly: true,
+      relativeLabel: memorySpecialRelativeLabel("yearly", diffYears)
+    })[0] || null;
+  }
+
+  const monthlyCandidate = availableEntries
+    .filter(({ date }) => (
+      date.getDate() === todayDay
+      && date.getMonth() === previousMonth
+      && date.getFullYear() === previousMonthYear
+    ))
+    .sort((a, b) => b.date.getTime() - a.date.getTime())[0];
+
+  if (!monthlyCandidate) return null;
+
+  return buildMemoryItemsFromEntries([monthlyCandidate.entry], {
+    firstImageOnly: true,
+    relativeLabel: memorySpecialRelativeLabel("monthly")
+  })[0] || null;
+}
+
+function memoryItemRelativeLabel(item = {}) {
+  const customLabel = String(item?.relativeLabel || "").trim();
+  return customLabel || formatRelativeTime(item.entryDate);
+}
+
+function latestJournalImages() {
+  const allEligibleEntries = memoryEligibleJournalEntries(journalEntriesNewestFirst());
+  const activeSeasonEntries = memoryEligibleJournalEntries(activeSeasonJournalEntries({ fallbackToAll: false }));
+  const recentSourceEntries = activeSeasonEntries.length ? activeSeasonEntries : allEligibleEntries;
+  const recentItems = buildMemoryItemsFromEntries(recentSourceEntries);
+  const reservedRecentItems = recentItems.slice(0, Math.max(0, MEMORY_ITEMS_MAX - 1));
+  const reservedEntryIds = new Set(reservedRecentItems.map((item) => String(item?.entryId || "").trim()).filter(Boolean));
+  const supplementalItem = selectSupplementalMemoryItem(allEligibleEntries, reservedEntryIds);
+
+  if (!supplementalItem) {
+    return recentItems.slice(0, MEMORY_ITEMS_MAX);
+  }
+
+  return [...reservedRecentItems, supplementalItem].slice(0, MEMORY_ITEMS_MAX);
 }
 
 const MEMORY_PHOTO_TRANSITION_MS = 500;
@@ -16848,7 +16992,7 @@ function renderMemoryHeroMarkup(item) {
         <div class="memory-frame">
           ${renderMemoryPhotoTag(item, { active: true })}
         </div>
-        <span class="memory-strip__subtitle">${escapeHtml(formatRelativeTime(item.entryDate))}</span>
+        <span class="memory-strip__subtitle">${escapeHtml(memoryItemRelativeLabel(item))}</span>
         ${noteText ? `<span class="memory-strip__note memory-tip">${escapeHtml(noteText)}</span>` : ""}
       </div>
     </div>
@@ -16862,7 +17006,7 @@ function updateMemoryHero(memoryHero, item) {
   memoryHero.setAttribute("data-memory-key", memoryHeroItemKey(item));
   const subtitleEl = memoryHero.querySelector(".memory-strip__subtitle");
   if (subtitleEl) {
-    subtitleEl.textContent = formatRelativeTime(item.entryDate);
+    subtitleEl.textContent = memoryItemRelativeLabel(item);
   }
   const backdropEl = memoryHero.querySelector(".memory-strip__backdrop");
   if (backdropEl instanceof HTMLElement) {
@@ -18586,6 +18730,9 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
   const siblingIndex = existing ? siblingSet.findIndex((item) => item.id === existing.id) : -1;
   const canMoveUp = siblingIndex > 0;
   const canMoveDown = siblingIndex !== -1 && siblingIndex < siblingSet.length - 1;
+  let draftThumbCrop = serializeCardThumbCropState(existing || {});
+  let thumbCropSource = String(existing?.image || "").trim();
+  let thumbCropPanelOpen = false;
   const colorFieldMarkup = isMobileEditorShell
     ? `<input name="color" type="hidden" value="${escapeAttribute(existing?.color || "#7e9f4b")}">`
     : `
@@ -18662,9 +18809,16 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
               <span>Náhľad kategórie</span>
               <div class="category-manager__preview-shell">
                 <div class="category-preview" id="category-preview" style="--category-accent:${escapeAttribute(existing?.color || "#7e9f4b")}">
-                  ${existing?.image ? `<img src="${escapeAttribute(existing.image)}" alt="${escapeHtml(existing.name || "Kategória")}">` : `<span>${escapeHtml((existing?.name || "K").slice(0, 1))}</span>`}
+                  ${existing?.image ? `<img src="${escapeAttribute(TRANSPARENT_IMAGE_PLACEHOLDER)}" alt="${escapeHtml(existing.name || "Kategória")}">` : `<span>${escapeHtml((existing?.name || "K").slice(0, 1))}</span>`}
                 </div>
               </div>
+            </div>
+            <div class="field-block field-block--full category-manager__field category-manager__field--thumb-crop">
+              ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, {
+                open: thumbCropPanelOpen,
+                description: "Upravuješ len náhľad hlavnej fotky kategórie. Originál ostane bez zmeny.",
+                altText: "Preview náhľadu kategórie"
+              })}
             </div>
             <label class="field-block category-manager__field category-manager__field--notes">
               <span>Poznámky ku kategórii</span>
@@ -18688,19 +18842,49 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
   const notesInput = categoryForm.querySelector('textarea[name="notes"]');
   const preview = document.getElementById("category-preview");
   const clearImageButton = document.getElementById("clear-category-image");
+  const thumbCropViewport = detailContent.querySelector("[data-thumb-crop-viewport]");
+  const thumbCropPreview = detailContent.querySelector("[data-thumb-crop-preview]");
 
   enableMobileMediaPickerForInput(imageInput);
 
+  const syncCategoryPreviewCrop = () => {
+    const previewImage = preview.querySelector("img");
+    if (!(previewImage instanceof HTMLImageElement)) return;
+    syncCardThumbCropImageDataset(previewImage, draftThumbCrop);
+    applyCardThumbCropPresentation(preview, previewImage, draftThumbCrop);
+  };
+
   const renderCategoryPreview = (image = "", altText = "") => {
     if (image) {
-      preview.innerHTML = `<img src="${escapeAttribute(image)}" alt="${escapeHtml(altText || nameInput.value || "Kategoria")}">`;
+      preview.innerHTML = `<img src="${escapeAttribute(TRANSPARENT_IMAGE_PLACEHOLDER)}" alt="${escapeHtml(altText || nameInput.value || "Kategoria")}">`;
+      const previewImage = preview.querySelector("img");
+      syncRenderableImageElementSource(previewImage, image, {
+        requestKey: "_categoryPreviewRequestToken",
+        onResolved: () => syncCategoryPreviewCrop()
+      });
       if (clearImageButton) clearImageButton.hidden = false;
+      syncCategoryPreviewCrop();
       return;
     }
 
     preview.innerHTML = `<span>${escapeHtml((nameInput.value || "K").slice(0, 1))}</span>`;
     if (clearImageButton) clearImageButton.hidden = true;
   };
+
+  const thumbCropEditor = bindCardThumbCropEditor(detailContent, {
+    getSource: () => thumbCropSource,
+    getCropState: () => draftThumbCrop,
+    setCropState: (nextValue) => {
+      draftThumbCrop = serializeCardThumbCropState(nextValue);
+      syncCategoryPreviewCrop();
+    },
+    getOpen: () => thumbCropPanelOpen,
+    setOpen: (nextValue) => {
+      thumbCropPanelOpen = Boolean(nextValue);
+    }
+  });
+  renderCategoryPreview(thumbCropSource, existing?.name || "Kategória");
+  thumbCropEditor.sync();
 
   categoryForm.addEventListener("keydown", (event) => {
     const tagName = event.target?.tagName;
@@ -18736,7 +18920,11 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
     const dataUrl = await fileToOptimizedDataUrl(file, CATEGORY_IMAGE_MAX_DIMENSION, CATEGORY_IMAGE_QUALITY);
     preview.dataset.uploaded = dataUrl;
     delete preview.dataset.removed;
+    thumbCropSource = dataUrl;
+    draftThumbCrop = serializeCardThumbCropState();
+    thumbCropPanelOpen = true;
     renderCategoryPreview(dataUrl, nameInput.value || "Kategoria");
+    thumbCropEditor.sync();
     focusFieldSoon(String(nameInput.value || "").trim() ? notesInput : nameInput);
   });
 
@@ -18745,7 +18933,11 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
       preview.dataset.uploaded = "";
       preview.dataset.removed = "true";
       imageInput.value = "";
+      thumbCropSource = "";
+      draftThumbCrop = serializeCardThumbCropState();
+      thumbCropPanelOpen = false;
       renderCategoryPreview("");
+      thumbCropEditor.sync();
     });
   }
 
@@ -18758,6 +18950,9 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
     const form = new FormData(categoryForm);
     const color = String(form.get("color") || "#7e9f4b");
     const image = preview.dataset.removed === "true" ? "" : (preview.dataset.uploaded || existing?.image || "");
+    const serializedThumbCrop = image && thumbCropViewport instanceof HTMLElement && thumbCropPreview instanceof HTMLImageElement
+      ? serializeCardThumbCropState(clampCardThumbCropStateForFrame(thumbCropViewport, thumbCropPreview, draftThumbCrop))
+      : serializeCardThumbCropState();
     const categoryIdForValidation = existing?.id || makeId("cat");
     let parentCategoryId = String(form.get("parentCategoryId") || "");
     let nodeType = String(form.get("nodeType") || NODE_TYPES.KIND);
@@ -18791,6 +18986,9 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
       existing.notes = String(form.get("notes") || "").trim();
       existing.color = color;
       existing.image = image;
+      existing.thumbOffsetX = serializedThumbCrop.thumbOffsetX;
+      existing.thumbOffsetY = serializedThumbCrop.thumbOffsetY;
+      existing.thumbScale = serializedThumbCrop.thumbScale;
     } else {
       const created = {
         id: categoryIdForValidation,
@@ -18803,7 +19001,10 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
         notes: String(form.get("notes") || "").trim(),
         order: state.categories.length,
         color,
-        image
+        image,
+        thumbOffsetX: serializedThumbCrop.thumbOffsetX,
+        thumbOffsetY: serializedThumbCrop.thumbOffsetY,
+        thumbScale: serializedThumbCrop.thumbScale
       };
       state.categories.push(created);
       activeCategoryId = created.id;
@@ -18881,8 +19082,8 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   const selectedStatuses = varietyStatusValues(existing);
   let draftImages = normalizeVarietyImages(existing);
   let draftThumbCrop = serializeCardThumbCropState(existing || {});
-  let thumbCropPanelOpen = resolveCardThumbCropState(existing || {}).hasCustom;
   let thumbCropSource = primaryCardThumbCropSource(draftImages);
+  let thumbCropPanelOpen = false;
   let activeImageIndex = 0;
   let draggedImageIndex = null;
 
@@ -18891,7 +19092,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     <div class="detail-layout detail-layout--editor">
       <div class="detail-image detail-image--editor">
         <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
-        <img id="variety-preview" src="${escapeAttribute(editorPreviewDisplaySource(draftImages))}" alt="${escapeAttribute(entryDisplayName(existing) || "Nový záznam")}">
+        <img id="variety-preview" src="${escapeAttribute(TRANSPARENT_IMAGE_PLACEHOLDER)}" alt="${escapeAttribute(entryDisplayName(existing) || "Nový záznam")}">
         <button class="gallery-nav gallery-nav--next" id="gallery-next" type="button" aria-label="Ďalšia fotka">&#8250;</button>
         <div class="detail-image__count" id="gallery-count"></div>
         <div class="detail-image__upload-cta-shell">
@@ -18915,6 +19116,11 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
             ${cardTypeOptionsMarkup("variety")}
           </div>
         ` : ""}
+        ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, {
+          open: thumbCropPanelOpen,
+          description: "Upravuješ len náhľad hlavnej fotky na karte. Takto sa potom zobrazí v prehľade.",
+          altText: "Preview náhľadu karty"
+        })}
         <form class="detail-form detail-form--editor" id="variety-form">
           ${showInlineCreateAction ? `
             <div class="detail-form__lead-action">
@@ -19000,7 +19206,6 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
             <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="${currentEntryKind === "detail" ? "Poznámky: chuť, rodivosť, čo jej sadlo, či ju chceš znova..." : currentEntryKind === "quick" ? "Krátky popis, kde rastie alebo čo si chceš zapamätať..." : "Voliteľný popis galérie..."}">${escapeHtml(existing?.notes || "")}</textarea>
           </label>
           ${renderEditorImageUploadField({ multiple: true, visual: false })}
-          ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, { open: thumbCropPanelOpen })}
           <div class="editor-gallery" id="variety-gallery-editor"></div>
           ${existing ? `
             <div class="danger-zone">
@@ -19056,12 +19261,11 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
 
   const syncThumbCropSource = () => {
     const nextSource = primaryCardThumbCropSource(draftImages);
-    if (nextSource === thumbCropSource) return;
+    const previousSource = thumbCropSource;
+    if (nextSource === previousSource) return;
     thumbCropSource = nextSource;
     draftThumbCrop = serializeCardThumbCropState();
-    if (!thumbCropSource) {
-      thumbCropPanelOpen = false;
-    }
+    thumbCropPanelOpen = !previousSource && Boolean(nextSource);
   };
 
   const syncPreview = () => {
@@ -19073,23 +19277,27 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
     previewPickerButton?.setAttribute("aria-label", hasImages ? "Pridať ďalšie fotky" : "Pridať prvú fotku");
     if (!draftImages.length) {
       activeImageIndex = 0;
-      preview.src = editorPreviewDisplaySource(draftImages);
+      syncRenderableImageElementSource(preview, editorPreviewDisplaySource(draftImages), {
+        requestKey: "_detailEditorPreviewRequestToken",
+        onResolved: () => syncDetailEditorImagePresentation(preview)
+      });
       preview.alt = entryDisplayName(existing) || "Nový záznam";
       previousImageButton.hidden = true;
       nextImageButton.hidden = true;
       galleryCount.hidden = true;
-      syncDetailEditorImagePresentation(preview);
       return;
     }
 
     activeImageIndex = Math.max(0, Math.min(activeImageIndex, draftImages.length - 1));
-    preview.src = draftImages[activeImageIndex];
+    syncRenderableImageElementSource(preview, draftImages[activeImageIndex], {
+      requestKey: "_detailEditorPreviewRequestToken",
+      onResolved: () => syncDetailEditorImagePresentation(preview)
+    });
     preview.alt = `Fotka ${activeImageIndex + 1} záznamu ${entryDisplayName(existing) || "Nový záznam"}`;
     previousImageButton.hidden = draftImages.length < 2;
     nextImageButton.hidden = draftImages.length < 2;
     galleryCount.hidden = false;
     galleryCount.textContent = `${activeImageIndex + 1}/${draftImages.length}`;
-    syncDetailEditorImagePresentation(preview);
   };
 
   const openEditorImagePicker = () => {
@@ -21343,8 +21551,8 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
   let categoryTouched = Boolean(existing?.categoryId || forcedCategoryId);
   let draftImages = normalizeVarietyImages(existing);
   let draftThumbCrop = serializeCardThumbCropState(existing || {});
-  let thumbCropPanelOpen = resolveCardThumbCropState(existing || {}).hasCustom;
   let thumbCropSource = primaryCardThumbCropSource(draftImages);
+  let thumbCropPanelOpen = false;
   let activeImageIndex = 0;
   let draggedImageIndex = null;
   let birdEbirdTaxonomy = [];
@@ -21353,12 +21561,11 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
 
   const syncThumbCropSource = () => {
     const nextSource = primaryCardThumbCropSource(draftImages);
-    if (nextSource === thumbCropSource) return;
+    const previousSource = thumbCropSource;
+    if (nextSource === previousSource) return;
     thumbCropSource = nextSource;
     draftThumbCrop = serializeCardThumbCropState();
-    if (!thumbCropSource) {
-      thumbCropPanelOpen = false;
-    }
+    thumbCropPanelOpen = !previousSource && Boolean(nextSource);
   };
 
   const renderEditor = () => {
@@ -21380,7 +21587,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       <div class="detail-layout detail-layout--editor">
         <div class="detail-image detail-image--editor">
           <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
-          <img id="variety-preview" src="${escapeAttribute(editorPreviewDisplaySource(draftImages))}" alt="${escapeAttribute(existing?.name || "Nová karta")}">
+        <img id="variety-preview" src="${escapeAttribute(TRANSPARENT_IMAGE_PLACEHOLDER)}" alt="${escapeAttribute(existing?.name || "Nová karta")}">
           <button class="gallery-nav gallery-nav--next" id="gallery-next" type="button" aria-label="Ďalšia fotka">&#8250;</button>
           <div class="detail-image__count" id="gallery-count"></div>
           <div class="detail-image__upload-cta-shell">
@@ -21404,6 +21611,11 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               ${cardTypeOptionsMarkup(selectedType)}
             </div>
           ` : ""}
+          ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, {
+            open: thumbCropPanelOpen,
+            description: "Upravuješ len náhľad hlavnej fotky na karte. Takto sa potom zobrazí v prehľade.",
+            altText: "Preview náhľadu karty"
+          })}
           <form class="detail-form detail-form--editor" id="universal-card-form">
             ${showInlineCreateAction ? `
               <div class="detail-form__lead-action">
@@ -21464,7 +21676,6 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               <textarea class="detail-editor__notes" name="notes" rows="3" placeholder="Krátka poznámka, čo si chceš zapamätať...">${escapeHtml(existing?.notes || "")}</textarea>
             </label>
             ${renderEditorImageUploadField({ multiple: true, visual: false })}
-            ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, { open: thumbCropPanelOpen })}
             <div class="editor-gallery" id="variety-gallery-editor"></div>
             ${existing ? `
               <div class="danger-zone">
@@ -21503,21 +21714,26 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       previewPickerButton?.setAttribute("aria-label", hasImages ? "Pridať ďalšie fotky" : "Pridať prvú fotku");
       if (!draftImages.length) {
         activeImageIndex = 0;
-        preview.src = editorPreviewDisplaySource(draftImages);
+        syncRenderableImageElementSource(preview, editorPreviewDisplaySource(draftImages), {
+          requestKey: "_detailEditorPreviewRequestToken",
+          onResolved: () => syncDetailEditorImagePresentation(preview)
+        });
         preview.alt = existing?.name || "Nová karta";
         previousImageButton.hidden = true;
         nextImageButton.hidden = true;
         galleryCount.hidden = true;
       } else {
         activeImageIndex = Math.max(0, Math.min(activeImageIndex, draftImages.length - 1));
-        preview.src = draftImages[activeImageIndex];
+        syncRenderableImageElementSource(preview, draftImages[activeImageIndex], {
+          requestKey: "_detailEditorPreviewRequestToken",
+          onResolved: () => syncDetailEditorImagePresentation(preview)
+        });
         preview.alt = `Fotka ${activeImageIndex + 1} záznamu ${entryDisplayName(existing) || "Nová karta"}`;
         previousImageButton.hidden = draftImages.length < 2;
         nextImageButton.hidden = draftImages.length < 2;
         galleryCount.hidden = false;
         galleryCount.textContent = `${activeImageIndex + 1}/${draftImages.length}`;
       }
-      syncDetailEditorImagePresentation(preview);
     };
 
     const thumbCropEditor = bindCardThumbCropEditor(detailContent, {
@@ -24157,16 +24373,22 @@ function shouldDeferCategoryCardImageSource(source = "") {
 
 function renderCategoryCardImageTag(category, altText, { preferQuietPlaceholder = false } = {}) {
   const source = categoryCardImage(category);
+  const thumbCrop = serializeCardThumbCropState(category);
+  const thumbCropAttributes = thumbCrop.thumbOffsetX !== ""
+    || thumbCrop.thumbOffsetY !== ""
+    || thumbCrop.thumbScale !== ""
+    ? ` data-thumb-crop="custom" data-thumb-offset-x="${escapeAttribute(String(thumbCrop.thumbOffsetX))}" data-thumb-offset-y="${escapeAttribute(String(thumbCrop.thumbOffsetY))}" data-thumb-scale="${escapeAttribute(String(thumbCrop.thumbScale))}"`
+    : "";
   const hasDirectSource = isDirectRenderableImageSource(source);
   const hasResolvableStoragePath = Boolean(extractSupabaseStoragePath(source));
   const shouldDeferSource = shouldDeferCategoryCardImageSource(source);
   const needsResolvedSource = !hasDirectSource;
   if (!needsResolvedSource && !hasResolvableStoragePath && !shouldDeferSource) {
-    return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+    return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${thumbCropAttributes}>`;
   }
   const cachedPreviewSource = getCachedPreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
   if (!needsResolvedSource && cachedPreviewSource && cachedPreviewSource !== source) {
-    return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+    return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${thumbCropAttributes}>`;
   }
   const placeholderSource = shouldUseQuietCatalogPreviewPlaceholder() || preferQuietPlaceholder
     ? TRANSPARENT_IMAGE_PLACEHOLDER
@@ -24174,7 +24396,7 @@ function renderCategoryCardImageTag(category, altText, { preferQuietPlaceholder 
   const optimisticSource = hasDirectSource && !shouldDeferSource
     ? source
     : placeholderSource;
-  return `<img src="${escapeAttribute(optimisticSource)}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+  return `<img src="${escapeAttribute(optimisticSource)}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low"${thumbCropAttributes}>`;
 }
 
 function resolveDeferredCategoryCardImageSource(categoryId = "") {
@@ -24207,6 +24429,10 @@ async function activateDeferredCategoryCardImage(img) {
     if (!img.isConnected) return;
     img.src = previewSource || renderableSource;
     img.removeAttribute("data-lazy-category-image");
+    const frame = img.closest(".catalog-card__image");
+    if (frame instanceof HTMLElement && readCardThumbCropStateFromImage(img).hasCustom) {
+      applyCardThumbCropPresentation(frame, img);
+    }
     if (deferredCategoryCardImageObserver) {
       try {
         deferredCategoryCardImageObserver.unobserve(img);

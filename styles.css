@@ -41926,6 +41926,22 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
   opacity: 0.86;
 }
 
+.thumb-crop-editor.is-collapsed {
+  gap: 8px;
+}
+
+.thumb-crop-editor.is-collapsed .thumb-crop-editor__head {
+  align-items: center;
+}
+
+.thumb-crop-editor.is-collapsed .thumb-crop-editor__copy {
+  gap: 2px;
+}
+
+.thumb-crop-editor.is-collapsed .thumb-crop-editor__copy p {
+  display: none;
+}
+
 body.app-mobile-shell .thumb-crop-editor {
   padding: 12px 13px;
   border-radius: 18px;
@@ -41952,6 +41968,17 @@ body.app-mobile-shell .thumb-crop-editor__zoom-row {
 body.app-mobile-shell .thumb-crop-editor__zoom-value {
   grid-column: 1 / -1;
   text-align: left;
+}
+
+body.app-mobile-shell .thumb-crop-editor.is-collapsed {
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+body.app-mobile-shell .thumb-crop-editor.is-collapsed .thumb-crop-editor__head {
+  align-items: center;
+  flex-direction: row;
+  justify-content: space-between;
 }
 
 /* Final mobile swipe + catalog hardening v2:
@@ -46979,6 +47006,9 @@ body.app-mobile-shell .workspace-layout--menu .memory-strip__hero {
   background: transparent !important;
   box-shadow: none !important;
   isolation: isolate !important;
+  contain: paint !important;
+  -webkit-clip-path: inset(0 round 24px) !important;
+  clip-path: inset(0 round 24px) !important;
 }
 
 body.app-mobile-shell .memory-strip__backdrop,
@@ -46994,6 +47024,9 @@ body.app-mobile-shell .workspace-layout--menu .memory-frame {
   overflow: hidden !important;
   border-radius: inherit !important;
   background: transparent !important;
+  contain: paint !important;
+  -webkit-clip-path: inset(0 round 24px) !important;
+  clip-path: inset(0 round 24px) !important;
 }
 
 body.app-mobile-shell .memory-strip__hero img,
@@ -47020,8 +47053,11 @@ body.app-mobile-shell .workspace-layout--menu .memory-photo {
   overflow: hidden !important;
   border-radius: inherit !important;
   background: transparent !important;
-  transform: translate3d(0, 0, 0) scale(1) !important;
+  transform: translate3d(0, 0, 0) scale(1.01) !important;
   transition: opacity 280ms ease !important;
+  backface-visibility: hidden !important;
+  transform-origin: center center !important;
+  contain: paint !important;
 }
 
 body.app-mobile-shell .memory-frame[data-memory-direction="prev"] .memory-photo,
@@ -47032,7 +47068,7 @@ body.app-mobile-shell .memory-photo.exit,
 body.app-mobile-shell .workspace-layout--menu .memory-photo.exit,
 body.app-mobile-shell .memory-frame[data-memory-direction="prev"] .memory-photo.exit,
 body.app-mobile-shell .workspace-layout--menu .memory-frame[data-memory-direction="prev"] .memory-photo.exit {
-  transform: translate3d(0, 0, 0) scale(1) !important;
+  transform: translate3d(0, 0, 0) scale(1.01) !important;
 }
 
 body.app-mobile-shell .memory-strip__hero[role="button"],
@@ -47046,6 +47082,10 @@ body.app-mobile-shell .workspace-layout--menu .memory-strip__note {
   text-align: left !important;
   font-size: 1rem !important;
   line-height: 1.26 !important;
+  overflow: hidden !important;
+  border-bottom-left-radius: 24px !important;
+  border-bottom-right-radius: 24px !important;
+  background-clip: padding-box !important;
 }
 
 .journal-overlay-card[data-journal-entry-id] {
@@ -47888,13 +47928,14 @@ body.app-mobile-shell .card-view-panel--note {
 }
 
 /* Final EOF mobile duplicate submit cleanup:
-   na mobile nech ostane len spodne sticky ulozit/pridat, nie horne duplikaty. */
-body.app-mobile-shell .mobile-compact-modal-topbar__submit,
+   na mobile nech ostane len spodne sticky ulozit/pridat, nie horne duplikaty.
+   V card view vsak hore nechaj akciu Upravit. */
+body.app-mobile-shell .mobile-compact-modal-topbar__submit:not(#card-view-edit),
 body.app-mobile-shell .photo-quick-sheet__save {
   display: none !important;
 }
 
-body.app-mobile-shell .mobile-compact-modal-topbar__actions:has(> .mobile-compact-modal-topbar__submit),
+body.app-mobile-shell .mobile-compact-modal-topbar__actions:has(> .mobile-compact-modal-topbar__submit:not(#card-view-edit)),
 body.app-mobile-shell .photo-quick-sheet__topbar-actions {
   display: none !important;
 }
@@ -48077,4 +48118,215 @@ body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combin
 
 body.app-mobile-shell .journal-overlay-shell .upload-field--journal-media-combined.upload-field--hero .upload-field__mobile-actions {
   gap: 8px !important;
+}
+
+/* Final true EOF settings corner cleanup:
+   collapsible panely v nastaveniach maju byt jeden korektne orezany wrapper bez ostrych vnutornych rohov. */
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible {
+  overflow: hidden !important;
+  border-radius: 18px !important;
+  background: var(--mobile-modal-surface-soft, #f7f9fc) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible {
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible .settings-panel__head {
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: inherit !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible:not(.is-collapsed) .settings-panel__head {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel--collapsible .settings-form {
+  margin: 0 !important;
+  padding: 10px 14px 14px !important;
+  background: transparent !important;
+  border-top: 1px solid rgba(209, 220, 233, 0.72) !important;
+  border-bottom-left-radius: 18px !important;
+  border-bottom-right-radius: 18px !important;
+}
+
+/* Final true EOF mobile panel corner audit:
+   spolocne rounded surface komponenty v modaloch a overlayoch maju vzdy korektny clip bez ostrych vnutornych rohov. */
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline,
+body.app-mobile-shell .detail-modal--settings .settings-panel,
+body.app-mobile-shell .detail-modal--settings .settings-panel__storage-meta,
+body.app-mobile-shell .detail-modal--settings .settings-panel__status,
+body.app-mobile-shell .detail-modal--settings .settings-panel__account-grid > *,
+body.app-mobile-shell .detail-modal--worklog .worklog-section,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager__selection-card,
+body.app-mobile-shell .detail-modal--overview .overview-group,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group,
+body.app-mobile-shell .detail-modal--weather .weather-alert,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel--note,
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__weather-card,
+body.app-mobile-shell .journal-overlay-frame__head,
+body.app-mobile-shell .journal-overlay-group,
+body.app-mobile-shell .journal-overlay-card {
+  overflow: hidden !important;
+  background-clip: padding-box !important;
+  border-radius: 22px !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline > :first-child,
+body.app-mobile-shell .detail-modal--settings .settings-panel > :first-child,
+body.app-mobile-shell .detail-modal--worklog .worklog-section > :first-child,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager__selection-card > :first-child,
+body.app-mobile-shell .detail-modal--overview .overview-group > :first-child,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group > :first-child,
+body.app-mobile-shell .detail-modal--weather .weather-alert > :first-child,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel > :first-child,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel--note > :first-child,
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__weather-card > :first-child,
+body.app-mobile-shell .journal-overlay-frame__head > :first-child,
+body.app-mobile-shell .journal-overlay-group > :first-child,
+body.app-mobile-shell .journal-overlay-card > :first-child {
+  border-top-left-radius: inherit !important;
+  border-top-right-radius: inherit !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .detail-copy__headline > :last-child,
+body.app-mobile-shell .detail-modal--settings .settings-panel > :last-child,
+body.app-mobile-shell .detail-modal--worklog .worklog-section > :last-child,
+body.app-mobile-shell .detail-modal--batch .batch-sowing-manager__selection-card > :last-child,
+body.app-mobile-shell .detail-modal--overview .overview-group > :last-child,
+body.app-mobile-shell .detail-modal--weather .weather-overview .overview-group > :last-child,
+body.app-mobile-shell .detail-modal--weather .weather-alert > :last-child,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel > :last-child,
+body.app-mobile-shell .detail-modal--card-view .card-view-panel--note > :last-child,
+body.app-mobile-shell .detail-modal--photo-quick .photo-quick-sheet__weather-card > :last-child,
+body.app-mobile-shell .journal-overlay-frame__head > :last-child,
+body.app-mobile-shell .journal-overlay-group > :last-child,
+body.app-mobile-shell .journal-overlay-card > :last-child {
+  border-bottom-left-radius: inherit !important;
+  border-bottom-right-radius: inherit !important;
+}
+
+body.app-mobile-shell .detail-modal--settings .settings-panel__head,
+body.app-mobile-shell .detail-modal--worklog .worklog-section__head,
+body.app-mobile-shell .detail-modal--overview .overview-group__head,
+body.app-mobile-shell .detail-modal--weather .overview-group__head,
+body.app-mobile-shell .journal-overlay-group__head,
+body.app-mobile-shell .journal-overlay-card__header {
+  background-image: none !important;
+  box-shadow: none !important;
+  border-top-left-radius: inherit !important;
+  border-top-right-radius: inherit !important;
+}
+
+/* Final EOF crop + preview cleanup:
+   crop ma byt viditelny a preview karty maju mat jednoduchy cisty surface bez dalsich mliecnych vrstiev. */
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:hover,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:focus-within,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview:hover,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview:focus-within {
+  background: #ffffff !important;
+  background-image: none !important;
+  border: 1px solid rgba(214, 224, 232, 0.88) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__main-hit--preview {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__meta--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__quick--preview .tag,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__quick--preview .tag {
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor {
+  gap: 10px !important;
+  padding: 12px 13px !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(211, 221, 229, 0.88) !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor__head {
+  gap: 8px !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor.is-collapsed {
+  gap: 6px !important;
+  padding: 10px 12px !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor.is-collapsed .thumb-crop-editor__head {
+  align-items: center !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor.is-collapsed .thumb-crop-editor__copy {
+  gap: 2px !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor__copy h4 {
+  font-size: 0.96rem !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor.is-collapsed .thumb-crop-editor__copy p {
+  display: none !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor__copy p,
+body.app-mobile-shell .thumb-crop-editor__hint {
+  color: #5f6e58 !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor__viewport {
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(213, 224, 233, 0.9) !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor__toggle,
+body.app-mobile-shell .thumb-crop-editor [data-thumb-crop-reset],
+body.app-mobile-shell .thumb-crop-editor [data-thumb-crop-zoom-step] {
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell .detail-modal--editor .category-manager__preview-shell {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+body.app-mobile-shell .tag,
+body.app-mobile-shell .preview-card-badge,
+body.app-mobile-shell .editor-gallery__main-badge,
+body.app-mobile-shell .card-view-title-badge {
+  line-height: 1.2 !important;
+  overflow: visible !important;
 }
