@@ -1736,6 +1736,7 @@ select {
   min-height: 68px;
   gap: 0;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .progress-card__tip {
@@ -46290,6 +46291,37 @@ body.app-mobile-shell .workspace-layout--menu .memory-strip__hero img {
   object-position: center !important;
 }
 
+body.app-mobile-shell .memory-photo,
+body.app-mobile-shell .workspace-layout--menu .memory-photo {
+  left: -3% !important;
+  top: -3% !important;
+  width: 106% !important;
+  height: 106% !important;
+  max-width: none !important;
+  max-height: none !important;
+  transform: translate3d(2.5%, 0, 0) scale(1.01) !important;
+}
+
+body.app-mobile-shell .memory-frame[data-memory-direction="prev"] .memory-photo,
+body.app-mobile-shell .workspace-layout--menu .memory-frame[data-memory-direction="prev"] .memory-photo {
+  transform: translate3d(-2.5%, 0, 0) scale(1.01) !important;
+}
+
+body.app-mobile-shell .memory-photo.active,
+body.app-mobile-shell .workspace-layout--menu .memory-photo.active {
+  transform: translate3d(0, 0, 0) scale(1) !important;
+}
+
+body.app-mobile-shell .memory-photo.exit,
+body.app-mobile-shell .workspace-layout--menu .memory-photo.exit {
+  transform: translate3d(-2.5%, 0, 0) scale(1.01) !important;
+}
+
+body.app-mobile-shell .memory-frame[data-memory-direction="prev"] .memory-photo.exit,
+body.app-mobile-shell .workspace-layout--menu .memory-frame[data-memory-direction="prev"] .memory-photo.exit {
+  transform: translate3d(2.5%, 0, 0) scale(1.01) !important;
+}
+
 body.app-mobile-shell .memory-strip__hero[role="button"],
 body.app-mobile-shell .workspace-layout--menu .memory-strip__hero[role="button"] {
   cursor: pointer !important;
@@ -46815,6 +46847,11 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .mobile-floatin
 body.app-mobile-shell .catalog-grid--main-menu {
   gap: 8px !important;
   margin-top: 56px !important;
+}
+
+body.app-mobile-shell.app-focused-mode #catalog[data-mobile-nav-pending="true"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 body.app-mobile-shell .catalog-grid--main-menu > .catalog-card--main-menu-card {

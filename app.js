@@ -1910,6 +1910,8 @@ let memoryCarouselIndex = 0;
 let memoryCarouselTransitionDirection = "next";
 let insightTipIndex = 0;
 let overviewHighlightsStep = 0;
+let memoryHighlightsPausedUntil = 0;
+let insightHighlightsPausedUntil = 0;
 let homeWeatherSnapshot = null;
 let homeWeatherTrend = null;
 let homeWeatherOverview = null;
@@ -1927,10 +1929,13 @@ let lastRenderSnapshot = {
   tasks: null,
   categories: null
 };
+let mobileFocusedCategoryTransitionPending = false;
+let mobileFocusedCategoryTransitionToken = 0;
 let scheduledRenderFrameId = 0;
 let scheduledRenderBypassDepth = 0;
 let scheduledRenderFlushing = false;
 const scheduledRenderQueue = new Map();
+const TRANSPARENT_IMAGE_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 let autoCloudPushTimer = null;
 let autoCloudPullTimer = null;
 let autoCloudSyncInFlight = false;
@@ -2067,6 +2072,57 @@ function renderCatalogSafe() {
   if (lastRenderSnapshot.categories === current) return;
   lastRenderSnapshot.categories = current;
   renderCatalog();
+}
+
+function isMobileFocusedCategoryTransitionContext() {
+  return typeof document !== "undefined"
+    && Boolean(document.body?.classList.contains("app-mobile-shell"))
+    && Boolean(isFocusedView);
+}
+
+function syncMobileFocusedCategoryTransitionState() {
+  if (!catalogEl) return;
+  if (mobileFocusedCategoryTransitionPending && isMobileFocusedCategoryTransitionContext()) {
+    catalogEl.setAttribute("data-mobile-nav-pending", "true");
+    return;
+  }
+  catalogEl.removeAttribute("data-mobile-nav-pending");
+}
+
+function startMobileFocusedCategoryTransition() {
+  if (!catalogEl || !isMobileFocusedCategoryTransitionContext()) {
+    mobileFocusedCategoryTransitionPending = false;
+    syncMobileFocusedCategoryTransitionState();
+    return 0;
+  }
+  mobileFocusedCategoryTransitionPending = true;
+  mobileFocusedCategoryTransitionToken += 1;
+  syncMobileFocusedCategoryTransitionState();
+  return mobileFocusedCategoryTransitionToken;
+}
+
+function finishMobileFocusedCategoryTransition(token = 0) {
+  if (!mobileFocusedCategoryTransitionPending) {
+    syncMobileFocusedCategoryTransitionState();
+    return;
+  }
+  const expectedToken = Number(token) || mobileFocusedCategoryTransitionToken;
+  const reveal = () => {
+    if (expectedToken !== mobileFocusedCategoryTransitionToken) return;
+    mobileFocusedCategoryTransitionPending = false;
+    syncMobileFocusedCategoryTransitionState();
+  };
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(reveal);
+    });
+    return;
+  }
+  window.setTimeout(reveal, 34);
+}
+
+function shouldUseQuietCatalogPreviewPlaceholder() {
+  return mobileFocusedCategoryTransitionPending && isMobileFocusedCategoryTransitionContext();
 }
 
 function requestScheduledRenderFrame(callback) {
@@ -4151,7 +4207,8 @@ function resolveThumbSaveSubmitButton(root, form) {
     ? [...root.querySelectorAll(`button[type="submit"][form="${formId}"], input[type="submit"][form="${formId}"]`)]
     : [];
   const internalCandidates = [...form.querySelectorAll('button[type="submit"], input[type="submit"]')];
-  return [...externalCandidates, ...internalCandidates].find((candidate) => isVisibleThumbSaveTarget(candidate)) || null;
+  const candidates = [...externalCandidates, ...internalCandidates];
+  return candidates.find((candidate) => isVisibleThumbSaveTarget(candidate)) || candidates[0] || null;
 }
 
 function resolveThumbSaveContext() {
@@ -4191,6 +4248,13 @@ function resolveThumbSaveContext() {
   return null;
 }
 
+function resolveThumbSaveBarHost(formElement) {
+  if (!(formElement instanceof HTMLFormElement)) return document.body || null;
+  const detailHost = formElement.closest("#detail-modal");
+  if (detailHost instanceof HTMLElement) return detailHost;
+  return document.body instanceof HTMLElement ? document.body : null;
+}
+
 function ensureThumbSaveBar(formElement) {
   if (typeof document === "undefined" || typeof window === "undefined") return null;
   if (!(formElement instanceof HTMLFormElement)) return null;
@@ -4203,12 +4267,15 @@ function ensureThumbSaveBar(formElement) {
     return null;
   }
 
-  let bar = document.body?.querySelector(":scope > .thumb-save-bar");
+  const barHost = resolveThumbSaveBarHost(formElement);
+  if (!(barHost instanceof HTMLElement)) return null;
+
+  let bar = barHost.querySelector(":scope > .thumb-save-bar");
   if (!(bar instanceof HTMLElement)) {
     bar = document.createElement("div");
     bar.className = "thumb-save-bar";
     bar.innerHTML = `<button class="thumb-save-btn" type="button">Uložiť</button>`;
-    document.body?.appendChild(bar);
+    barHost.appendChild(bar);
   }
   document.querySelectorAll(".has-thumb-save-bar").forEach((element) => {
     if (element !== formElement) {
@@ -6910,8 +6977,8 @@ function openJournalComposer(editingEntryId = "", preferredEntryType = "", optio
   const journalComposerActions = isMobileJournalShell
     ? `
         <div class="journal-overlay-mobile-actions">
-          <div class="journal-overlay-mobile-actions__primary">
-            <button class="button" id="journal-overlay-submit" type="submit" form="journal-overlay-form">${editingEntry ? "Uložiť zmeny" : "Uložiť zápis"}</button>
+          <div class="journal-overlay-mobile-actions__primary" hidden>
+            <button class="button" id="journal-overlay-submit" type="submit" form="journal-overlay-form" hidden aria-hidden="true" tabindex="-1">${editingEntry ? "Uložiť zmeny" : "Uložiť zápis"}</button>
           </div>
           <div class="journal-overlay-mobile-actions__modes">
             ${journalModeSwitchMarkup}
@@ -8342,7 +8409,7 @@ function renderFocusedCategoryNavigation() {
   ensureActiveCategory();
   closeUtilityDrawers();
   updateMenuVisibility();
-  scheduleCatalogRenderSafe();
+  renderCatalogSafe();
   reconcileBodyScrollState();
   syncMainMenuTouchScrollState();
   scheduleEmbeddedMobilePreviewMetricsPush();
@@ -8351,9 +8418,17 @@ function renderFocusedCategoryNavigation() {
 function openFocusedCategoryNavigation(categoryId = "", { scrollToTop = true } = {}) {
   const normalizedId = String(categoryId || "").trim();
   if (!normalizedId) return;
+  const previousCategoryId = String(activeCategoryId || "").trim();
+  const wasFocusedView = isFocusedView;
   activeCategoryId = normalizedId;
   mainMenuCategoriesPreviewVisible = false;
   isFocusedView = true;
+  if (!wasFocusedView || previousCategoryId !== normalizedId) {
+    startMobileFocusedCategoryTransition();
+  } else {
+    mobileFocusedCategoryTransitionPending = false;
+    syncMobileFocusedCategoryTransitionState();
+  }
   renderFocusedCategoryNavigation();
   syncAppNavigationHistoryState({ mode: "push" });
   if (scrollToTop) {
@@ -11411,12 +11486,16 @@ function setupSowingTipMarquee() {
 
 function renderCatalog() {
   if (!isFocusedView) {
+    mobileFocusedCategoryTransitionPending = false;
+    syncMobileFocusedCategoryTransitionState();
     renderHomeDashboard();
     return;
   }
 
   const category = currentCategory();
   if (!category) {
+    mobileFocusedCategoryTransitionPending = false;
+    syncMobileFocusedCategoryTransitionState();
     catalogEl.innerHTML = renderWarmEmptyState({
       title: "Začni niečím malým",
       text: "Vytvor prvú kategóriu a potom do nej môžeš ukladať karty, poznámky aj odrody.",
@@ -11709,6 +11788,7 @@ function renderCatalog() {
   }
 
   bindSwipeRows(catalogEl);
+  finishMobileFocusedCategoryTransition(mobileFocusedCategoryTransitionToken);
 
 }
 
@@ -15799,6 +15879,55 @@ function latestJournalImages() {
 const MEMORY_PHOTO_TRANSITION_MS = 500;
 const MEMORY_TIP_TRANSITION_MS = 250;
 const MEMORY_TIP_SWAP_DELAY_MS = 120;
+const OVERVIEW_HIGHLIGHTS_MANUAL_PAUSE_MS = 16000;
+
+function pauseOverviewHighlights(kind = "all", durationMs = OVERVIEW_HIGHLIGHTS_MANUAL_PAUSE_MS) {
+  const safeDuration = Math.max(0, Number(durationMs) || OVERVIEW_HIGHLIGHTS_MANUAL_PAUSE_MS);
+  const pauseUntil = Date.now() + safeDuration;
+  const normalizedKind = String(kind || "all").trim() || "all";
+  if (normalizedKind === "all" || normalizedKind === "memories") {
+    memoryHighlightsPausedUntil = Math.max(memoryHighlightsPausedUntil, pauseUntil);
+  }
+  if (normalizedKind === "all" || normalizedKind === "tips") {
+    insightHighlightsPausedUntil = Math.max(insightHighlightsPausedUntil, pauseUntil);
+  }
+}
+
+function isOverviewHighlightsPaused(kind = "all") {
+  const now = Date.now();
+  const normalizedKind = String(kind || "all").trim() || "all";
+  if (normalizedKind === "memories") return now < memoryHighlightsPausedUntil;
+  if (normalizedKind === "tips") return now < insightHighlightsPausedUntil;
+  return now < memoryHighlightsPausedUntil || now < insightHighlightsPausedUntil;
+}
+
+function currentInsightTips() {
+  const weather = insightWeatherSignals();
+  const isMobileRuntime = Boolean(document.body?.classList.contains("app-mobile-runtime"));
+  const compactAlerts = isMobileRuntime ? weather.alerts.slice(0, 3) : [];
+  return buildSmartInsights(weather, { includeAlerts: !isMobileRuntime || compactAlerts.length === 0 });
+}
+
+function stepMemoryCarousel(step = 1, { manual = false } = {}) {
+  const memoryItems = latestJournalImages();
+  if (memoryItems.length < 2) return false;
+  const normalizedStep = step < 0 ? -1 : 1;
+  if (manual) pauseOverviewHighlights("memories");
+  memoryCarouselTransitionDirection = normalizedStep < 0 ? "prev" : "next";
+  memoryCarouselIndex = (memoryCarouselIndex + normalizedStep + memoryItems.length) % memoryItems.length;
+  renderMemories();
+  return true;
+}
+
+function stepInsightTips(step = 1, { manual = false } = {}) {
+  const tips = currentInsightTips();
+  if (tips.length < 2) return false;
+  const normalizedStep = step < 0 ? -1 : 1;
+  if (manual) pauseOverviewHighlights("tips");
+  insightTipIndex = (insightTipIndex + normalizedStep + tips.length) % tips.length;
+  renderInsights();
+  return true;
+}
 
 function memoryHeroItemKey(item = {}) {
   return [
@@ -16127,6 +16256,7 @@ function bindMemoryHeroInteractions(memoryHero) {
     touchStartY = touch.clientY;
     touchActive = true;
     swipeConsumed = false;
+    pauseOverviewHighlights("memories");
   }, { passive: true });
 
   memoryHero.addEventListener("touchcancel", () => {
@@ -16141,12 +16271,8 @@ function bindMemoryHeroInteractions(memoryHero) {
     const deltaX = touch.clientX - touchStartX;
     const deltaY = touch.clientY - touchStartY;
     if (Math.abs(deltaX) < 28 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
-    const memoryItems = latestJournalImages();
-    if (memoryItems.length < 2) return;
     swipeConsumed = true;
-    memoryCarouselTransitionDirection = deltaX < 0 ? "next" : "prev";
-    memoryCarouselIndex = (memoryCarouselIndex + (deltaX < 0 ? 1 : -1) + memoryItems.length) % memoryItems.length;
-    renderMemories();
+    stepMemoryCarousel(deltaX < 0 ? 1 : -1, { manual: true });
   }, { passive: true });
 
   memoryHero.addEventListener("click", () => {
@@ -16159,6 +16285,41 @@ function bindMemoryHeroInteractions(memoryHero) {
     event.preventDefault();
     openLinkedMemoryEntry(memoryHero);
   });
+}
+
+function bindInsightStripInteractions() {
+  if (!(insightStripEl instanceof HTMLElement)) return;
+  const ticker = insightStripEl.querySelector(".insight-strip__ticker");
+  if (!(ticker instanceof HTMLElement) || ticker.dataset.boundInsightTicker === "true") return;
+  ticker.dataset.boundInsightTicker = "true";
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchActive = false;
+
+  ticker.addEventListener("touchstart", (event) => {
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchActive = true;
+    pauseOverviewHighlights("tips");
+  }, { passive: true });
+
+  ticker.addEventListener("touchcancel", () => {
+    touchActive = false;
+  }, { passive: true });
+
+  ticker.addEventListener("touchend", (event) => {
+    if (!touchActive) return;
+    touchActive = false;
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+    if (Math.abs(deltaX) < 28 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    stepInsightTips(deltaX < 0 ? 1 : -1, { manual: true });
+  }, { passive: true });
 }
 
 function renderMemories() {
@@ -16796,6 +16957,7 @@ function renderInsights() {
       text: "Keď sa počasie rozhýbe, objavia sa tu jemné upozornenia a nápady.",
       compact: true
     });
+  bindInsightStripInteractions();
 }
 
 function syncOverviewHighlights() {
@@ -16819,14 +16981,12 @@ function syncOverviewHighlights() {
     if (typeof document !== "undefined" && document.hidden) return;
     overviewHighlightsStep += 1;
 
-    if (canRotateMemories) {
-      memoryCarouselIndex = (memoryCarouselIndex + 1) % memoryItems.length;
-      renderMemories();
+    if (canRotateMemories && !isOverviewHighlightsPaused("memories")) {
+      stepMemoryCarousel(1);
     }
 
-    if (canRotateTips && overviewHighlightsStep % 2 === 0) {
-      insightTipIndex = (insightTipIndex + 1) % tips.length;
-      renderInsights();
+    if (canRotateTips && overviewHighlightsStep % 2 === 0 && !isOverviewHighlightsPaused("tips")) {
+      stepInsightTips(1);
     }
   }, isMobileRuntime ? 7600 : 6200);
 }
@@ -18059,7 +18219,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
   const showMobileEditorTopbar = isMobileShell && (currentEntryKind === "detail" || (!existing && currentEntryKind === "gallery"));
   const showCardTypePicker = !existing && currentEntryKind === "detail";
-  const showMobileAddTypeBar = isMobileShell && !existing && currentEntryKind === "detail";
+  const showMobileAddTypeBar = isMobileShell && !existing && (currentEntryKind === "detail" || currentEntryKind === "gallery");
   const inlineCreateAction = !existing && isMobileShell;
   const useCompactCategoryLabels = isMobileShell && currentEntryKind === "detail";
   const submitLabel = existing ? "Uložiť" : currentEntryKind === "detail" ? "Pridať odrodu" : currentEntryKind === "quick" ? "Pridať rýchly záznam" : "Pridať galériu";
@@ -18077,7 +18237,7 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
   let draggedImageIndex = null;
 
   detailContent.innerHTML = `
-    ${showMobileEditorTopbar ? mobileAddCardTypeBarMarkup(showMobileAddTypeBar ? "variety" : "", { formId: "variety-form", submitLabel: existing ? "Uložiť" : "Pridať", withTypeSwitch: showMobileAddTypeBar }) : ""}
+    ${showMobileEditorTopbar ? mobileAddCardTypeBarMarkup(showMobileAddTypeBar ? "variety" : "", { formId: "variety-form", submitLabel, withTypeSwitch: showMobileAddTypeBar }) : ""}
     <div class="detail-layout detail-layout--editor">
       <div class="detail-image detail-image--editor">
         <button class="gallery-nav gallery-nav--prev" id="gallery-prev" type="button" aria-label="Predchádzajúca fotka">&#8249;</button>
@@ -19234,8 +19394,8 @@ function mobileAddCardTypeBarMarkup(selectedType, { formId = "", submitLabel = "
     <div class="detail-editor-mobile-topbar">
       <div class="detail-editor-mobile-topbar__row">
         <button class="back-button journal-overlay-shell__back detail-editor-mobile-switch__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
-        <div class="detail-editor-mobile-topbar__actions">
-          <button class="back-button detail-editor-mobile-topbar__submit" type="submit" form="${escapeAttribute(formId)}">${escapeHtml(submitLabel)}</button>
+        <div class="detail-editor-mobile-topbar__actions" hidden>
+          <button class="back-button detail-editor-mobile-topbar__submit" type="submit" form="${escapeAttribute(formId)}" hidden aria-hidden="true" tabindex="-1">${escapeHtml(submitLabel)}</button>
         </div>
       </div>
       ${withTypeSwitch ? `
@@ -22849,10 +23009,17 @@ function shouldDeferVarietyCardImageSource(source = "") {
 function renderVarietyCardImageTag(item, altText) {
   const source = primaryVarietyImage(item);
   const requiresResolution = !isDirectRenderableImageSource(source);
+  const cachedPreviewSource = getCachedPreviewImageSource(source, LIST_IMAGE_PREVIEW_MAX_DIMENSION);
+  if (!requiresResolution && cachedPreviewSource && cachedPreviewSource !== source) {
+    return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+  }
   if (!requiresResolution && !shouldDeferVarietyCardImageSource(source)) {
     return `<img src="${escapeAttribute(source)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
-  return `<img src="${escapeAttribute(cardPlaceholderImage(cardType(item)))}" data-lazy-variety-image="${escapeAttribute(item.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
+  const placeholderSource = shouldUseQuietCatalogPreviewPlaceholder()
+    ? TRANSPARENT_IMAGE_PLACEHOLDER
+    : cardPlaceholderImage(cardType(item));
+  return `<img src="${escapeAttribute(placeholderSource)}" data-lazy-variety-image="${escapeAttribute(item.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
 }
 
 function resolveDeferredVarietyCardImageSource(varietyId = "") {
@@ -22923,6 +23090,14 @@ function syncDeferredVarietyCardImages(root = document) {
   const pendingImages = [...root.querySelectorAll("img[data-lazy-variety-image]")];
   if (!pendingImages.length) return;
 
+  const immediateCount = Math.max(0, Math.min(pendingImages.length, isRealMobileRuntimeMode() ? 4 : 2));
+  if (immediateCount > 0) {
+    pendingImages.slice(0, immediateCount).forEach((img) => activateDeferredVarietyCardImage(img));
+  }
+
+  const remainingImages = pendingImages.filter((img) => img.hasAttribute("data-lazy-variety-image"));
+  if (!remainingImages.length) return;
+
   if ("IntersectionObserver" in window) {
     if (!deferredVarietyCardImageObserver) {
       deferredVarietyCardImageObserver = new IntersectionObserver((entries) => {
@@ -22936,11 +23111,11 @@ function syncDeferredVarietyCardImages(root = document) {
         threshold: 0.01
       });
     }
-    pendingImages.forEach((img) => deferredVarietyCardImageObserver.observe(img));
+    remainingImages.forEach((img) => deferredVarietyCardImageObserver.observe(img));
     return;
   }
 
-  pendingImages.forEach((img) => scheduleDeferredCardImageActivation(img, activateDeferredVarietyCardImage));
+  remainingImages.forEach((img) => scheduleDeferredCardImageActivation(img, activateDeferredVarietyCardImage));
 }
 
 function normalizeVarietyRecord(item) {
@@ -23256,9 +23431,12 @@ function renderCategoryCardImageTag(category, altText) {
   if (!needsResolvedSource && cachedPreviewSource && cachedPreviewSource !== source) {
     return `<img src="${escapeAttribute(cachedPreviewSource)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
   }
+  const placeholderSource = shouldUseQuietCatalogPreviewPlaceholder()
+    ? TRANSPARENT_IMAGE_PLACEHOLDER
+    : categoryPlaceholderImage(category);
   const optimisticSource = hasDirectSource && !shouldDeferSource
     ? source
-    : categoryPlaceholderImage(category);
+    : placeholderSource;
   return `<img src="${escapeAttribute(optimisticSource)}" data-lazy-category-image="${escapeAttribute(category.id)}" alt="${escapeAttribute(altText)}" loading="lazy" decoding="async" fetchpriority="low">`;
 }
 
@@ -24241,6 +24419,7 @@ function updateMenuVisibility() {
   if (mainMenuQuickEl) {
     mainMenuQuickEl.hidden = !isFocusedView;
   }
+  syncMobileFocusedCategoryTransitionState();
   if (batchSowingQuickEl) {
     batchSowingQuickEl.hidden = !activeSyncCount(state.varieties);
   }
