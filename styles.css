@@ -41805,7 +41805,10 @@ body.app-mobile-shell:is(.app-main-menu-mode, .app-focused-mode) .utility-bar--f
 /* Manual thumbnail crop:
    editor drzi len transform pre preview karty, bez zmeny originalu. */
 .catalog-card__image img[data-thumb-crop="custom"],
-.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img[data-thumb-crop="custom"] {
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img[data-thumb-crop="custom"],
+.menu-pill__thumb img[data-thumb-crop="custom"],
+.category-panel__thumb img[data-thumb-crop="custom"],
+.category-preview img[data-thumb-crop="custom"] {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
@@ -48329,4 +48332,39 @@ body.app-mobile-shell .editor-gallery__main-badge,
 body.app-mobile-shell .card-view-title-badge {
   line-height: 1.2 !important;
   overflow: visible !important;
+}
+
+/* Final thumb crop enforcement:
+   neskore preview pravidla vedeli zrusit manualny transform na kartach. */
+.catalog-card__image img[data-thumb-crop="custom"],
+.catalog-card--child .catalog-card__image img[data-thumb-crop="custom"],
+.catalog-card--main-menu-card .catalog-card__image img[data-thumb-crop="custom"],
+.catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img[data-thumb-crop="custom"],
+.menu-pill__thumb img[data-thumb-crop="custom"],
+.category-panel__thumb img[data-thumb-crop="custom"],
+.category-preview img[data-thumb-crop="custom"],
+body.app-mobile-shell .catalog-card--child .catalog-card__image img[data-thumb-crop="custom"],
+body.app-mobile-shell.app-focused-mode .catalog-card--child .catalog-card__image img[data-thumb-crop="custom"],
+body.app-mobile-shell .catalog-card--main-menu-card .catalog-card__image img[data-thumb-crop="custom"],
+body.app-mobile-shell .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--main-menu-card .catalog-card__image img[data-thumb-crop="custom"],
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-card--main-menu-card .catalog-card__image img[data-thumb-crop="custom"],
+body.app-mobile-shell.app-main-menu-mode.app-main-menu-categories-preview .catalog-grid--main-menu > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--main-menu-card .catalog-card__image img[data-thumb-crop="custom"],
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img[data-thumb-crop="custom"],
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview img[data-thumb-crop="custom"],
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:hover .catalog-card__image--preview img[data-thumb-crop="custom"],
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview:focus-within .catalog-card__image--preview img[data-thumb-crop="custom"],
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview:hover .catalog-card__image--preview img[data-thumb-crop="custom"],
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview:focus-within .catalog-card__image--preview img[data-thumb-crop="custom"],
+body.app-mobile-shell .menu-pill__thumb img[data-thumb-crop="custom"],
+body.app-mobile-shell .category-panel__thumb img[data-thumb-crop="custom"],
+body.app-mobile-shell .category-preview img[data-thumb-crop="custom"],
+body.app-mobile-shell .detail-modal--editor .category-preview img[data-thumb-crop="custom"] {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  transform: translate3d(var(--thumb-crop-translate-x, 0px), var(--thumb-crop-translate-y, 0px), 0) scale(var(--thumb-crop-scale, 1)) !important;
+  transform-origin: center center !important;
 }
