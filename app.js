@@ -55,6 +55,7 @@ const AUTO_CLOUD_BACKGROUND_PULL_MS = 1000 * 4;
 const UNDO_KEY = "moja-zahrada-undo-v1";
 const RESET_BACKUP_KEY = "moja-zahrada-reset-backup-v1";
 const IMAGE_BACKGROUND_MIGRATION_KEY = "moja-zahrada-white-bg-v1";
+
 function requireValue(name, value) {
   if (typeof value !== "undefined" && value !== null && value !== "") return value;
   throw new Error(`[MojaZahrada] Missing required dependency: ${name}`);
@@ -10286,6 +10287,7 @@ function ensureSettingsToolbarButton() {
     if (button.parentElement !== targetParent) {
       targetParent.appendChild(button);
     }
+    button.textContent = "Nastavenia";
     button.setAttribute("aria-label", "Nastavenia");
     button.setAttribute("title", "Nastavenia");
     button.dataset.toolbarEmoji = "\u2699\uFE0F";
@@ -12692,7 +12694,7 @@ function mobileWeatherAudioLabel(key = "") {
     night_cold_air: "studená noc",
     clear_air_soft: "čistý vzduch",
     cloud_air_soft: "oblačný vzduch",
-    overcast_air_heavy: "ťažký vzduch",
+    overcast_air_heavy: "zamračené ticho",
     fog_air_soft: "hmlistý priestor",
     drizzle_soft: "jemné mrholenie",
     rain_soft: "dážď",
@@ -12702,13 +12704,13 @@ function mobileWeatherAudioLabel(key = "") {
     wind_soft_trees: "jemný vánok v stromoch",
     wind_medium_trees: "vietor v stromoch",
     wind_strong_trees: "silný vietor v stromoch",
-    snow_air_soft: "tichý sneh",
+    snow_air_soft: "slabé sneženie",
     snow_air_heavy: "hutný sneh",
     snow_wind_soft: "snehový vzduch",
     wet_snow_slush: "mokrá kaša",
     hail_hits_bed: "krúpy na povrchu",
     frost_cold_air: "mrazivý vzduch",
-    heat_soft_air: "horúci vzduch",
+    heat_soft_air: "teplý deň",
     crowns_soft: "jemné koruny stromov",
     crowns_medium: "koruny stromov",
     crowns_strong: "silné koruny stromov",
@@ -15565,7 +15567,7 @@ function syncRenderableImageElementSource(imageEl, rawSource = "", {
   })();
 }
 
-const CARD_THUMB_CROP_MIN_SCALE = 1;
+const CARD_THUMB_CROP_MIN_SCALE = 0.5;
 const CARD_THUMB_CROP_MAX_SCALE = 3;
 const CARD_THUMB_CROP_SCALE_STEP = 0.05;
 

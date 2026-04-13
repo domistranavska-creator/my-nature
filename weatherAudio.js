@@ -38,7 +38,7 @@
     strongAfterglowMs: 28000,
     maxProminentActive: 1,
     maxTotalShots: 2,
-    baseSilenceWeight: 0.14,
+    baseSilenceWeight: 0.34,
     maxSilenceWeight: 0.48
   });
   const DETAIL_DURATION_MULTIPLIER = Object.freeze({
@@ -458,7 +458,7 @@
       wind_medium_trees: layerDef({
         group: "weather",
         fileList: ["assets/weather-audio/wind-main.mp3"],
-        baseVolume: 0.34
+        baseVolume: 0.18
       }),
       wind_strong_trees: layerDef({
         group: "weather",
@@ -471,7 +471,7 @@
           "assets/weather-audio/winter-wind-loop.mp3",
           "assets/weather-audio/wind-soft.mp3"
         ],
-        baseVolume: 0.08,
+        baseVolume: 0.03,
         crossfadeDuration: 5.6
       }),
       snow_air_heavy: layerDef({
@@ -489,7 +489,7 @@
           "assets/weather-audio/winter-wind-loop.mp3",
           "assets/weather-audio/wind-soft.mp3"
         ],
-        baseVolume: 0.12,
+        baseVolume: 0.04,
         crossfadeDuration: 5.4
       }),
       wet_snow_slush: layerDef({
@@ -1058,11 +1058,11 @@
       crossfadeDuration: 4.4
     }),
     overcast: scenePreset({
-      weatherLayers: ["overcast_air_heavy"],
+      weatherLayers: [],
       textureLayers: ["crowns_medium"],
       allowDetails: ["crow_call"],
       blockDetails: ["bee_pass"],
-      groupVolumes: { master: 1, time: 0.84, weather: 0.76, texture: 0.76, details: 0.56 },
+      groupVolumes: { master: 1, time: 0.84, weather: 0, texture: 0.32, details: 0.56 },
       priority: "medium",
       crossfadeDuration: 4.2
     }),
@@ -1118,9 +1118,9 @@
       crossfadeDuration: 2.4
     }),
     wind_soft: scenePreset({
-      weatherLayers: ["wind_soft_trees"],
-      textureLayers: ["crowns_soft"],
-      groupVolumes: { master: 1, time: 0.98, weather: 0.56, texture: 0.76, details: 0.92 },
+      weatherLayers: [],
+      textureLayers: [],
+      groupVolumes: { master: 1, time: 0.98, weather: 0, texture: 0, details: 0.92 },
       priority: "low",
       crossfadeDuration: 4.2
     }),
@@ -1128,7 +1128,7 @@
       weatherLayers: ["wind_medium_trees"],
       textureLayers: ["crowns_medium"],
       blockDetails: ["bee_pass"],
-      groupVolumes: { master: 1, time: 0.74, weather: 0.86, texture: 0.94, details: 0.38 },
+      groupVolumes: { master: 1, time: 0.74, weather: 0.52, texture: 0.62, details: 0.38 },
       priority: "medium",
       crossfadeDuration: 3.8
     }),
@@ -1141,11 +1141,11 @@
       crossfadeDuration: 3
     }),
     snow_light: scenePreset({
-      weatherLayers: ["snow_air_soft"],
-      textureLayers: ["winter_space_soft"],
+      weatherLayers: [],
+      textureLayers: [],
       allowDetails: ["crow_call"],
       blockDetails: ["bee_pass", "dove_call", "woodpecker", "wolf_far"],
-      groupVolumes: { master: 1, time: 0.42, weather: 0.72, texture: 0.68, details: 0.28 },
+      groupVolumes: { master: 1, time: 0.42, weather: 0, texture: 0, details: 0.28 },
       priority: "medium",
       crossfadeDuration: 5.8
     }),
@@ -1154,7 +1154,7 @@
       textureLayers: ["winter_space_soft"],
       allowDetails: ["crow_call"],
       blockDetails: ["bee_pass", "dove_call", "woodpecker", "wolf_far"],
-      groupVolumes: { master: 1, time: 0.30, weather: 0.82, texture: 0.72, details: 0.22 },
+      groupVolumes: { master: 1, time: 0.30, weather: 0.56, texture: 0.72, details: 0.22 },
       priority: "medium",
       crossfadeDuration: 5.8
     }),
@@ -1228,10 +1228,10 @@
       crossfadeDuration: 5.8
     }),
     heat_haze: scenePreset({
-      weatherLayers: ["heat_soft_air"],
-      textureLayers: ["crowns_soft"],
+      weatherLayers: [],
+      textureLayers: [],
       allowDetails: ["bee_pass"],
-      groupVolumes: { master: 1, time: 0.72, weather: 0.34, texture: 0.54, details: 0.42 },
+      groupVolumes: { master: 1, time: 0.72, weather: 0, texture: 0, details: 0.42 },
       priority: "low",
       crossfadeDuration: 4.4
     })
@@ -2071,7 +2071,6 @@
 
       if (nextState.timeOfDay === "day" && nextState.weather === "overcast") {
         ensureGroupFallback("time", ["day_garden_soft", "day_forest_air"], 0.0048);
-        ensureGroupFallback("weather", ["overcast_air_heavy"], 0.0044);
         ensureGroupFallback("texture", ["crowns_soft", "crowns_medium"], 0.0038);
       }
 
