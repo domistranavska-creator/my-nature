@@ -100,6 +100,7 @@
       const isDetailEntry = requireFunction("isDetailEntry", rawIsDetailEntry);
       const FALLBACK_CATEGORY_ID = requireValue("FALLBACK_CATEGORY_ID", rawFallbackCategoryId ?? CATEGORY_IDS.FALLBACK);
       const ROOT_CATEGORY_IDS = requireArray("ROOT_CATEGORY_IDS", rawRootCategoryIds ?? constants.ROOT_CATEGORY_ORDER);
+      const EMPTY_DERIVED_LIST = [];
 
       function normalizeCategoryRecord(category = {}) {
         try {
@@ -128,7 +129,7 @@
       }
 
       function filteredVarietiesForCurrentCategory() {
-        return [...(ensureDerivedDataCache().sortedVarietiesByCategory.get(getActiveCategoryId()) || [])];
+        return ensureDerivedDataCache().sortedVarietiesByCategory.get(getActiveCategoryId()) || EMPTY_DERIVED_LIST;
       }
 
       function currentCategory() {
@@ -148,15 +149,15 @@
       }
 
       function childCategoriesOf(categoryId) {
-        return [...(ensureDerivedDataCache().childrenByParent.get(String(categoryId || "").trim()) || [])];
+        return ensureDerivedDataCache().childrenByParent.get(String(categoryId || "").trim()) || EMPTY_DERIVED_LIST;
       }
 
       function varietiesInCategory(categoryId) {
-        return [...(ensureDerivedDataCache().varietiesByCategory.get(String(categoryId || "").trim()) || [])];
+        return ensureDerivedDataCache().varietiesByCategory.get(String(categoryId || "").trim()) || EMPTY_DERIVED_LIST;
       }
 
       function varietiesInCategoryTree(categoryId) {
-        return [...(ensureDerivedDataCache().varietiesByCategoryTree.get(String(categoryId || "").trim()) || [])];
+        return ensureDerivedDataCache().varietiesByCategoryTree.get(String(categoryId || "").trim()) || EMPTY_DERIVED_LIST;
       }
 
       function inheritedCategoryValue(categoryId, field) {
