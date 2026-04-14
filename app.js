@@ -15599,7 +15599,7 @@ function syncRenderableImageElementSource(imageEl, rawSource = "", {
   })();
 }
 
-const CARD_THUMB_CROP_MIN_SCALE = 0.5;
+const CARD_THUMB_CROP_MIN_SCALE = 1;
 const CARD_THUMB_CROP_MAX_SCALE = 3;
 const CARD_THUMB_CROP_SCALE_STEP = 0.05;
 
