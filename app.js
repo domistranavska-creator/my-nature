@@ -1158,10 +1158,37 @@ function journalHeaderWeather(entry = {}) {
 
 const APP_STARTUP_MIN_HOLD_MS = 450;
 const APP_STARTUP_FAILSAFE_MS = 2200;
+const HOME_PREVIEW_BOOT_HOLD_MS = 4200;
+const APP_BOOT_STARTED_AT = Date.now();
 let appStartupRevealScheduled = false;
 let appStartupRevealComplete = false;
 let appStartupRevealDelayTimer = 0;
 let appStartupRevealFailsafeTimer = 0;
+
+function isMobileHomePreviewContext() {
+  return Boolean(typeof document !== "undefined" && document.body?.classList.contains("app-mobile-shell"));
+}
+
+function homePreviewBootHoldActive() {
+  return Math.max(0, Date.now() - APP_BOOT_STARTED_AT) < HOME_PREVIEW_BOOT_HOLD_MS;
+}
+
+function shouldHoldHomePreviewCloudContent() {
+  return isMobileHomePreviewContext()
+    && homePreviewBootHoldActive()
+    && hasConfiguredAutoCloudSync()
+    && autoCloudInitialSyncPending;
+}
+
+function shouldHoldHomePreviewWeatherContent() {
+  return isMobileHomePreviewContext()
+    && homePreviewBootHoldActive()
+    && (!homeWeatherSnapshot || !homeWeatherOverview);
+}
+
+function shouldHoldHomePreviewHighlights() {
+  return shouldHoldHomePreviewCloudContent() || shouldHoldHomePreviewWeatherContent();
+}
 
 function clearAppStartupRevealTimers() {
   if (typeof window === "undefined") return;
@@ -11643,6 +11670,11 @@ function renderProgressOverview() {
     clearInterval(sowingTipInterval);
     sowingTipInterval = null;
   }
+  if (shouldHoldHomePreviewCloudContent()) {
+    progressOverviewEl.hidden = true;
+    progressOverviewEl.innerHTML = "";
+    return;
+  }
   if (shouldUseCleanLoggedOutHome()) {
     progressOverviewEl.hidden = true;
     progressOverviewEl.innerHTML = "";
@@ -16392,34 +16424,45 @@ function renderJournal() {
   }
 
   if (journalSidebarEl) {
-    const latestEntries = journalEntries.slice(0, 3);
-    try {
-      journalSidebarEl.innerHTML = latestEntries.length
-        ? `
-          ${latestEntries.map((entry) => renderJournalSidebarCard(entry)).join("")}
-          ${journalEntries.length > latestEntries.length ? `<button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Zobraziť všetky zápisy (${journalEntries.length})</button>` : ""}
-        `
-        : journalSidebarEmptyMarkup;
-    } catch (error) {
-      console.error("Zlyhal bočný prehľad denníka", error);
-      journalSidebarEl.innerHTML = latestEntries.length
-        ? `
-          ${latestEntries.map((entry) => `
-            <article class="sidebar-preview-card sidebar-preview-card--journal">
-              <div class="sidebar-preview-card__title-row">
-                <p class="sidebar-preview-card__title">${escapeHtml(entry.title || "Záhradný zápis")}</p>
-              </div>
-              <p class="sidebar-preview-card__meta">${escapeHtml(formatDate(entry.date))}</p>
-            </article>
-          `).join("")}
-          <button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Otvoriť denník</button>
-        `
-        : journalSidebarEmptyMarkup;
+    const journalSidebarCardEl = journalSidebarEl.closest(".season-card");
+    if (shouldHoldHomePreviewCloudContent()) {
+      if (journalSidebarCardEl instanceof HTMLElement) {
+        journalSidebarCardEl.hidden = true;
+      }
+      journalSidebarEl.innerHTML = "";
+    } else {
+      if (journalSidebarCardEl instanceof HTMLElement) {
+        journalSidebarCardEl.hidden = false;
+      }
+      const latestEntries = journalEntries.slice(0, 3);
+      try {
+        journalSidebarEl.innerHTML = latestEntries.length
+          ? `
+            ${latestEntries.map((entry) => renderJournalSidebarCard(entry)).join("")}
+            ${journalEntries.length > latestEntries.length ? `<button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Zobraziť všetky zápisy (${journalEntries.length})</button>` : ""}
+          `
+          : journalSidebarEmptyMarkup;
+      } catch (error) {
+        console.error("Zlyhal bočný prehľad denníka", error);
+        journalSidebarEl.innerHTML = latestEntries.length
+          ? `
+            ${latestEntries.map((entry) => `
+              <article class="sidebar-preview-card sidebar-preview-card--journal">
+                <div class="sidebar-preview-card__title-row">
+                  <p class="sidebar-preview-card__title">${escapeHtml(entry.title || "Záhradný zápis")}</p>
+                </div>
+                <p class="sidebar-preview-card__meta">${escapeHtml(formatDate(entry.date))}</p>
+              </article>
+            `).join("")}
+            <button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Otvoriť denník</button>
+          `
+          : journalSidebarEmptyMarkup;
+      }
+      syncDeferredJournalImages(journalSidebarEl, { eagerCount: 3 });
+      journalSidebarEl.querySelectorAll("[data-open-empty-journal-sidebar]").forEach((button) => {
+        button.addEventListener("click", () => forceOpenJournalManager());
+      });
     }
-    syncDeferredJournalImages(journalSidebarEl, { eagerCount: 3 });
-    journalSidebarEl.querySelectorAll("[data-open-empty-journal-sidebar]").forEach((button) => {
-      button.addEventListener("click", () => forceOpenJournalManager());
-    });
   }
 
   if (journalListEl) {
@@ -16434,7 +16477,7 @@ function renderJournal() {
     });
   }
 
-  if (journalSidebarEl) {
+  if (journalSidebarEl && !shouldHoldHomePreviewCloudContent()) {
     const openAllJournalButton = document.getElementById("open-all-journal");
     if (openAllJournalButton) {
       openAllJournalButton.addEventListener("click", () => {
@@ -17117,6 +17160,17 @@ function bindInsightStripInteractions() {
 
 function renderMemories() {
   if (!memoryStripEl) return;
+  const memoriesCardEl = memoryStripEl.closest(".season-card--memories");
+  if (shouldHoldHomePreviewHighlights()) {
+    if (memoriesCardEl instanceof HTMLElement) {
+      memoriesCardEl.hidden = true;
+    }
+    memoryStripEl.innerHTML = "";
+    return;
+  }
+  if (memoriesCardEl instanceof HTMLElement) {
+    memoriesCardEl.hidden = false;
+  }
   const memoryItems = latestJournalImages();
   const totalJournalEntries = activeSyncCount(state.journal);
   const useCleanHome = shouldUseCleanLoggedOutHome();
@@ -17710,6 +17764,18 @@ function renderInsightSignalDock(alerts = []) {
 
 function renderInsights() {
   if (!insightStripEl) return;
+  const memoriesCardEl = memoryStripEl?.closest(".season-card--memories");
+  if (shouldHoldHomePreviewHighlights()) {
+    if (memoriesCardEl instanceof HTMLElement) {
+      memoriesCardEl.hidden = true;
+    }
+    insightStripEl.hidden = true;
+    insightStripEl.innerHTML = "";
+    return;
+  }
+  if (memoriesCardEl instanceof HTMLElement) {
+    memoriesCardEl.hidden = false;
+  }
   if (shouldUseCleanLoggedOutHome()) {
     insightStripEl.hidden = true;
     insightStripEl.innerHTML = "";
