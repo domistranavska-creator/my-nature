@@ -122,6 +122,7 @@
     resizeHost: null,
     layoutSyncRaf: 0
   };
+  let sharedWeatherAuxInput = null;
 
   function ensureRoot() {
     const host = document.body;
@@ -503,6 +504,428 @@
     if (speed >= 20) return "strong";
     if (speed >= 4) return "breeze";
     return "calm";
+  }
+
+  function normalizeSharedWeatherKey(value) {
+    const weather = String(value || "").trim().toLowerCase();
+    return [
+      "clear",
+      "partly_cloudy",
+      "cloudy",
+      "overcast",
+      "fog",
+      "drizzle",
+      "rain",
+      "heavy_rain",
+      "storm_far",
+      "storm_near",
+      "wind_soft",
+      "wind_medium",
+      "wind_strong",
+      "snow_light",
+      "snow_medium",
+      "snow_heavy",
+      "wet_snow",
+      "blizzard_like",
+      "hail",
+      "post_rain",
+      "post_storm",
+      "post_snow",
+      "frost",
+      "heat_haze"
+    ].includes(weather) ? weather : "clear";
+  }
+
+  function normalizeSharedIntensityKey(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      if (value >= 0.72) return "heavy";
+      if (value >= 0.42) return "medium";
+      return "light";
+    }
+    const intensity = String(value || "").trim().toLowerCase();
+    if (["heavy", "strong", "high", "intense"].includes(intensity)) return "heavy";
+    if (["medium", "moderate", "normal", "mid"].includes(intensity)) return "medium";
+    return "light";
+  }
+
+  function normalizeSharedWindKey(value) {
+    const wind = String(value || "").trim().toLowerCase();
+    if (["gale", "storm", "very_strong"].includes(wind)) return "gale";
+    if (["strong", "medium", "windy"].includes(wind)) return "strong";
+    if (["breeze", "soft", "light", "gentle"].includes(wind)) return "breeze";
+    return "calm";
+  }
+
+  function normalizeSharedTimeOfDayKey(value) {
+    const time = String(value || "").trim().toLowerCase();
+    if (time === "morning") return "dawn";
+    if (time === "sunset") return "evening";
+    if (["dawn", "day", "evening", "night"].includes(time)) return time;
+    return time === "night" ? "night" : "day";
+  }
+
+  function readSharedWeatherState(input = null) {
+    const shared = input && typeof input === "object"
+      ? input
+      : (typeof window !== "undefined" && window.weatherState && typeof window.weatherState === "object"
+        ? window.weatherState
+        : null);
+    return {
+      weather: normalizeSharedWeatherKey(shared?.weather),
+      intensity: normalizeSharedIntensityKey(shared?.intensity),
+      wind: normalizeSharedWindKey(shared?.wind),
+      timeOfDay: normalizeSharedTimeOfDayKey(shared?.timeOfDay),
+      season: resolveActiveSeason(shared?.season || "spring")
+    };
+  }
+
+  function sharedIntensityFactor(value) {
+    const intensity = normalizeSharedIntensityKey(value);
+    if (intensity === "heavy") return 1;
+    if (intensity === "medium") return 0.66;
+    return 0.36;
+  }
+
+  function sharedWindSpeedFromKey(windKey) {
+    if (windKey === "gale") return 46;
+    if (windKey === "strong") return 28;
+    if (windKey === "breeze") return 10;
+    return 0;
+  }
+
+  function sharedWindGustFromKey(windKey) {
+    if (windKey === "gale") return 62;
+    if (windKey === "strong") return 40;
+    if (windKey === "breeze") return 18;
+    return 4;
+  }
+
+  function sharedTemperatureForState(sharedState) {
+    const season = resolveActiveSeason(sharedState?.season || "spring");
+    let base = season === "winter"
+      ? 1
+      : season === "summer"
+        ? 24
+        : season === "autumn"
+          ? 12
+          : 14;
+    const timeOfDay = normalizeSharedTimeOfDayKey(sharedState?.timeOfDay);
+    if (timeOfDay === "night") base -= 7;
+    else if (timeOfDay === "dawn") base -= 3;
+    else if (timeOfDay === "evening") base -= 2;
+    return base;
+  }
+
+  function sharedCloudCoverForWeather(weatherKey, intensityFactor) {
+    switch (weatherKey) {
+      case "partly_cloudy": return 42 + (intensityFactor * 10);
+      case "cloudy": return 68 + (intensityFactor * 8);
+      case "overcast":
+      case "fog":
+      case "drizzle":
+      case "rain":
+      case "heavy_rain":
+      case "storm_far":
+      case "storm_near":
+      case "snow_light":
+      case "snow_medium":
+      case "snow_heavy":
+      case "wet_snow":
+      case "blizzard_like":
+      case "hail":
+        return 92 + (intensityFactor * 6);
+      case "post_storm": return 70;
+      case "post_rain": return 46;
+      case "post_snow": return 58;
+      case "wind_strong": return 58;
+      case "wind_medium": return 36;
+      case "wind_soft": return 22;
+      default: return 10;
+    }
+  }
+
+  function deriveSharedWeatherStateFromLegacyInput(input = null) {
+    const source = input && typeof input === "object" ? input : {};
+    const phenomenon = String(source.phenomenonVariant || source.conditionVariant || "").trim().toLowerCase();
+    const variant = String(source.variant || source.condition || "").trim().toLowerCase();
+    const windSpeed = Math.max(0, Number(source.windSpeed) || 0);
+    const wind = normalizeSharedWindKey(source.wind || source.windCategory || windCategoryFromSpeed(windSpeed));
+    const timeOfDay = normalizeSharedTimeOfDayKey(source.timeOfDay || source.phase || source.period || (source.isDay === false ? "night" : "day"));
+    const season = resolveActiveSeason(source.season || "spring");
+    const precipitationAmount = Math.max(
+      0,
+      Number(source.precipitationAmount) || 0,
+      Number(source.rainAmount) || 0,
+      Number(source.showersAmount) || 0
+    );
+    const snowfallAmount = Math.max(0, Number(source.snowfallAmount) || 0);
+    let weather = normalizeSharedWeatherKey(source.weather);
+
+    if (weather === "clear") {
+      if (["fog", "mist"].includes(phenomenon)) weather = "fog";
+      else if (phenomenon === "drizzle") weather = "drizzle";
+      else if (phenomenon === "rain") weather = precipitationAmount >= 6 ? "heavy_rain" : "rain";
+      else if (phenomenon === "storm") weather = Boolean(source.hasThunder) ? "storm_near" : "storm_far";
+      else if (phenomenon === "snow") weather = snowfallAmount >= 2.2 ? "snow_heavy" : snowfallAmount >= 0.9 ? "snow_medium" : "snow_light";
+      else if (phenomenon === "sleet" || phenomenon === "freezing-rain") weather = "wet_snow";
+      else if (phenomenon === "hail") weather = "hail";
+      else if (phenomenon === "frost") weather = "frost";
+      else if (variant === "partly-cloudy" || variant === "partly_cloudy" || variant === "mostly-clear") weather = "partly_cloudy";
+      else if (variant === "cloudy") weather = "cloudy";
+      else if (variant === "overcast") weather = "overcast";
+      else if (variant === "clear" && wind !== "calm") weather = wind === "gale" ? "wind_strong" : wind === "strong" ? "wind_medium" : "wind_soft";
+    }
+
+    let intensity = normalizeSharedIntensityKey(source.intensity);
+    if (!("intensity" in source)) {
+      if (["heavy_rain", "storm_near", "snow_heavy", "blizzard_like", "hail"].includes(weather)) intensity = "heavy";
+      else if (["rain", "storm_far", "wind_medium", "wind_strong", "snow_medium", "wet_snow", "fog", "cloudy", "overcast", "post_storm"].includes(weather)) intensity = "medium";
+      else intensity = "light";
+    }
+
+    return {
+      weather,
+      intensity,
+      wind,
+      timeOfDay,
+      season
+    };
+  }
+
+  function buildInputFromSharedWeatherState(sharedInput = null) {
+    const shared = readSharedWeatherState(sharedInput);
+    const intensityFactor = sharedIntensityFactor(shared.intensity);
+    const auxiliaryInput = sharedWeatherAuxInput || {};
+    let temperature = sharedTemperatureForState(shared);
+    let apparentTemperature = temperature;
+    let windSpeed = sharedWindSpeedFromKey(shared.wind);
+    let windGustSpeed = sharedWindGustFromKey(shared.wind);
+    let variant = "clear";
+    let phenomenonVariant = "none";
+    let tone = "soft";
+    let humidity = null;
+    let visibility = null;
+    let precipitationAmount = 0;
+    let rainAmount = 0;
+    let snowfallAmount = 0;
+    let hasThunder = false;
+    let hasHail = false;
+
+    switch (shared.weather) {
+      case "partly_cloudy":
+        variant = "partly-cloudy";
+        break;
+      case "cloudy":
+        variant = "cloudy";
+        break;
+      case "overcast":
+        variant = "overcast";
+        break;
+      case "fog":
+        variant = "overcast";
+        phenomenonVariant = "fog";
+        humidity = 96;
+        visibility = Math.round(2600 - (intensityFactor * 1500));
+        break;
+      case "drizzle":
+        variant = "overcast";
+        phenomenonVariant = "drizzle";
+        humidity = 94;
+        rainAmount = 0.6 + (intensityFactor * 1.2);
+        precipitationAmount = rainAmount;
+        break;
+      case "rain":
+        variant = "overcast";
+        phenomenonVariant = "rain";
+        humidity = 92;
+        rainAmount = 2.2 + (intensityFactor * 3.2);
+        precipitationAmount = rainAmount;
+        break;
+      case "heavy_rain":
+        variant = "overcast";
+        phenomenonVariant = "rain";
+        tone = "storm";
+        humidity = 95;
+        rainAmount = 6 + (intensityFactor * 4.6);
+        precipitationAmount = rainAmount;
+        break;
+      case "storm_far":
+        variant = "overcast";
+        phenomenonVariant = "storm";
+        tone = "storm";
+        humidity = 95;
+        rainAmount = 4.8 + (intensityFactor * 3.8);
+        precipitationAmount = rainAmount;
+        hasThunder = true;
+        windSpeed = Math.max(windSpeed, 24);
+        windGustSpeed = Math.max(windGustSpeed, 36);
+        break;
+      case "storm_near":
+        variant = "overcast";
+        phenomenonVariant = "storm";
+        tone = "storm";
+        humidity = 96;
+        rainAmount = 7.4 + (intensityFactor * 4.8);
+        precipitationAmount = rainAmount;
+        hasThunder = true;
+        windSpeed = Math.max(windSpeed, 34);
+        windGustSpeed = Math.max(windGustSpeed, 50);
+        break;
+      case "wind_soft":
+        windSpeed = Math.max(windSpeed, 10);
+        windGustSpeed = Math.max(windGustSpeed, 18);
+        variant = "clear";
+        break;
+      case "wind_medium":
+        windSpeed = Math.max(windSpeed, 24);
+        windGustSpeed = Math.max(windGustSpeed, 36);
+        variant = "partly-cloudy";
+        break;
+      case "wind_strong":
+        windSpeed = Math.max(windSpeed, 42);
+        windGustSpeed = Math.max(windGustSpeed, 58);
+        variant = "cloudy";
+        break;
+      case "snow_light":
+        variant = "overcast";
+        phenomenonVariant = "snow";
+        temperature = Math.min(temperature, -1);
+        apparentTemperature = temperature - 1;
+        snowfallAmount = 0.4 + (intensityFactor * 0.6);
+        precipitationAmount = snowfallAmount;
+        humidity = 90;
+        break;
+      case "snow_medium":
+        variant = "overcast";
+        phenomenonVariant = "snow";
+        temperature = Math.min(temperature, -2);
+        apparentTemperature = temperature - 2;
+        snowfallAmount = 1.1 + (intensityFactor * 0.9);
+        precipitationAmount = snowfallAmount;
+        humidity = 92;
+        break;
+      case "snow_heavy":
+        variant = "overcast";
+        phenomenonVariant = "snow";
+        temperature = Math.min(temperature, -4);
+        apparentTemperature = temperature - 3;
+        snowfallAmount = 2 + (intensityFactor * 1.3);
+        precipitationAmount = snowfallAmount;
+        humidity = 94;
+        break;
+      case "wet_snow":
+        variant = "overcast";
+        phenomenonVariant = "sleet";
+        temperature = Math.min(temperature, 1);
+        apparentTemperature = temperature - 1;
+        snowfallAmount = 0.8 + (intensityFactor * 0.6);
+        precipitationAmount = 1.8 + (intensityFactor * 1.4);
+        humidity = 94;
+        break;
+      case "blizzard_like":
+        variant = "overcast";
+        phenomenonVariant = "snow";
+        temperature = Math.min(temperature, -6);
+        apparentTemperature = temperature - 5;
+        snowfallAmount = 2.6 + (intensityFactor * 1.4);
+        precipitationAmount = snowfallAmount;
+        humidity = 96;
+        windSpeed = Math.max(windSpeed, 40);
+        windGustSpeed = Math.max(windGustSpeed, 56);
+        break;
+      case "hail":
+        variant = "overcast";
+        phenomenonVariant = "hail";
+        tone = "storm";
+        precipitationAmount = 2.4 + (intensityFactor * 2);
+        rainAmount = precipitationAmount * 0.7;
+        hasHail = true;
+        humidity = 92;
+        windSpeed = Math.max(windSpeed, 20);
+        windGustSpeed = Math.max(windGustSpeed, 32);
+        break;
+      case "post_rain":
+        variant = "partly-cloudy";
+        humidity = 82;
+        break;
+      case "post_storm":
+        variant = "cloudy";
+        humidity = 84;
+        windSpeed = Math.max(windSpeed, 12);
+        windGustSpeed = Math.max(windGustSpeed, 20);
+        break;
+      case "post_snow":
+        variant = "cloudy";
+        temperature = Math.min(temperature, -2);
+        apparentTemperature = temperature - 2;
+        break;
+      case "frost":
+        variant = "clear";
+        temperature = Math.min(temperature, -4);
+        apparentTemperature = temperature - 2;
+        humidity = 86;
+        visibility = 22000;
+        break;
+      case "heat_haze":
+        variant = "clear";
+        temperature = Math.max(temperature, 31 + Math.round(intensityFactor * 4));
+        apparentTemperature = temperature + 2;
+        break;
+      default:
+        break;
+    }
+
+    const cloudCover = sharedCloudCoverForWeather(shared.weather, intensityFactor);
+    return {
+      ...DEFAULT_INPUT,
+      isDay: shared.timeOfDay !== "night",
+      period: shared.timeOfDay === "night" ? "night" : "day",
+      phase: shared.timeOfDay,
+      tone,
+      variant,
+      phenomenonVariant,
+      season: shared.season,
+      precipitationLocked: Boolean(auxiliaryInput?.precipitationLocked),
+      windSpeed,
+      windGustSpeed,
+      windDirection: Number.isFinite(Number(auxiliaryInput?.windDirection)) ? Number(auxiliaryInput.windDirection) : null,
+      windCategory: windCategoryFromSpeed(windSpeed),
+      temperature,
+      apparentTemperature,
+      humidity,
+      precipitationAmount,
+      rainAmount,
+      snowfallAmount,
+      precipitationProbability: precipitationAmount > 0 ? Math.round(58 + (intensityFactor * 38)) : null,
+      cloudCover,
+      cloudCoverLow: cloudCover,
+      cloudCoverMid: Math.max(0, cloudCover - 10),
+      cloudCoverHigh: Math.max(0, cloudCover - 18),
+      cloudLocked: Boolean(auxiliaryInput?.cloudLocked),
+      visibility,
+      hasThunder,
+      hasHail,
+      moonPhase: auxiliaryInput?.moonPhase || "auto"
+    };
+  }
+
+  function syncSharedWeatherState(nextState) {
+    const normalizedCurrent = readSharedWeatherState();
+    const normalizedNext = readSharedWeatherState(nextState);
+    if (
+      normalizedCurrent.weather === normalizedNext.weather
+      && normalizedCurrent.intensity === normalizedNext.intensity
+      && normalizedCurrent.wind === normalizedNext.wind
+      && normalizedCurrent.timeOfDay === normalizedNext.timeOfDay
+      && normalizedCurrent.season === normalizedNext.season
+    ) {
+      return false;
+    }
+    if (typeof window !== "undefined" && typeof window.setWeatherState === "function") {
+      window.setWeatherState(normalizedNext);
+      return true;
+    }
+    return false;
   }
 
   function windStrengthFactor() {
@@ -1726,7 +2149,7 @@
     return `${sceneKey}|${phenomenon}|${precipitationBucket}|step-${intensityStep}|${windBucket}|${precipitationMode}`;
   }
 
-  function apply(input) {
+  function applyResolvedInput(input) {
     const root = ensureRoot();
     if (!root) return;
     const normalized = normaliseInput(input);
@@ -1799,6 +2222,27 @@
     state.forceTreeRedraw = true;
     if (needsParticleRebuild) buildParticles();
     ensureAnimation();
+  }
+
+  function handleSharedWeatherStateChange(event) {
+    applyResolvedInput(buildInputFromSharedWeatherState(event?.detail || null));
+  }
+
+  function apply(input) {
+    if (!input) {
+      clear();
+      return;
+    }
+    sharedWeatherAuxInput = {
+      windDirection: Number.isFinite(Number(input?.windDirection)) ? Number(input.windDirection) : null,
+      precipitationLocked: Boolean(input?.precipitationLocked),
+      cloudLocked: Boolean(input?.cloudLocked),
+      moonPhase: String(input?.moonPhase || "auto")
+    };
+    const nextSharedState = deriveSharedWeatherStateFromLegacyInput(input);
+    if (!syncSharedWeatherState(nextSharedState)) {
+      applyResolvedInput(buildInputFromSharedWeatherState(nextSharedState));
+    }
   }
 
   function updateDebugLabel(text) {
@@ -5584,6 +6028,10 @@
       moonPhase: state.activeMoonPhase,
       debugLabel: state.activeDebugLabel
     };
+  }
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("weather-state-change", handleSharedWeatherStateChange);
   }
 
   window.weatherBackgroundEngine = {

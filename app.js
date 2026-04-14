@@ -2353,6 +2353,16 @@ function requestScheduledRenderFrame(callback) {
   return window.setTimeout(() => callback(Date.now()), 16);
 }
 
+function cancelScheduledRenderFrame(frameId) {
+  if (!frameId || typeof window === "undefined") return;
+  if (typeof window.cancelAnimationFrame === "function") {
+    window.cancelAnimationFrame(frameId);
+  }
+  if (typeof window.clearTimeout === "function") {
+    window.clearTimeout(frameId);
+  }
+}
+
 function flushScheduledRenders() {
   if (!scheduledRenderQueue.size) return;
   const queue = [...scheduledRenderQueue.values()];
@@ -4802,6 +4812,26 @@ function openDetailModalDialog() {
   bindSwipeRows(detailContent || detailModal);
   scheduleThumbSaveBarSync();
 }
+
+function closeDetailModalInPlaceAfterSave() {
+  if (!detailModal?.open || typeof detailModal.close !== "function") return;
+
+  if (typeof window !== "undefined" && window.history?.replaceState) {
+    const currentState = window.history.state && typeof window.history.state === "object"
+      ? { ...window.history.state }
+      : {};
+    delete currentState.__mzOverlay;
+    window.history.replaceState(buildAppNavigationHistoryState(currentState), "");
+  }
+
+  overlayHistoryNavigating = true;
+  activeOverlayHistoryKind = "";
+  detailModal.close();
+  window.setTimeout(() => {
+    overlayHistoryNavigating = false;
+  }, 0);
+}
+
 const imageLightboxImageEl = document.getElementById("image-lightbox-image");
 const imageLightboxCountEl = document.getElementById("image-lightbox-count");
 const imageLightboxCloseEl = document.getElementById("image-lightbox-close");
@@ -6307,6 +6337,7 @@ function toggleToolbarAddMenuFromMobileNav() {
 
 function openMainMenuView(options = {}) {
   const revealCategories = Boolean(options && options.revealCategories);
+  clearIncrementalCatalogRender(catalogEl);
   mainMenuCategoriesPreviewVisible = revealCategories;
   isFocusedView = false;
   updateMenuVisibility();
@@ -11761,6 +11792,7 @@ function setupSowingTipMarquee() {
 }
 
 function renderCatalog() {
+  clearIncrementalCatalogRender(catalogEl);
   if (!isFocusedView) {
     mobileFocusedCategoryTransitionPending = false;
     syncMobileFocusedCategoryTransitionState();
@@ -11786,7 +11818,6 @@ function renderCatalog() {
   const childCategories = childCategoriesOf(category.id);
   const varieties = filteredVarietiesForCurrentCategory();
   const scopedCategoryVarieties = category.nodeType === NODE_TYPES.PARENT ? [] : varietiesInCategoryTree(category.id);
-  const batchCandidates = varietiesInCategoryTree(category.id).filter(isDetailEntry);
   const scopedPlantVarieties = scopedCategoryVarieties.filter((item) => cardType(item) === CARD_TYPES.VARIETY && isDetailEntry(item));
   const sownCount = scopedPlantVarieties.filter((item) => item.sowedAt).length;
   const topCount = scopedPlantVarieties.filter((item) => item.top).length;
@@ -11824,6 +11855,7 @@ function renderCatalog() {
   const useInlineCategoryManage = isMobileShell && isFocusedView;
   const renderInlineChildCategories = isMobileShell && isFocusedView && childCategories.length;
   const showCategoryTitleCount = scopedCategoryVarieties.length && !(isMobileShell && isFocusedView);
+  const hasVarieties = varieties.length > 0;
   const inlineCategoryBackMarkup = useInlineCategoryBack
     ? `<button class="category-shell__back category-shell__back--inline" type="button" data-category-back aria-label="${categoryBackAriaLabel}" title="Späť">&#8249;</button>`
     : "";
@@ -11932,20 +11964,15 @@ function renderCatalog() {
         ` : ""}
         ${childCategoriesSectionMarkup}
     </div>
-      ${varieties.length ? `
+      ${hasVarieties ? `
         <section class="subcatalog">
-          <div class="catalog-grid catalog-grid--varieties">
-            ${varieties.map(renderVarietyCard).join("")}
-          </div>
+          <div class="catalog-grid catalog-grid--varieties"></div>
         </section>
       ` : ""}
     `;
 
   syncDeferredCategoryCardImages(catalogEl);
-  syncDeferredVarietyCardImages(catalogEl);
-  if (!shouldUseMobileDeferredVarietyImages()) {
-    syncCatalogCardImagePresentation(catalogEl);
-  }
+  bindSwipeRows(catalogEl);
   if (typeof window !== "undefined") {
     window.requestAnimationFrame(() => {
       if (!document.body.classList.contains("app-mobile-shell")) return;
@@ -12063,7 +12090,36 @@ function renderCatalog() {
     });
   }
 
-  bindSwipeRows(catalogEl);
+  const catalogGridEl = hasVarieties ? catalogEl.querySelector(".catalog-grid--varieties") : null;
+  let focusedCatalogRevealQueued = false;
+  const syncCatalogBatchUi = () => {
+    if (catalogGridEl instanceof HTMLElement) {
+      bindSwipeRows(catalogGridEl);
+      syncDeferredVarietyCardImages(catalogGridEl);
+    }
+    if (!shouldUseMobileDeferredVarietyImages()) {
+      syncCatalogCardImagePresentation(catalogEl);
+    }
+    if (focusedCatalogRevealQueued) return;
+    focusedCatalogRevealQueued = true;
+    finishMobileFocusedCategoryTransition(mobileFocusedCategoryTransitionToken);
+  };
+
+  if (catalogGridEl instanceof HTMLElement) {
+    renderIncrementalCatalogList(catalogEl, catalogGridEl, varieties, {
+      initialCount: INITIAL_CATALOG_RENDER_COUNT,
+      batchSize: CATALOG_RENDER_BATCH_SIZE,
+      renderBatchMarkup: (slice) => slice.map(renderVarietyCard).join(""),
+      afterBatchRender: () => {
+        syncCatalogBatchUi();
+      }
+    });
+    return;
+  }
+
+  if (!shouldUseMobileDeferredVarietyImages()) {
+    syncCatalogCardImagePresentation(catalogEl);
+  }
   finishMobileFocusedCategoryTransition(mobileFocusedCategoryTransitionToken);
 
 }
@@ -15599,7 +15655,7 @@ function syncRenderableImageElementSource(imageEl, rawSource = "", {
   })();
 }
 
-const CARD_THUMB_CROP_MIN_SCALE = 1;
+const CARD_THUMB_CROP_MIN_SCALE = 0.5;
 const CARD_THUMB_CROP_MAX_SCALE = 3;
 const CARD_THUMB_CROP_SCALE_STEP = 0.05;
 
@@ -15790,7 +15846,8 @@ function renderCardThumbCropEditorMarkup(source = "", cropValue = {}, {
   description = "Upravuješ len náhľad hlavnej fotky na karte. Originál ostane bez zmeny.",
   emptyLabel = "Najprv pridaj hlavnú fotku",
   altText = "Preview náhľadu karty",
-  hint = "Potiahni fotku prstom. Priblíženie meníš posuvníkom."
+  hint = "Potiahni fotku prstom. Priblíženie meníš posuvníkom.",
+  viewportClassName = ""
 } = {}) {
   const hasImage = Boolean(String(source || "").trim());
   const resolved = resolveCardThumbCropState(cropValue);
@@ -15808,7 +15865,7 @@ function renderCardThumbCropEditorMarkup(source = "", cropValue = {}, {
         <button class="button button--ghost button--small thumb-crop-editor__toggle" type="button" data-thumb-crop-toggle ${hasImage ? "" : "disabled"}>${toggleLabel}</button>
       </div>
       <div class="thumb-crop-editor__panel" data-thumb-crop-panel ${hasImage && open ? "" : "hidden"}>
-        <div class="thumb-crop-editor__viewport" data-thumb-crop-viewport>
+        <div class="thumb-crop-editor__viewport${viewportClassName ? ` ${escapeAttribute(viewportClassName)}` : ""}" data-thumb-crop-viewport>
           <img
             class="thumb-crop-editor__image"
             data-thumb-crop-preview
@@ -16209,6 +16266,9 @@ const INITIAL_JOURNAL_RENDER_COUNT = 10;
 const JOURNAL_RENDER_BATCH_SIZE = 10;
 const JOURNAL_LAZY_RENDER_THRESHOLD_PX = 300;
 const incrementalJournalRenderState = new WeakMap();
+const INITIAL_CATALOG_RENDER_COUNT = 10;
+const CATALOG_RENDER_BATCH_SIZE = 6;
+const incrementalCatalogRenderState = new WeakMap();
 
 function clearIncrementalJournalRender(container) {
   const state = incrementalJournalRenderState.get(container);
@@ -16357,6 +16417,75 @@ function renderIncrementalJournalList(container, items, options = {}) {
     if (isIncrementalJournalRootNearBottom(scrollRoot)) {
       queueNextBatch();
     }
+  }
+}
+
+function clearIncrementalCatalogRender(container) {
+  const state = container instanceof HTMLElement ? incrementalCatalogRenderState.get(container) : null;
+  if (!state) return;
+  state.dispose();
+  incrementalCatalogRenderState.delete(container);
+}
+
+function renderIncrementalCatalogList(rootContainer, container, items, options = {}) {
+  if (!(rootContainer instanceof HTMLElement) || !(container instanceof HTMLElement)) return;
+  clearIncrementalCatalogRender(rootContainer);
+
+  const safeItems = Array.isArray(items) ? items : [];
+  const initialCount = Math.max(1, Number(options.initialCount) || INITIAL_CATALOG_RENDER_COUNT);
+  const batchSize = Math.max(1, Number(options.batchSize) || CATALOG_RENDER_BATCH_SIZE);
+  const renderBatchMarkup = requireFunction("renderBatchMarkup", options.renderBatchMarkup);
+  const afterBatchRender = typeof options.afterBatchRender === "function" ? options.afterBatchRender : null;
+
+  container.innerHTML = "";
+
+  if (!safeItems.length) {
+    afterBatchRender?.(container, { renderedCount: 0, appendedItems: [], isFinal: true });
+    return;
+  }
+
+  let renderedCount = 0;
+  let batchFrameId = 0;
+  let disposed = false;
+
+  const appendBatch = (startIndex, count) => {
+    if (disposed || !container.isConnected) return false;
+    const slice = safeItems.slice(startIndex, startIndex + count);
+    if (!slice.length) return false;
+    appendHtmlFragment(container, renderBatchMarkup(slice));
+    renderedCount += slice.length;
+    afterBatchRender?.(container, {
+      renderedCount,
+      appendedItems: slice,
+      isFinal: renderedCount >= safeItems.length
+    });
+    return renderedCount < safeItems.length;
+  };
+
+  const queueNextBatch = () => {
+    if (disposed || batchFrameId || renderedCount >= safeItems.length) return;
+    batchFrameId = requestScheduledRenderFrame(() => {
+      batchFrameId = 0;
+      const hasMore = appendBatch(renderedCount, batchSize);
+      if (hasMore) {
+        queueNextBatch();
+      }
+    });
+  };
+
+  incrementalCatalogRenderState.set(rootContainer, {
+    dispose() {
+      disposed = true;
+      if (batchFrameId) {
+        cancelScheduledRenderFrame(batchFrameId);
+        batchFrameId = 0;
+      }
+    }
+  });
+
+  appendBatch(0, Math.min(initialCount, safeItems.length));
+  if (renderedCount < safeItems.length) {
+    queueNextBatch();
   }
 }
 
@@ -19057,6 +19186,7 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
       existing.thumbOffsetX = serializedThumbCrop.thumbOffsetX;
       existing.thumbOffsetY = serializedThumbCrop.thumbOffsetY;
       existing.thumbScale = serializedThumbCrop.thumbScale;
+      Object.assign(existing, touchLocalSyncRecord(existing, "category"));
     } else {
       const created = {
         id: categoryIdForValidation,
@@ -19090,8 +19220,13 @@ function openCategoryManager(categoryId = null, forcedParentId = "") {
     if (isCategoryCompatibleWithCardType(preferredCardType, savedCategoryId)) {
       rememberLastUsedCategory(savedCategoryId, preferredCardType);
     }
+    if (savedCategoryId) {
+      activeCategoryId = savedCategoryId;
+      isFocusedView = true;
+      mainMenuCategoriesPreviewVisible = false;
+    }
     render();
-    detailModal.close();
+    closeDetailModalInPlaceAfterSave();
     showAppToast(existing ? "Kategória uložená" : "Kategória pridaná", {
       tone: "success"
     });
@@ -19187,7 +19322,8 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
         ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, {
           open: thumbCropPanelOpen,
           description: "Upravuješ len náhľad hlavnej fotky na karte. Takto sa potom zobrazí v prehľade.",
-          altText: "Preview náhľadu karty"
+          altText: "Preview náhľadu karty",
+          viewportClassName: "thumb-crop-editor__viewport--card-preview"
         })}
         <form class="detail-form detail-form--editor" id="variety-form">
           ${showInlineCreateAction ? `
@@ -19600,18 +19736,21 @@ function openVarietyEditor(varietyId = null, forcedCategoryId = null, forcedEntr
 
     if (existing) {
       Object.assign(existing, payload);
+      Object.assign(existing, touchLocalSyncRecord(existing, "card"));
     } else {
       state.varieties.unshift({ id: makeId("var"), ...payload });
     }
 
-    activeCategoryId = currentViewCategoryId;
+    activeCategoryId = String(payload.categoryId || currentViewCategoryId || "").trim() || currentViewCategoryId;
+    isFocusedView = true;
+    mainMenuCategoriesPreviewVisible = false;
     clearAppCache();
     rememberLastUsedCardType(CARD_TYPES.VARIETY);
     if (isCategoryCompatibleWithCardType(CARD_TYPES.VARIETY, payload.categoryId)) {
       rememberLastUsedCategory(payload.categoryId, CARD_TYPES.VARIETY);
     }
     render();
-    detailModal.close();
+    closeDetailModalInPlaceAfterSave();
     showAppToast(existing ? "Karta uložená" : "Karta pridaná", {
       tone: "success"
     });
@@ -21679,11 +21818,12 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
               ${cardTypeOptionsMarkup(selectedType)}
             </div>
           ` : ""}
-          ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, {
-            open: thumbCropPanelOpen,
-            description: "Upravuješ len náhľad hlavnej fotky na karte. Takto sa potom zobrazí v prehľade.",
-            altText: "Preview náhľadu karty"
-          })}
+        ${renderCardThumbCropEditorMarkup(thumbCropSource, draftThumbCrop, {
+          open: thumbCropPanelOpen,
+          description: "Upravuješ len náhľad hlavnej fotky na karte. Takto sa potom zobrazí v prehľade.",
+          altText: "Preview náhľadu karty",
+          viewportClassName: "thumb-crop-editor__viewport--card-preview"
+        })}
           <form class="detail-form detail-form--editor" id="universal-card-form">
             ${showInlineCreateAction ? `
               <div class="detail-form__lead-action">
@@ -22236,7 +22376,7 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
 
       if (existing) {
         const index = state.varieties.findIndex((item) => item.id === existing.id);
-        if (index >= 0) state.varieties[index] = payload;
+        if (index >= 0) state.varieties[index] = touchLocalSyncRecord(payload, "card");
       } else {
         state.varieties.unshift(payload);
       }
@@ -22246,8 +22386,11 @@ function openUniversalCardEditor(cardTypeValue = "mushroom", cardId = null, forc
       if (isCategoryCompatibleWithCardType(selectedType, normalizedCategoryId)) {
         rememberLastUsedCategory(normalizedCategoryId, selectedType);
       }
+      activeCategoryId = normalizedCategoryId;
+      isFocusedView = true;
+      mainMenuCategoriesPreviewVisible = false;
       render();
-      detailModal.close();
+      closeDetailModalInPlaceAfterSave();
       showAppToast(existing ? "Karta uložená" : "Karta pridaná", {
         tone: "success"
       });

@@ -48368,3 +48368,107 @@ body.app-mobile-shell .detail-modal--editor .category-preview img[data-thumb-cro
   transform: translate3d(var(--thumb-crop-translate-x, 0px), var(--thumb-crop-translate-y, 0px), 0) scale(var(--thumb-crop-scale, 1)) !important;
   transform-origin: center center !important;
 }
+
+/* Final mobile thumb crop parity:
+   editor pre karty ma mat rovnaky crop box ako realny preview frame. */
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape,
+body.app-mobile-shell .thumb-crop-editor__viewport--card-preview {
+  aspect-ratio: 1 / 0.84 !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor__viewport--card-preview {
+  width: 100% !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  display: grid !important;
+  place-items: stretch !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell .thumb-crop-editor__viewport--card-preview > .thumb-crop-editor__image {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+
+/* Final mobile preview frame size lock:
+   aj swipe-wrapped a cropnute karty musia mat identicky image frame. */
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties > .swipe-row--catalog-card > .swipe-row__content > .catalog-card--preview .catalog-card__image--preview,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--soft-fit,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--portrait,
+body.app-mobile-shell.app-focused-mode .catalog-grid--varieties .catalog-card--preview .catalog-card__image--preview.catalog-card__image--landscape {
+  box-sizing: border-box !important;
+  width: calc(100% - 20px) !important;
+  max-width: calc(100% - 20px) !important;
+  min-width: 0 !important;
+  margin: 10px auto 0 !important;
+  flex: 0 0 auto !important;
+  align-self: center !important;
+  justify-self: stretch !important;
+  aspect-ratio: 1 / 0.84 !important;
+  min-height: 92px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+}
+
+/* Final mobile journal border cleanup:
+   compact list ma mat len jeden vonkajsi ram a filter summary ma mat ciste plne zaoblenie. */
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-overlay-card--compact-list .journal-overlay-card__compact-shell {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__disclosure {
+  border-radius: 18px !important;
+  border: 1px solid rgba(210, 219, 229, 0.96) !important;
+  background: rgba(248, 250, 252, 0.98) !important;
+  box-shadow: none !important;
+  background-clip: padding-box !important;
+  overflow: hidden !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary {
+  border: 0 !important;
+  border-radius: inherit !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  background-clip: padding-box !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+body.app-mobile-shell #journal-overlay-root[data-journal-overlay-layout="mobile-list"] .journal-tag-filter__summary::marker {
+  content: "" !important;
+  font-size: 0 !important;
+}

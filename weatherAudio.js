@@ -168,6 +168,326 @@
     return "mild";
   }
 
+  function normalizeSharedIntensityKey(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      if (value >= 0.72) return "heavy";
+      if (value >= 0.42) return "medium";
+      return "light";
+    }
+    const intensity = String(value || "").trim().toLowerCase();
+    if (["heavy", "strong", "high", "intense"].includes(intensity)) return "heavy";
+    if (["medium", "moderate", "normal", "mid"].includes(intensity)) return "medium";
+    return "light";
+  }
+
+  function sharedIntensityValue(value) {
+    const intensity = normalizeSharedIntensityKey(value);
+    if (intensity === "heavy") return 0.96;
+    if (intensity === "medium") return 0.64;
+    return 0.34;
+  }
+
+  function normalizeSharedWindKey(value) {
+    const wind = String(value || "").trim().toLowerCase();
+    if (["gale", "storm", "very_strong"].includes(wind)) return "gale";
+    if (["strong", "medium", "windy"].includes(wind)) return "strong";
+    if (["breeze", "soft", "light", "gentle"].includes(wind)) return "breeze";
+    return "calm";
+  }
+
+  function sharedWindKeyFromSpeed(speed) {
+    const numericSpeed = Math.max(0, Number(speed) || 0);
+    if (numericSpeed >= 42) return "gale";
+    if (numericSpeed >= 22) return "strong";
+    if (numericSpeed >= 6) return "breeze";
+    return "calm";
+  }
+
+  function normalizeSharedTimeOfDayKey(value) {
+    return normalizeTimeOfDay(value);
+  }
+
+  function readSharedWeatherState(input = null) {
+    const shared = input && typeof input === "object"
+      ? input
+      : (typeof window !== "undefined" && window.weatherState && typeof window.weatherState === "object"
+        ? window.weatherState
+        : null);
+    return {
+      weather: normalizeWeatherKey(shared?.weather),
+      intensity: normalizeSharedIntensityKey(shared?.intensity),
+      wind: normalizeSharedWindKey(shared?.wind),
+      timeOfDay: normalizeSharedTimeOfDayKey(shared?.timeOfDay),
+      season: normalizeSeason(shared?.season || "spring")
+    };
+  }
+
+  function mergeSharedWeatherState(nextPatch = {}) {
+    const current = readSharedWeatherState();
+    return readSharedWeatherState({
+      weather: nextPatch.weather === undefined ? current.weather : nextPatch.weather,
+      intensity: nextPatch.intensity === undefined ? current.intensity : nextPatch.intensity,
+      wind: nextPatch.wind === undefined ? current.wind : nextPatch.wind,
+      timeOfDay: nextPatch.timeOfDay === undefined ? current.timeOfDay : nextPatch.timeOfDay,
+      season: nextPatch.season === undefined ? current.season : nextPatch.season
+    });
+  }
+
+  function syncSharedWeatherState(nextPatch = {}) {
+    const current = readSharedWeatherState();
+    const nextState = mergeSharedWeatherState(nextPatch);
+    const changed = current.weather !== nextState.weather
+      || current.intensity !== nextState.intensity
+      || current.wind !== nextState.wind
+      || current.timeOfDay !== nextState.timeOfDay
+      || current.season !== nextState.season;
+    if (changed && typeof window !== "undefined" && typeof window.setWeatherState === "function") {
+      window.setWeatherState(nextState);
+    }
+    return { changed, nextState };
+  }
+
+  function deriveSharedWeatherStateFromLegacyInput(input = {}) {
+    const source = input && typeof input === "object" ? input : {};
+    const phenomenon = String(source.phenomenonVariant || source.conditionVariant || "").trim().toLowerCase();
+    const variant = String(source.variant || source.condition || "").trim().toLowerCase();
+    const timeOfDay = normalizeSharedTimeOfDayKey(source.timeOfDay || source.phase || source.period || (source.isDay === false ? "night" : "day"));
+    const season = normalizeSeason(source.season || "spring");
+    const windSpeed = Math.max(0, Number(source.windSpeed) || 0);
+    const wind = normalizeSharedWindKey(source.wind || source.windCategory || sharedWindKeyFromSpeed(windSpeed));
+    const precipitationAmount = Math.max(
+      0,
+      Number(source.precipitationAmount) || 0,
+      Number(source.rainAmount) || 0,
+      Number(source.showersAmount) || 0
+    );
+    const snowfallAmount = Math.max(0, Number(source.snowfallAmount) || 0);
+    let weather = normalizeWeatherKey(source.weather);
+
+    if (weather === "clear") {
+      if (["fog", "mist"].includes(phenomenon)) weather = "fog";
+      else if (phenomenon === "drizzle") weather = "drizzle";
+      else if (phenomenon === "rain") weather = precipitationAmount >= 6 ? "heavy_rain" : "rain";
+      else if (phenomenon === "storm") weather = Boolean(source.hasThunder) ? "storm_near" : "storm_far";
+      else if (phenomenon === "snow") weather = snowfallAmount >= 2.2 ? "snow_heavy" : snowfallAmount >= 0.9 ? "snow_medium" : "snow_light";
+      else if (phenomenon === "sleet" || phenomenon === "freezing-rain") weather = "wet_snow";
+      else if (phenomenon === "hail") weather = "hail";
+      else if (phenomenon === "frost") weather = "frost";
+      else if (variant === "partly-cloudy" || variant === "partly_cloudy" || variant === "mostly-clear") weather = "partly_cloudy";
+      else if (variant === "cloudy") weather = "cloudy";
+      else if (variant === "overcast") weather = "overcast";
+      else if (variant === "clear" && wind !== "calm") weather = wind === "gale" ? "wind_strong" : wind === "strong" ? "wind_medium" : "wind_soft";
+    }
+
+    let intensity = normalizeSharedIntensityKey(source.intensity);
+    if (!("intensity" in source)) {
+      if (["heavy_rain", "storm_near", "snow_heavy", "blizzard_like", "hail"].includes(weather)) intensity = "heavy";
+      else if (["rain", "storm_far", "wind_medium", "wind_strong", "snow_medium", "wet_snow", "fog", "cloudy", "overcast", "post_storm"].includes(weather)) intensity = "medium";
+      else intensity = "light";
+    }
+
+    return {
+      weather,
+      intensity,
+      wind,
+      timeOfDay,
+      season
+    };
+  }
+
+  function cloudCoverForSharedWeather(weather) {
+    switch (weather) {
+      case "partly_cloudy": return 0.42;
+      case "cloudy": return 0.68;
+      case "overcast":
+      case "fog":
+      case "drizzle":
+      case "rain":
+      case "heavy_rain":
+      case "storm_far":
+      case "storm_near":
+      case "snow_light":
+      case "snow_medium":
+      case "snow_heavy":
+      case "wet_snow":
+      case "blizzard_like":
+      case "hail":
+        return 0.94;
+      case "post_storm": return 0.70;
+      case "post_rain": return 0.46;
+      case "post_snow": return 0.58;
+      case "wind_strong": return 0.58;
+      case "wind_medium": return 0.36;
+      case "wind_soft": return 0.22;
+      default: return 0.1;
+    }
+  }
+
+  function sharedTemperatureBandForState(sharedState) {
+    const weather = normalizeWeatherKey(sharedState?.weather);
+    const season = normalizeSeason(sharedState?.season || "spring");
+    if (weather === "heat_haze") return "hot";
+    if (["snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "post_snow", "frost"].includes(weather)) return "cold";
+    if (season === "winter") return "cold";
+    if (season === "summer") return weather === "overcast" || weather === "rain" || weather === "heavy_rain" || weather === "storm_far" || weather === "storm_near"
+      ? "mild"
+      : "warm";
+    return "mild";
+  }
+
+  function sharedTemperatureValue(sharedState, temperatureBand, intensityValue) {
+    const timeOfDay = normalizeSharedTimeOfDayKey(sharedState?.timeOfDay);
+    const weather = normalizeWeatherKey(sharedState?.weather);
+    let value = temperatureBand === "hot"
+      ? 31 + Math.round(intensityValue * 4)
+      : temperatureBand === "warm"
+        ? 23
+        : temperatureBand === "cold"
+          ? 1
+          : 14;
+    if (["snow_light", "snow_medium", "snow_heavy", "blizzard_like"].includes(weather)) value = Math.min(value, -2);
+    if (weather === "frost") value = Math.min(value, -4);
+    if (weather === "wet_snow") value = Math.min(value, 1);
+    if (timeOfDay === "night") value -= 5;
+    else if (timeOfDay === "dawn") value -= 2;
+    else if (timeOfDay === "evening") value -= 1;
+    return value;
+  }
+
+  function buildSoundStateFromSharedWeatherState(sharedInput = null) {
+    const sharedState = readSharedWeatherState(sharedInput);
+    const weather = normalizeWeatherKey(sharedState.weather);
+    const timeOfDay = normalizeTimeOfDay(sharedState.timeOfDay);
+    const season = normalizeSeason(sharedState.season);
+    const intensityValue = sharedIntensityValue(sharedState.intensity);
+    const temperatureBand = sharedTemperatureBandForState(sharedState);
+    const temperatureC = sharedTemperatureValue(sharedState, temperatureBand, intensityValue);
+    const cloudCover = cloudCoverForSharedWeather(weather);
+    let windSpeed = sharedState.wind === "gale" ? 46 : sharedState.wind === "strong" ? 28 : sharedState.wind === "breeze" ? 12 : 0;
+    let windGustSpeed = sharedState.wind === "gale" ? 62 : sharedState.wind === "strong" ? 40 : sharedState.wind === "breeze" ? 18 : 4;
+    if (weather === "wind_medium") {
+      windSpeed = Math.max(windSpeed, 24);
+      windGustSpeed = Math.max(windGustSpeed, 36);
+    } else if (weather === "wind_strong" || weather === "blizzard_like") {
+      windSpeed = Math.max(windSpeed, 42);
+      windGustSpeed = Math.max(windGustSpeed, 56);
+    } else if (weather === "storm_far") {
+      windSpeed = Math.max(windSpeed, 24);
+      windGustSpeed = Math.max(windGustSpeed, 38);
+    } else if (weather === "storm_near") {
+      windSpeed = Math.max(windSpeed, 34);
+      windGustSpeed = Math.max(windGustSpeed, 52);
+    }
+
+    let rainIntensity = 0;
+    let snowIntensity = 0;
+    let hailIntensity = 0;
+    let fogIntensity = 0;
+    let heatIntensity = 0;
+    let coldIntensity = 0;
+    let precipitationAmount = 0;
+    let snowfallAmount = 0;
+    let hasThunder = false;
+
+    switch (weather) {
+      case "drizzle":
+        rainIntensity = clamp(0.22 + (intensityValue * 0.18), 0, 1);
+        precipitationAmount = 1 + (intensityValue * 1.1);
+        break;
+      case "rain":
+        rainIntensity = clamp(0.48 + (intensityValue * 0.24), 0, 1);
+        precipitationAmount = 3 + (intensityValue * 2.8);
+        break;
+      case "heavy_rain":
+        rainIntensity = clamp(0.78 + (intensityValue * 0.18), 0, 1);
+        precipitationAmount = 7 + (intensityValue * 3.4);
+        break;
+      case "storm_far":
+        rainIntensity = clamp(0.70 + (intensityValue * 0.18), 0, 1);
+        precipitationAmount = 6 + (intensityValue * 3);
+        hasThunder = true;
+        break;
+      case "storm_near":
+        rainIntensity = clamp(0.88 + (intensityValue * 0.10), 0, 1);
+        precipitationAmount = 8 + (intensityValue * 3.6);
+        hasThunder = true;
+        break;
+      case "snow_light":
+        snowIntensity = clamp(0.22 + (intensityValue * 0.16), 0, 1);
+        snowfallAmount = 0.5 + (intensityValue * 0.6);
+        break;
+      case "snow_medium":
+        snowIntensity = clamp(0.48 + (intensityValue * 0.18), 0, 1);
+        snowfallAmount = 1.2 + (intensityValue * 0.9);
+        break;
+      case "snow_heavy":
+      case "blizzard_like":
+        snowIntensity = clamp(0.80 + (intensityValue * 0.14), 0, 1);
+        snowfallAmount = 2.2 + (intensityValue * 1.2);
+        break;
+      case "wet_snow":
+        rainIntensity = clamp(0.18 + (intensityValue * 0.16), 0, 1);
+        snowIntensity = clamp(0.42 + (intensityValue * 0.18), 0, 1);
+        snowfallAmount = 0.9 + (intensityValue * 0.6);
+        precipitationAmount = 2 + (intensityValue * 1.4);
+        break;
+      case "hail":
+        hailIntensity = clamp(0.68 + (intensityValue * 0.18), 0, 1);
+        rainIntensity = clamp(0.24 + (intensityValue * 0.12), 0, 1);
+        precipitationAmount = 4 + (intensityValue * 2);
+        break;
+      case "fog":
+        fogIntensity = clamp(0.56 + (intensityValue * 0.22), 0, 1);
+        break;
+      case "heat_haze":
+        heatIntensity = clamp(0.62 + (intensityValue * 0.24), 0, 1);
+        break;
+      default:
+        break;
+    }
+
+    if (["snow_light", "snow_medium", "snow_heavy", "wet_snow", "blizzard_like", "post_snow", "frost"].includes(weather)) {
+      coldIntensity = clamp(0.46 + (intensityValue * 0.24), 0, 1);
+    } else if (season === "winter") {
+      coldIntensity = 0.34;
+    }
+
+    const windIntensity = clamp(
+      Math.max(
+        weather === "wind_soft" ? 0.28 : 0,
+        weather === "wind_medium" ? 0.62 : 0,
+        weather === "wind_strong" || weather === "blizzard_like" ? 0.94 : 0,
+        weather === "storm_far" ? 0.62 : 0,
+        weather === "storm_near" ? 0.84 : 0,
+        sharedState.wind === "gale" ? 1 : sharedState.wind === "strong" ? 0.68 : sharedState.wind === "breeze" ? 0.28 : 0
+      ),
+      0,
+      1
+    );
+
+    return {
+      timeOfDay,
+      weather,
+      intensity: intensityValue,
+      season,
+      temperatureBand,
+      cloudCover,
+      rainIntensity,
+      snowIntensity,
+      windIntensity,
+      hailIntensity,
+      fogIntensity,
+      heatIntensity,
+      coldIntensity,
+      temperatureC,
+      windSpeed,
+      windGustSpeed,
+      precipitationAmount,
+      snowfallAmount,
+      hasThunder
+    };
+  }
+
   function isRealMobileRuntimeAudioMode() {
     if (typeof document === "undefined" || typeof window === "undefined") return false;
     try {
@@ -1411,9 +1731,11 @@
       this.autoActivationBound = false;
       this.handleUserActivation = this.handleUserActivation.bind(this);
       this.handleAutoActivationGesture = this.handleAutoActivationGesture.bind(this);
+      this.handleSharedWeatherStateChange = this.handleSharedWeatherStateChange.bind(this);
       this.stepMix = this.stepMix.bind(this);
       this.bindUserActivation();
       if (typeof window !== "undefined") {
+        window.addEventListener("weather-state-change", this.handleSharedWeatherStateChange);
         window.setWeatherAudioDebug = (enabled) => this.setDebug(Boolean(enabled));
       }
     }
@@ -1731,15 +2053,15 @@
     }
 
     setTimeOfDay(value) {
-      return this.transitionToState({ timeOfDay: normalizeTimeOfDay(value) });
+      return this.applyWeatherState({ timeOfDay: value });
     }
 
     setWeather(value) {
-      return this.transitionToState({ weather: normalizeWeatherKey(value) });
+      return this.applyWeatherState({ weather: value });
     }
 
     setWeatherIntensity(value) {
-      return this.transitionToState({ intensity: clamp(Number(value) || 0, 0, 1) });
+      return this.applyWeatherState({ intensity: value });
     }
 
     setTemperatureBand(value) {
@@ -1759,11 +2081,59 @@
     }
 
     updateSoundscape() {
-      return this.transitionToState({});
+      return this.applySharedWeatherState(readSharedWeatherState(), {
+        sourceInput: this.lastInput || { sharedWeatherState: readSharedWeatherState() }
+      });
     }
 
     applyWeatherState(nextState) {
-      return this.transitionToState(nextState);
+      const safeNextState = nextState && typeof nextState === "object" ? { ...nextState } : {};
+      const sharedPatch = {};
+      if (Object.prototype.hasOwnProperty.call(safeNextState, "timeOfDay")) {
+        sharedPatch.timeOfDay = safeNextState.timeOfDay;
+        delete safeNextState.timeOfDay;
+      }
+      if (Object.prototype.hasOwnProperty.call(safeNextState, "weather")) {
+        sharedPatch.weather = safeNextState.weather;
+        delete safeNextState.weather;
+      }
+      if (Object.prototype.hasOwnProperty.call(safeNextState, "intensity")) {
+        sharedPatch.intensity = safeNextState.intensity;
+        delete safeNextState.intensity;
+      }
+      if (Object.prototype.hasOwnProperty.call(safeNextState, "season")) {
+        sharedPatch.season = safeNextState.season;
+        delete safeNextState.season;
+      }
+      if (Object.prototype.hasOwnProperty.call(safeNextState, "wind")) {
+        sharedPatch.wind = safeNextState.wind;
+        delete safeNextState.wind;
+      } else if (Object.prototype.hasOwnProperty.call(safeNextState, "windSpeed")) {
+        sharedPatch.wind = sharedWindKeyFromSpeed(safeNextState.windSpeed);
+        delete safeNextState.windSpeed;
+        if (Object.prototype.hasOwnProperty.call(safeNextState, "windGustSpeed")) {
+          delete safeNextState.windGustSpeed;
+        }
+      }
+
+      let evaluation = null;
+      if (Object.keys(sharedPatch).length) {
+        const syncResult = syncSharedWeatherState(sharedPatch);
+        if (!syncResult.changed) {
+          evaluation = this.applySharedWeatherState(syncResult.nextState, {
+            sourceInput: { api: "applyWeatherState", nextState: nextState || null }
+          });
+        } else {
+          evaluation = this.evaluation;
+        }
+      }
+
+      if (Object.keys(safeNextState).length) {
+        return this.transitionToState(safeNextState, {
+          sourceInput: { api: "applyWeatherState", nextState: nextState || null }
+        });
+      }
+      return evaluation;
     }
 
     apply(input = null) {
@@ -1776,16 +2146,44 @@
         this.clear();
         return null;
       }
-      const normalized = this.normalizeInputToState(input);
+      const sharedState = deriveSharedWeatherStateFromLegacyInput(input);
+      const syncResult = syncSharedWeatherState(sharedState);
+      if (!syncResult.changed) {
+        return this.applySharedWeatherState(syncResult.nextState, { sourceInput: input });
+      }
+      return this.evaluation;
+    }
+
+    handleSharedWeatherStateChange(event) {
+      this.applySharedWeatherState(event?.detail || null, {
+        sourceInput: {
+          sharedWeatherState: readSharedWeatherState(event?.detail || null)
+        }
+      });
+    }
+
+    applySharedWeatherState(sharedInput = null, options = {}) {
+      const normalized = buildSoundStateFromSharedWeatherState(sharedInput);
+      const sourceInput = options.sourceInput || {
+        sharedWeatherState: readSharedWeatherState(sharedInput)
+      };
+      if (!this.supported || !this.enabled) {
+        this.clear();
+        return null;
+      }
       if (!this.activated) {
-        this.state = normalized;
-        this.evaluation = this.evaluateRules(normalized);
-        this.lastActiveMix = this.computeActiveLayers(normalized, this.evaluation);
+        this.state = {
+          ...this.state,
+          ...normalized,
+          sourceInput
+        };
+        this.evaluation = this.evaluateRules(this.state);
+        this.lastActiveMix = this.computeActiveLayers(this.state, this.evaluation);
         this.stopDetailTimers();
         this.notifyStateChange("pending-activation");
         return this.evaluation;
       }
-      return this.transitionToState(normalized, { sourceInput: input });
+      return this.transitionToState(normalized, { sourceInput });
     }
 
     transitionToState(partialState = {}, options = {}) {
@@ -3339,6 +3737,9 @@
     destroyAudioEngine() {
       this.clear();
       this.unbindUserActivation();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("weather-state-change", this.handleSharedWeatherStateChange);
+      }
       this.loopLayers.forEach((layer) => {
         try {
           layer.audio.pause();
