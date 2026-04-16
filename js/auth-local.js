@@ -244,8 +244,6 @@
       }
 
       function syncAuthGate(statusMessage = "", tone = "") {
-        clearLocalAuthSession();
-        clearLocalAuthProfile();
         removeAuthGate();
       }
 
