@@ -1,5 +1,6 @@
 (function initMojaZahradaPwa() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  const serviceWorkerVersion = "2026-04-16-0005";
 
   const isSecureContextLike = window.location.protocol === "https:"
     || window.location.hostname === "localhost"
@@ -19,7 +20,7 @@
   });
 
   window.addEventListener("load", () => {
-    const serviceWorkerUrl = new URL("./sw.js?v=2026-04-09-0003", window.location.href);
+    const serviceWorkerUrl = new URL(`./sw.js?v=${serviceWorkerVersion}`, window.location.href);
 
     navigator.serviceWorker.register(serviceWorkerUrl.href).then((registration) => {
       if (registration.waiting) {

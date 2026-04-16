@@ -1,9 +1,9 @@
-const MOJA_ZAHRADA_STATIC_CACHE = "moja-zahrada-static-v2026-04-14-0010";
-const MOJA_ZAHRADA_RUNTIME_CACHE = "moja-zahrada-runtime-v2026-04-14-0010";
+const MOJA_ZAHRADA_STATIC_CACHE = "moja-zahrada-static-v2026-04-16-0005";
+const MOJA_ZAHRADA_RUNTIME_CACHE = "moja-zahrada-runtime-v2026-04-16-0005";
 const MOJA_ZAHRADA_APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=2026-04-14-0006",
+  "./styles.css?v=2026-04-16-0003",
   "./weatherBackground.css?v=2026-04-05-0129",
   "./js/constants.js?v=2026-04-09-0003",
   "./js/seed-data.js?v=2026-04-09-0003",
@@ -11,14 +11,19 @@ const MOJA_ZAHRADA_APP_SHELL = [
   "./js/journal.js?v=2026-04-09-0003",
   "./js/categories.js?v=2026-04-14-0001",
   "./js/storage.js?v=2026-04-09-0003",
+  "./js/preferences.js?v=2026-04-10-2357",
+  "./js/data-transfer.js?v=2026-04-11-0003",
+  "./js/weather-location.js?v=2026-04-11-0002",
+  "./js/auth-local.js?v=2026-04-16-0001",
+  "./js/actions.js?v=2026-04-11-0004",
   "./js/ui.helpers.js?v=2026-04-09-0003",
   "./js/ui.js?v=2026-04-09-0003",
-  "./app.js?v=2026-04-14-0006",
+  "./app.js?v=2026-04-16-0004",
   "./weather-state.js?v=2026-04-14-0001",
   "./weatherBackground.js?v=2026-04-14-0001",
   "./weatherAudio.js?v=2026-04-14-0001",
   "./supabase-config.js?v=2026-03-29-0015",
-  "./pwa.js?v=2026-04-09-0003",
+  "./pwa.js?v=2026-04-16-0004",
   "./manifest.webmanifest?v=2026-04-04-0077",
   "./icon-192.png",
   "./icon-512.png",
@@ -65,6 +70,7 @@ function shouldRuntimeCache(requestUrl, request) {
     || destination === "style"
     || destination === "image"
     || destination === "audio"
+    || destination === "video"
     || destination === "font"
     || pathname.endsWith(".js")
     || pathname.endsWith(".css")
@@ -73,6 +79,11 @@ function shouldRuntimeCache(requestUrl, request) {
     || pathname.endsWith(".jpg")
     || pathname.endsWith(".jpeg")
     || pathname.endsWith(".webp")
+    || pathname.endsWith(".mp4")
+    || pathname.endsWith(".mov")
+    || pathname.endsWith(".m4v")
+    || pathname.endsWith(".webm")
+    || pathname.endsWith(".3gp")
     || pathname.endsWith(".mp3")
     || pathname.endsWith(".wav")
     || pathname.endsWith(".ogg");

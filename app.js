@@ -30,14 +30,14 @@ const MOBILE_WEATHER_SOUND_VOLUME_KEY = "moja-zahrada-mobile-weather-sound-volum
 const QUICK_UI_PREFERENCES_KEY = "moja-zahrada-quick-ui-v1";
 const IMAGE_FILE_ACCEPT = "image/*,.jpg,.jpeg,.png,.webp,.heic,.heif";
 const VIDEO_FILE_ACCEPT = "video/*,.mp4,.mov,.m4v,.webm,.3gp";
-const JOURNAL_IMAGE_MAX_DIMENSION = 1280;
-const JOURNAL_IMAGE_QUALITY = 0.8;
-const QUICK_CAPTURE_PREVIEW_MAX_DIMENSION = 1440;
-const QUICK_CAPTURE_PREVIEW_QUALITY = 0.82;
-const CATEGORY_IMAGE_MAX_DIMENSION = 1280;
-const CATEGORY_IMAGE_QUALITY = 0.8;
-const LIST_IMAGE_PREVIEW_MAX_DIMENSION = 420;
-const JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION = 520;
+const JOURNAL_IMAGE_MAX_DIMENSION = 2048;
+const JOURNAL_IMAGE_QUALITY = 0.94;
+const QUICK_CAPTURE_PREVIEW_MAX_DIMENSION = 2160;
+const QUICK_CAPTURE_PREVIEW_QUALITY = 0.94;
+const CATEGORY_IMAGE_MAX_DIMENSION = 2048;
+const CATEGORY_IMAGE_QUALITY = 0.94;
+const LIST_IMAGE_PREVIEW_MAX_DIMENSION = 720;
+const JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION = 880;
 const JOURNAL_SIDEBAR_MEDIA_ASPECT_RATIO = 92 / 65;
 const SUPABASE_IMAGE_BUCKET = "mojazahrada-images";
 const SUPABASE_VIDEO_FILE_LIMIT_BYTES = 100 * 1024 * 1024;
@@ -9676,181 +9676,11 @@ function renderMainMenu() {
   const roots = grouped.map(({ root }) => root);
   const isMobileShell = typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell");
   const showMainMenuCategories = !isMobileShell || mainMenuCategoriesPreviewVisible;
-  const showMobileWeatherDebugPanel = false;
-  const activeWeatherThemeDebug = loadMobileWeatherThemeDebugOverride();
-  const activeWeatherThemeDebugId = activeWeatherThemeDebug?.id || "auto";
-  const activeWeatherThemeCloudOverride = loadMobileWeatherThemeCloudOverride();
-  const activeWeatherThemePhase = loadMobileWeatherThemePhaseOverride();
-  const activeWeatherThemeSeason = loadMobileWeatherThemeSeasonOverride();
-  const activeWeatherThemeWindOverride = loadMobileWeatherThemeWindOverride();
-  const activeWeatherThemePrecipOverride = loadMobileWeatherThemePrecipOverride();
-  const activeWeatherThemeTemperatureOverride = loadMobileWeatherThemeTemperatureOverride();
-  let weatherSceneOnlyActive = loadMobileWeatherSceneOnlyPreference();
-  const effectiveWeatherWindSpeed = activeWeatherThemeWindOverride === null
-    ? (homeWeatherSnapshot
-      ? weatherWindSpeedKmh(homeWeatherSnapshot)
-      : weatherWindSpeedFallbackForCategory(activeWeatherThemeDebug?.wind || "calm"))
-    : activeWeatherThemeWindOverride;
-  const effectiveWeatherPrecipitationAmount = activeWeatherThemePrecipOverride === null
-    ? (homeWeatherSnapshot ? weatherPrecipitationMm(homeWeatherSnapshot) : 0)
-    : activeWeatherThemePrecipOverride;
-  const effectiveWeatherTemperature = activeWeatherThemeTemperatureOverride === null
-    ? (homeWeatherSnapshot ? (weatherTemperatureC(homeWeatherSnapshot) ?? 16) : 16)
-    : activeWeatherThemeTemperatureOverride;
-  const weatherWindDebugLabel = activeWeatherThemeWindOverride === null
-    ? `Auto · ${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`
-    : `${Math.round(effectiveWeatherWindSpeed)} km/h · ${mobileWeatherWindLabel(effectiveWeatherWindSpeed)}`;
-  const weatherPrecipitationDebugLabel = activeWeatherThemePrecipOverride === null
-    ? `Auto · ${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`
-    : `${effectiveWeatherPrecipitationAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(effectiveWeatherPrecipitationAmount)}`;
-  const weatherTemperatureDebugLabel = activeWeatherThemeTemperatureOverride === null
-    ? `Auto · ${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`
-    : `${Math.round(effectiveWeatherTemperature)} °C · ${mobileWeatherTemperatureBandLabel(effectiveWeatherTemperature)}`;
-  const weatherBackgroundDebugState = typeof window !== "undefined" && window.weatherBackgroundEngine?.getDebugState
-    ? window.weatherBackgroundEngine.getDebugState()
-    : null;
-  const weatherBackgroundDebugText = formatWeatherBackgroundDebugText(weatherBackgroundDebugState);
-  const weatherAudioDebugMarkup = showMobileWeatherDebugPanel
-    ? renderWeatherAudioDebugMarkup(typeof window !== "undefined" && window.weatherAudioEngine?.getState
-      ? window.weatherAudioEngine.getState()
-      : null)
-    : "";
-  if (typeof document !== "undefined" && document.body.classList.contains("app-mobile-shell") && loadMobileWeatherSceneOnlyPreference()) {
-    saveMobileWeatherSceneOnlyPreference(false);
-  }
-  weatherSceneOnlyActive = loadMobileWeatherSceneOnlyPreference();
-  applyMobileWeatherSceneMode();
   mainMenuEl.innerHTML = `
     <section class="menu-group">
       <div class="home-section__header">
       <div></div>
       </div>
-      ${showMobileWeatherDebugPanel ? `
-        <details class="weather-theme-debug"${activeWeatherThemeDebugId !== "auto" || activeWeatherThemeCloudOverride !== "" || activeWeatherThemePhase !== "" || activeWeatherThemeSeason !== "" || activeWeatherThemeWindOverride !== null || activeWeatherThemePrecipOverride !== null || activeWeatherThemeTemperatureOverride !== null || weatherSceneOnlyActive ? " open" : ""}>
-          <summary class="weather-theme-debug__summary">Test počasia</summary>
-          <div class="weather-theme-debug__scene">
-            <button
-              class="weather-theme-debug__scene-button ${weatherSceneOnlyActive ? "is-active" : ""}"
-              type="button"
-              data-mobile-weather-scene-toggle="1"
-              aria-pressed="${weatherSceneOnlyActive ? "true" : "false"}"
-            >${weatherSceneOnlyActive ? "Čisté pozadie je zapnuté" : "Čisté pozadie"}</button>
-            <p class="weather-theme-debug__scene-note" data-mobile-weather-scene-note>${weatherSceneOnlyActive ? "Karty a ďalší obsah sú skryté, aby bolo vidno celé pozadie." : "Dočasne skryje karty a obsah, aby si vedela odfotiť celé pozadie."}</p>
-          </div>
-          <div class="weather-theme-debug__period">
-            ${MOBILE_WEATHER_PHASE_DEBUG_OPTIONS.map((item) => `
-              <button class="weather-theme-debug__mode ${item.id === activeWeatherThemePhase ? "is-active" : ""}" type="button" data-mobile-weather-phase="${escapeAttribute(item.id)}">${escapeHtml(item.label)}</button>
-            `).join("")}
-          </div>
-          <div class="weather-theme-debug__section-label">Sezóna</div>
-          <div class="weather-theme-debug__chips">
-            ${MOBILE_WEATHER_SEASON_DEBUG_OPTIONS.map((item) => `
-              <button
-                class="weather-theme-debug__chip ${item.id === activeWeatherThemeSeason ? "is-active" : ""}"
-                type="button"
-                data-mobile-weather-season="${escapeAttribute(item.id)}"
-              >${escapeHtml(item.label)}</button>
-            `).join("")}
-          </div>
-          <div class="weather-theme-debug__section-label">Oblačnosť</div>
-          <div class="weather-theme-debug__chips">
-            ${MOBILE_WEATHER_CLOUD_DEBUG_OPTIONS.map((item) => `
-              <button
-                class="weather-theme-debug__chip ${item.id === activeWeatherThemeCloudOverride ? "is-active" : ""}"
-                type="button"
-                data-mobile-weather-cloud="${escapeAttribute(item.id)}"
-              >${escapeHtml(item.label)}</button>
-            `).join("")}
-          </div>
-          <div class="weather-theme-debug__section-label">Javy</div>
-          <div class="weather-theme-debug__chips">
-            ${MOBILE_WEATHER_THEME_DEBUG_OPTIONS.map((item) => `
-              <button
-                class="weather-theme-debug__chip ${item.id === activeWeatherThemeDebugId ? "is-active" : ""}"
-                type="button"
-                data-mobile-weather-debug="${escapeAttribute(item.id)}"
-              >${escapeHtml(item.label)}</button>
-            `).join("")}
-          </div>
-          <div class="weather-theme-debug__wind weather-theme-debug__wind--precip">
-            <div class="weather-theme-debug__wind-head">
-              <span class="weather-theme-debug__wind-caption">Zrážky</span>
-              <span class="weather-theme-debug__wind-value" data-mobile-weather-precip-label>${escapeHtml(weatherPrecipitationDebugLabel)}</span>
-            </div>
-            <div class="weather-theme-debug__wind-controls">
-              <button class="weather-theme-debug__mode ${activeWeatherThemePrecipOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-precip-auto="1">Auto</button>
-              <input
-                class="weather-theme-debug__range weather-theme-debug__range--precip"
-                type="range"
-                min="0"
-                max="12"
-                step="0.2"
-                value="${escapeAttribute(effectiveWeatherPrecipitationAmount.toFixed(1))}"
-                data-mobile-weather-precip-range
-                aria-label="Intenzita zrážok v milimetroch"
-              >
-            </div>
-            <div class="weather-theme-debug__scale" aria-hidden="true">
-              <span>0</span>
-              <span>2</span>
-              <span>6</span>
-              <span>12 mm</span>
-            </div>
-          </div>
-          <div class="weather-theme-debug__wind">
-            <div class="weather-theme-debug__wind-head">
-              <span class="weather-theme-debug__wind-caption">Vietor</span>
-              <span class="weather-theme-debug__wind-value" data-mobile-weather-wind-label>${escapeHtml(weatherWindDebugLabel)}</span>
-            </div>
-            <div class="weather-theme-debug__wind-controls">
-              <button class="weather-theme-debug__mode ${activeWeatherThemeWindOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-wind-auto="1">Auto</button>
-              <input
-                class="weather-theme-debug__range"
-                type="range"
-                min="0"
-                max="70"
-                step="2"
-                value="${escapeAttribute(Math.round(effectiveWeatherWindSpeed))}"
-                data-mobile-weather-wind-range
-                aria-label="Sila vetra v kilometroch za hodinu"
-              >
-            </div>
-            <div class="weather-theme-debug__scale" aria-hidden="true">
-              <span>0</span>
-              <span>20</span>
-              <span>40</span>
-              <span>70 km/h</span>
-            </div>
-          </div>
-          <div class="weather-theme-debug__wind weather-theme-debug__wind--temp">
-            <div class="weather-theme-debug__wind-head">
-              <span class="weather-theme-debug__wind-caption">Teplota</span>
-              <span class="weather-theme-debug__wind-value" data-mobile-weather-temp-label>${escapeHtml(weatherTemperatureDebugLabel)}</span>
-            </div>
-            <div class="weather-theme-debug__wind-controls">
-              <button class="weather-theme-debug__mode ${activeWeatherThemeTemperatureOverride === null ? "is-active" : ""}" type="button" data-mobile-weather-temp-auto="1">Auto</button>
-              <input
-                class="weather-theme-debug__range"
-                type="range"
-                min="-15"
-                max="38"
-                step="1"
-                value="${escapeAttribute(String(Math.round(effectiveWeatherTemperature)))}"
-                data-mobile-weather-temp-range
-                aria-label="Teplota v stupňoch Celzia"
-              >
-            </div>
-            <div class="weather-theme-debug__scale" aria-hidden="true">
-              <span>-15</span>
-              <span>0</span>
-              <span>20</span>
-              <span>38 °C</span>
-            </div>
-          </div>
-          <p class="weather-theme-debug__inline-state" data-mobile-weather-inline-state style="margin:10px 0 0; padding:8px 10px; border-radius:14px; background:rgba(16,22,30,.08); color:#314233; font-size:12px; line-height:1.35; word-break:break-word;">Debug: ${escapeHtml(weatherBackgroundDebugText)}</p>
-        </details>
-        ${weatherAudioDebugMarkup}
-      ` : ""}
       ${showMainMenuCategories ? `
         <div class="catalog-grid catalog-grid--main-menu" data-main-menu-categories-section>
           ${roots.map(renderMainMenuCategoryCard).join("")}
@@ -9864,225 +9694,7 @@ function renderMainMenu() {
   if (journalSidebarEl) {
     bindJournalSwipeRows(journalSidebarEl);
   }
-
-  const hasMobileWeatherDebugControls = Boolean(
-    mainMenuEl.querySelector("[data-mobile-weather-debug], [data-mobile-weather-cloud], [data-mobile-weather-phase], [data-mobile-weather-season], [data-mobile-weather-wind-range], [data-mobile-weather-precip-range], [data-mobile-weather-temp-range], [data-mobile-weather-scene-toggle], [data-mobile-weather-audio-panel], [data-mobile-weather-audio-inline]")
-  );
-  if (!hasMobileWeatherDebugControls) {
-    return;
-  }
-
-  mainMenuEl.querySelectorAll("[data-mobile-weather-debug]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      const nextId = String(button.getAttribute("data-mobile-weather-debug") || "auto").trim() || "auto";
-      saveMobileWeatherThemeDebugOverride(nextId);
-      applyMobileWeatherTheme();
-      renderMainMenu();
-    });
-  });
-
-  mainMenuEl.querySelectorAll("[data-mobile-weather-cloud]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      const nextId = String(button.getAttribute("data-mobile-weather-cloud") || "").trim();
-      saveMobileWeatherThemeCloudOverride(nextId);
-      applyMobileWeatherTheme();
-      renderMainMenu();
-    });
-  });
-
-  mainMenuEl.querySelectorAll("[data-mobile-weather-phase]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      const nextValue = String(button.getAttribute("data-mobile-weather-phase") || "").trim();
-      saveMobileWeatherThemePhaseOverride(nextValue);
-      applyMobileWeatherTheme();
-      renderMainMenu();
-    });
-  });
-
-  mainMenuEl.querySelectorAll("[data-mobile-weather-season]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      const nextValue = String(button.getAttribute("data-mobile-weather-season") || "").trim();
-      saveMobileWeatherThemeSeasonOverride(nextValue);
-      applyMobileWeatherTheme();
-      renderMainMenu();
-    });
-  });
-
-  const weatherWindAutoButton = mainMenuEl.querySelector("[data-mobile-weather-wind-auto]");
-  const weatherWindRange = mainMenuEl.querySelector("[data-mobile-weather-wind-range]");
-  const weatherWindLabel = mainMenuEl.querySelector("[data-mobile-weather-wind-label]");
-  const weatherPrecipAutoButton = mainMenuEl.querySelector("[data-mobile-weather-precip-auto]");
-  const weatherPrecipRange = mainMenuEl.querySelector("[data-mobile-weather-precip-range]");
-  const weatherPrecipLabel = mainMenuEl.querySelector("[data-mobile-weather-precip-label]");
-  const weatherTempAutoButton = mainMenuEl.querySelector("[data-mobile-weather-temp-auto]");
-  const weatherTempRange = mainMenuEl.querySelector("[data-mobile-weather-temp-range]");
-  const weatherTempLabel = mainMenuEl.querySelector("[data-mobile-weather-temp-label]");
-  const weatherInlineState = mainMenuEl.querySelector("[data-mobile-weather-inline-state]");
-  const weatherSceneToggle = mainMenuEl.querySelector("[data-mobile-weather-scene-toggle]");
-  const weatherSceneNote = mainMenuEl.querySelector("[data-mobile-weather-scene-note]");
-  const resolveAutoWeatherWindSpeed = () => {
-    const liveDebugOverride = loadMobileWeatherThemeDebugOverride();
-    return homeWeatherSnapshot
-      ? weatherWindSpeedKmh(homeWeatherSnapshot)
-      : weatherWindSpeedFallbackForCategory(liveDebugOverride?.wind || "calm");
-  };
-  const resolveAutoWeatherPrecipitationAmount = () => homeWeatherSnapshot ? weatherPrecipitationMm(homeWeatherSnapshot) : 0;
-  const resolveAutoWeatherTemperature = () => homeWeatherSnapshot ? (weatherTemperatureC(homeWeatherSnapshot) ?? 16) : 16;
-  const syncWeatherWindUi = (speedValue, isAuto) => {
-    const normalizedSpeed = Math.max(0, Math.min(70, Math.round(Number(speedValue) || 0)));
-    if (weatherWindRange) weatherWindRange.value = String(normalizedSpeed);
-    if (weatherWindLabel) {
-      weatherWindLabel.textContent = isAuto
-        ? `Auto · ${normalizedSpeed} km/h · ${mobileWeatherWindLabel(normalizedSpeed)}`
-        : `${normalizedSpeed} km/h · ${mobileWeatherWindLabel(normalizedSpeed)}`;
-    }
-    if (weatherWindAutoButton) weatherWindAutoButton.classList.toggle("is-active", isAuto);
-  };
-  const syncWeatherPrecipUi = (amountValue, isAuto) => {
-    const normalizedAmount = Math.max(0, Math.min(12, Math.round((Number(amountValue) || 0) * 10) / 10));
-    if (weatherPrecipRange) weatherPrecipRange.value = normalizedAmount.toFixed(1);
-    if (weatherPrecipLabel) {
-      weatherPrecipLabel.textContent = isAuto
-        ? `Auto · ${normalizedAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(normalizedAmount)}`
-        : `${normalizedAmount.toFixed(1)} mm · ${mobileWeatherPrecipitationLabel(normalizedAmount)}`;
-    }
-    if (weatherPrecipAutoButton) weatherPrecipAutoButton.classList.toggle("is-active", isAuto);
-  };
-  const syncWeatherTempUi = (temperatureValue, isAuto) => {
-    const normalizedTemp = Math.max(-15, Math.min(38, Math.round(Number(temperatureValue) || 0)));
-    if (weatherTempRange) weatherTempRange.value = String(normalizedTemp);
-    if (weatherTempLabel) {
-      weatherTempLabel.textContent = isAuto
-        ? `Auto · ${normalizedTemp} °C · ${mobileWeatherTemperatureBandLabel(normalizedTemp)}`
-        : `${normalizedTemp} °C · ${mobileWeatherTemperatureBandLabel(normalizedTemp)}`;
-    }
-    if (weatherTempAutoButton) weatherTempAutoButton.classList.toggle("is-active", isAuto);
-  };
-  const syncWeatherSceneUi = (isActive) => {
-    if (weatherSceneToggle) {
-      weatherSceneToggle.classList.toggle("is-active", isActive);
-      weatherSceneToggle.setAttribute("aria-pressed", isActive ? "true" : "false");
-      weatherSceneToggle.textContent = isActive ? "Čisté pozadie je zapnuté" : "Čisté pozadie";
-    }
-    if (weatherSceneNote) {
-      weatherSceneNote.textContent = isActive
-        ? "Karty a ďalší obsah sú skryté, aby bolo vidno celé pozadie."
-        : "Dočasne skryje karty a obsah, aby si vedela odfotiť celé pozadie.";
-    }
-  };
-  const syncWeatherInlineDebugText = () => {
-    if (!weatherInlineState) return;
-    const nextDebugState = typeof window !== "undefined" && window.weatherBackgroundEngine?.getDebugState
-      ? window.weatherBackgroundEngine.getDebugState()
-      : null;
-    weatherInlineState.textContent = `Debug: ${formatWeatherBackgroundDebugText(nextDebugState)}`;
-  };
-  const syncWeatherAudioDebugPanel = () => {
-    updateMainMenuWeatherAudioDebugPanel();
-  };
-
-  if (weatherWindAutoButton) {
-    weatherWindAutoButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      saveMobileWeatherThemeWindOverride(null);
-      applyMobileWeatherTheme();
-      syncWeatherWindUi(resolveAutoWeatherWindSpeed(), true);
-      syncWeatherInlineDebugText();
-      syncWeatherAudioDebugPanel();
-    });
-  }
-
-  if (weatherWindRange) {
-    const applyWeatherWindFromRange = () => {
-      const nextSpeed = Math.max(0, Math.min(70, Math.round(Number(weatherWindRange.value) || 0)));
-      saveMobileWeatherThemeWindOverride(nextSpeed);
-      applyMobileWeatherTheme();
-      syncWeatherWindUi(nextSpeed, false);
-      syncWeatherInlineDebugText();
-      syncWeatherAudioDebugPanel();
-    };
-
-    weatherWindRange.addEventListener("input", applyWeatherWindFromRange);
-    weatherWindRange.addEventListener("change", applyWeatherWindFromRange);
-  }
-
-  if (weatherPrecipAutoButton) {
-    weatherPrecipAutoButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      saveMobileWeatherThemePrecipOverride(null);
-      applyMobileWeatherTheme();
-      syncWeatherPrecipUi(resolveAutoWeatherPrecipitationAmount(), true);
-      syncWeatherInlineDebugText();
-      syncWeatherAudioDebugPanel();
-    });
-  }
-
-  if (weatherPrecipRange) {
-    const applyWeatherPrecipFromRange = () => {
-      const nextAmount = Math.max(0, Math.min(12, Math.round((Number(weatherPrecipRange.value) || 0) * 10) / 10));
-      saveMobileWeatherThemePrecipOverride(nextAmount);
-      applyMobileWeatherTheme();
-      syncWeatherPrecipUi(nextAmount, false);
-      syncWeatherInlineDebugText();
-      syncWeatherAudioDebugPanel();
-    };
-
-    weatherPrecipRange.addEventListener("input", applyWeatherPrecipFromRange);
-    weatherPrecipRange.addEventListener("change", applyWeatherPrecipFromRange);
-  }
-
-  if (weatherTempAutoButton) {
-    weatherTempAutoButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      saveMobileWeatherThemeTemperatureOverride(null);
-      applyMobileWeatherTheme();
-      syncWeatherTempUi(resolveAutoWeatherTemperature(), true);
-      syncWeatherInlineDebugText();
-      syncWeatherAudioDebugPanel();
-    });
-  }
-
-  if (weatherTempRange) {
-    const applyWeatherTempFromRange = () => {
-      const nextTemp = Math.max(-15, Math.min(38, Math.round(Number(weatherTempRange.value) || 0)));
-      saveMobileWeatherThemeTemperatureOverride(nextTemp);
-      applyMobileWeatherTheme();
-      syncWeatherTempUi(nextTemp, false);
-      syncWeatherInlineDebugText();
-      syncWeatherAudioDebugPanel();
-    };
-
-    weatherTempRange.addEventListener("input", applyWeatherTempFromRange);
-    weatherTempRange.addEventListener("change", applyWeatherTempFromRange);
-  }
-
-  if (weatherSceneToggle) {
-    weatherSceneToggle.addEventListener("click", (event) => {
-      event.preventDefault();
-      const nextValue = !loadMobileWeatherSceneOnlyPreference();
-      saveMobileWeatherSceneOnlyPreference(nextValue);
-      applyMobileWeatherSceneMode();
-      syncWeatherSceneUi(nextValue);
-    });
-  }
-
-  syncWeatherWindUi(activeWeatherThemeWindOverride ?? resolveAutoWeatherWindSpeed(), activeWeatherThemeWindOverride === null);
-  syncWeatherPrecipUi(activeWeatherThemePrecipOverride ?? resolveAutoWeatherPrecipitationAmount(), activeWeatherThemePrecipOverride === null);
-  syncWeatherTempUi(activeWeatherThemeTemperatureOverride ?? resolveAutoWeatherTemperature(), activeWeatherThemeTemperatureOverride === null);
-  syncWeatherSceneUi(weatherSceneOnlyActive);
-  bindMainMenuWeatherAudioControlEvents();
-  if (showMobileWeatherDebugPanel) {
-    syncWeatherInlineDebugText();
-    syncWeatherAudioDebugPanel();
-    bindMainMenuWeatherAudioDebugEvents();
-    ensureMainMenuWeatherAudioDebugTicker();
-  } else {
-    stopMainMenuWeatherAudioDebugTicker();
-  }
+  stopMainMenuWeatherAudioDebugTicker();
 }
 
 function bindSettingsToolbarButton(button) {
@@ -16564,11 +16176,14 @@ function renderJournal() {
         journalSidebarCardEl.hidden = false;
       }
       const latestEntries = journalEntries.slice(0, 3);
+      const journalSidebarMoreButtonMarkup = latestEntries.length
+        ? `<button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Zobraziť všetky zápisy (${journalEntries.length})</button>`
+        : "";
       try {
         journalSidebarEl.innerHTML = latestEntries.length
           ? `
             ${latestEntries.map((entry) => renderJournalSidebarCard(entry)).join("")}
-            ${journalEntries.length > latestEntries.length ? `<button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Zobraziť všetky zápisy (${journalEntries.length})</button>` : ""}
+            ${journalSidebarMoreButtonMarkup}
           `
           : journalSidebarEmptyMarkup;
       } catch (error) {
@@ -16583,7 +16198,7 @@ function renderJournal() {
                 <p class="sidebar-preview-card__meta">${escapeHtml(formatDate(entry.date))}</p>
               </article>
             `).join("")}
-            <button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Otvoriť denník</button>
+            ${journalSidebarMoreButtonMarkup || `<button class="button button--ghost mini-list__more" type="button" id="open-all-journal">Otvoriť denník</button>`}
           `
           : journalSidebarEmptyMarkup;
       }
@@ -18832,15 +18447,30 @@ function openAvoidOverviewModal(items) {
 function openVarietyOverviewModal({ title, items, emptyMessage, detailBuilder }) {
   resetDetailModalClasses();
   detailModal.classList.add("detail-modal--overview");
+  const isMobileOverviewShell = document.body.classList.contains("app-mobile-shell");
   const availableCategoryIds = [...new Set(items.map((item) => item.categoryId))];
   const categories = orderedCategories().filter((item) => availableCategoryIds.includes(item.id));
+  const mobileTopbarMarkup = isMobileOverviewShell ? `
+    <div class="mobile-compact-modal-topbar">
+      <button class="back-button journal-overlay-shell__back" type="button" data-detail-editor-back aria-label="Krok späť">Späť</button>
+      <div class="mobile-compact-modal-topbar__main">
+        <div class="mobile-compact-modal-topbar__titleline">
+          <h3 id="overview-manager-title">${escapeHtml(title)}</h3>
+          <div class="mobile-compact-modal-topbar__actions"></div>
+        </div>
+      </div>
+    </div>
+  ` : "";
 
   detailContent.innerHTML = `
+    ${mobileTopbarMarkup}
     <div class="detail-layout detail-layout--compact">
       <div class="detail-copy detail-copy--wide overview-manager">
-        <div class="overview-manager__head">
-          <h3>${escapeHtml(title)}</h3>
-        </div>
+        ${isMobileOverviewShell ? "" : `
+          <div class="overview-manager__head">
+            <h3>${escapeHtml(title)}</h3>
+          </div>
+        `}
         ${categories.length > 1 ? `
           <label class="field-block field-block--full overview-manager__filter">
             <span>Filtrovať kategóriu</span>
@@ -20700,10 +20330,8 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   detailModal.classList.add("detail-modal--settings");
   const isMobileSettingsShell = document.body.classList.contains("app-mobile-shell");
   const weatherPreferences = loadWeatherPreferences();
-  clearLocalAuthSession();
-  clearLocalAuthProfile();
-  const authProfile = null;
-  const authSession = null;
+  const authProfile = loadLocalAuthProfile();
+  const authSession = loadLocalAuthSession();
   const supabaseBootstrapPreferences = loadSupabaseBootstrapPreferences();
   const supabasePreferences = loadSupabasePreferences();
   const supabaseAuthMirror = loadSupabaseAuthMirror();
@@ -20716,9 +20344,9 @@ function openSettingsManager(statusMessage = "", tone = "", statusScope = "") {
   };
   const currentWeatherPlace = String(weatherPreferences?.placeLabel || GARDEN_WEATHER_PLACE).trim() || GARDEN_WEATHER_PLACE;
   const resetBackup = loadResetBackup();
-  const hasLocalAccount = false;
-  const isSignedIn = false;
-  const accountName = "";
+  const hasLocalAccount = Boolean(authProfile?.enabled);
+  const isSignedIn = hasLocalAccount && isLocalAuthSessionValid(authProfile, authSession);
+  const accountName = localAuthDisplayName(authProfile);
   const supabaseManagedInCode = Boolean(
     supabaseBootstrapPreferences.enabled
     && supabaseBootstrapPreferences.url
@@ -24830,7 +24458,7 @@ function shouldDerivePreviewImageSource(source = "") {
   return isProcessableImageDataUrl(normalized) && normalized.length > 18000;
 }
 
-async function resolvePreviewImageSource(source = "", maxDimension = LIST_IMAGE_PREVIEW_MAX_DIMENSION, quality = 0.72) {
+async function resolvePreviewImageSource(source = "", maxDimension = LIST_IMAGE_PREVIEW_MAX_DIMENSION, quality = 0.9) {
   const normalized = String(source || "").trim();
   if (!shouldDerivePreviewImageSource(normalized)) return normalized;
 
@@ -25053,7 +24681,7 @@ function findContentAwarePreviewCrop(canvas, bounds, targetAspectRatio) {
   return bestRect;
 }
 
-async function resolveJournalSidebarPreviewImageSource(source = "", maxDimension = JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION, quality = 0.76) {
+async function resolveJournalSidebarPreviewImageSource(source = "", maxDimension = JOURNAL_LIST_IMAGE_PREVIEW_MAX_DIMENSION, quality = 0.9) {
   const normalized = String(source || "").trim();
   if (!normalized || isPlaceholderImage(normalized)) return normalized;
 
